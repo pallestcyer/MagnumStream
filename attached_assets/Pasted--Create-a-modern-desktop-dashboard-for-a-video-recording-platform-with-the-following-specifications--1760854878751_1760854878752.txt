@@ -1,0 +1,79 @@
+
+Create a modern desktop dashboard for a video recording platform with the following specifications:
+Layout Structure
+
+Full-screen desktop application interface with dark theme (dark blue/purple gradient background)
+Left sidebar (80px wide) with navigation icons
+Main content area split into recording section and preview panel
+
+Core Recording Workflow - 3 Phases
+Phase 1: Introduction
+
+Form fields for Name (required) and Email (optional)
+Large "Start Recording" button
+Visual indicator showing "Phase 1 of 3: Introduction"
+When recording starts, show live camera feed with recording timer
+After recording stops, immediately show preview of that clip
+
+Phase 2: Main Content
+
+Automatically proceeds after Phase 1 completion
+Same recording interface but labeled "Phase 2 of 3: Main Tour"
+Recording controls with pause/resume capability
+Live preview during recording
+
+Phase 3: Conclusion
+
+Final recording phase "Phase 3 of 3: Closing"
+Option to re-record any phase before final processing
+
+Timeline & Editing Features
+
+Below recording area, show horizontal timeline with all 3 recorded clips
+Each clip shows:
+
+Thumbnail preview
+Duration
+Trim handles at start/end for adjusting in/out points
+Drag to reorder capability
+
+
+Playback controls for reviewing full sequence
+"Auto-trim" button to remove dead space
+Manual trim adjustment with frame-accurate scrubbing
+
+Visual Design Requirements
+
+Modern glassmorphism effects with subtle transparency
+Purple/blue gradient accents (#667eea to #764ba2)
+Smooth animations and transitions
+Progress indicator showing current phase (1/3, 2/3, 3/3)
+Recording status with pulsing red dot when active
+Waveform visualization during recording
+
+Interface Elements
+
+Top header with project name and save status
+Recording controls: Start/Stop/Pause/Retake buttons
+Preview window with play/pause/scrub controls
+Export options in top-right (Quality settings, Format selection)
+Auto-save indicator
+Keyboard shortcuts display (Space to start/stop, R to retake, etc.)
+
+Technical Features
+
+Real-time preview during recording
+Automatic segment detection
+Quick trim suggestions based on silence detection
+Countdown timer before recording starts (3-2-1)
+Audio level meters
+Camera/microphone selection dropdown
+
+Status Indicators
+
+Phase completion checkmarks
+Recording time elapsed/remaining
+Storage space indicator
+Processing status for renders
+
+Make it feel professional, intuitive, and efficient for users who need to quickly record multi-segment video tours. The interface should minimize clicks and guide users naturally through the 3-phase recording process while giving them control to adjust and perfect their recordings.Retry
