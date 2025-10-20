@@ -18,7 +18,8 @@ import {
   MessageSquare, 
   AlertCircle,
   Video,
-  Plane
+  Plane,
+  DollarSign
 } from "lucide-react";
 
 const menuItems = [
@@ -26,6 +27,11 @@ const menuItems = [
     title: "Home",
     url: "/",
     icon: Home,
+  },
+  {
+    title: "Sales",
+    url: "/sales",
+    icon: DollarSign,
   },
   {
     title: "History",

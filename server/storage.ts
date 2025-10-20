@@ -3,8 +3,8 @@ import {
   type InsertUser, 
   type FlightRecording, 
   type InsertFlightRecording,
-  type Clip,
-  type InsertClip 
+  type Sale,
+  type InsertSale
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -18,21 +18,20 @@ export interface IStorage {
   updateFlightRecording(id: string, updates: Partial<FlightRecording>): Promise<FlightRecording | undefined>;
   getAllFlightRecordings(): Promise<FlightRecording[]>;
   
-  createClip(clip: InsertClip): Promise<Clip>;
-  getClipsByRecordingId(recordingId: string): Promise<Clip[]>;
-  updateClip(id: string, updates: Partial<Clip>): Promise<Clip | undefined>;
-  deleteClip(id: string): Promise<boolean>;
+  createSale(sale: InsertSale): Promise<Sale>;
+  getAllSales(): Promise<Sale[]>;
+  getSalesByRecording(recordingId: string): Promise<Sale[]>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
   private flightRecordings: Map<string, FlightRecording>;
-  private clips: Map<string, Clip>;
+  private sales: Map<string, Sale>;
 
   constructor() {
     this.users = new Map();
     this.flightRecordings = new Map();
-    this.clips = new Map();
+    this.sales = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -56,11 +55,14 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const flightRecording: FlightRecording = {
       pilotEmail: null,
+      staffMember: null,
       flightDate: null,
       flightTime: null,
       exportStatus: "pending",
       driveFileId: null,
       driveFileUrl: null,
+      smsPhoneNumber: null,
+      sold: false,
       ...recording,
       id,
       createdAt: new Date(),
@@ -83,41 +85,34 @@ export class MemStorage implements IStorage {
   }
 
   async getAllFlightRecordings(): Promise<FlightRecording[]> {
-    return Array.from(this.flightRecordings.values());
+    return Array.from(this.flightRecordings.values())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
-  async createClip(clip: InsertClip): Promise<Clip> {
+  async createSale(sale: InsertSale): Promise<Sale> {
     const id = randomUUID();
-    const newClip: Clip = {
-      camera1Url: null,
-      camera2Url: null,
-      trimStart: 0,
-      trimEnd: null,
-      ...clip,
+    const newSale: Sale = {
+      ...sale,
       id,
-      createdAt: new Date(),
+      saleDate: new Date(),
+      driveShared: false,
     };
-    this.clips.set(id, newClip);
-    return newClip;
-  }
-
-  async getClipsByRecordingId(recordingId: string): Promise<Clip[]> {
-    return Array.from(this.clips.values())
-      .filter(clip => clip.recordingId === recordingId)
-      .sort((a, b) => a.orderIndex - b.orderIndex);
-  }
-
-  async updateClip(id: string, updates: Partial<Clip>): Promise<Clip | undefined> {
-    const clip = this.clips.get(id);
-    if (!clip) return undefined;
+    this.sales.set(id, newSale);
     
-    const updated = { ...clip, ...updates };
-    this.clips.set(id, updated);
-    return updated;
+    // Mark recording as sold
+    await this.updateFlightRecording(sale.recordingId, { sold: true });
+    
+    return newSale;
   }
 
-  async deleteClip(id: string): Promise<boolean> {
-    return this.clips.delete(id);
+  async getAllSales(): Promise<Sale[]> {
+    return Array.from(this.sales.values())
+      .sort((a, b) => b.saleDate.getTime() - a.saleDate.getTime());
+  }
+
+  async getSalesByRecording(recordingId: string): Promise<Sale[]> {
+    return Array.from(this.sales.values())
+      .filter(sale => sale.recordingId === recordingId);
   }
 }
 

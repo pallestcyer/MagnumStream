@@ -23,12 +23,14 @@ export const flightRecordings = pgTable("flight_recordings", {
   projectName: text("project_name").notNull(),
   pilotName: text("pilot_name").notNull(),
   pilotEmail: text("pilot_email"),
+  staffMember: text("staff_member"),
   flightDate: text("flight_date"),
   flightTime: text("flight_time"),
   exportStatus: text("export_status").notNull().default("pending"),
   driveFileId: text("drive_file_id"),
   driveFileUrl: text("drive_file_url"),
   smsPhoneNumber: text("sms_phone_number"),
+  sold: boolean("sold").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -39,6 +41,26 @@ export const insertFlightRecordingSchema = createInsertSchema(flightRecordings).
 
 export type InsertFlightRecording = z.infer<typeof insertFlightRecordingSchema>;
 export type FlightRecording = typeof flightRecordings.$inferSelect;
+
+// Sales tracking
+export const sales = pgTable("sales", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  recordingId: varchar("recording_id").notNull(),
+  customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email").notNull(),
+  staffMember: text("staff_member").notNull(),
+  saleAmount: real("sale_amount"),
+  saleDate: timestamp("sale_date").notNull().defaultNow(),
+  driveShared: boolean("drive_shared").notNull().default(false),
+});
+
+export const insertSaleSchema = createInsertSchema(sales).omit({
+  id: true,
+  saleDate: true,
+});
+
+export type InsertSale = z.infer<typeof insertSaleSchema>;
+export type Sale = typeof sales.$inferSelect;
 
 // Scene recordings (3 scenes per project)
 export const sceneRecordings = pgTable("scene_recordings", {

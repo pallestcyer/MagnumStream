@@ -12,6 +12,7 @@ import EditorCruising from "@/pages/EditorCruising";
 import EditorChase from "@/pages/EditorChase";
 import EditorArrival from "@/pages/EditorArrival";
 import SlotEditor from "@/pages/SlotEditor";
+import SalesPage from "@/pages/SalesPage";
 import HistoryPage from "@/pages/HistoryPage";
 import ManualPage from "@/pages/ManualPage";
 import ChatPage from "@/pages/ChatPage";
@@ -27,6 +28,7 @@ function Router() {
       <Route path="/editor/chase" component={EditorChase} />
       <Route path="/editor/arrival" component={EditorArrival} />
       <Route path="/editor" component={EditorCruising} />
+      <Route path="/sales" component={SalesPage} />
       <Route path="/history" component={HistoryPage} />
       <Route path="/manual" component={ManualPage} />
       <Route path="/chat" component={ChatPage} />
