@@ -121,7 +121,7 @@ export default function InfoPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-purple-950/20 to-gray-950 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-black flex flex-col">
       <PhaseNavigation currentPhase="info" />
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-6xl space-y-8">

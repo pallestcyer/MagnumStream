@@ -90,14 +90,14 @@ export interface SlotConfig {
 
 export const SLOT_TEMPLATE: SlotConfig[] = [
   // Cruising Scene (3 slots)
-  { slotNumber: 1, sceneType: 'cruising', cameraAngle: 1, color: '#3B82F6' }, // Blue
-  { slotNumber: 2, sceneType: 'cruising', cameraAngle: 2, color: '#06B6D4' }, // Cyan
-  { slotNumber: 3, sceneType: 'cruising', cameraAngle: 1, color: '#3B82F6' }, // Blue
+  { slotNumber: 1, sceneType: 'cruising', cameraAngle: 1, color: '#FF6B35' }, // Vibrant Orange
+  { slotNumber: 2, sceneType: 'cruising', cameraAngle: 2, color: '#F7931E' }, // Bright Orange
+  { slotNumber: 3, sceneType: 'cruising', cameraAngle: 1, color: '#FF8C42' }, // Light Orange
   // Chase Scene (3 slots)
-  { slotNumber: 4, sceneType: 'chase', cameraAngle: 1, color: '#8B5CF6' }, // Purple
-  { slotNumber: 5, sceneType: 'chase', cameraAngle: 2, color: '#A855F7' }, // Light Purple
-  { slotNumber: 6, sceneType: 'chase', cameraAngle: 1, color: '#8B5CF6' }, // Purple
+  { slotNumber: 4, sceneType: 'chase', cameraAngle: 1, color: '#FFA500' }, // Classic Orange
+  { slotNumber: 5, sceneType: 'chase', cameraAngle: 2, color: '#FF9E3D' }, // Amber Orange
+  { slotNumber: 6, sceneType: 'chase', cameraAngle: 1, color: '#FFB84D' }, // Soft Orange
   // Arrival Scene (2 slots)
-  { slotNumber: 7, sceneType: 'arrival', cameraAngle: 1, color: '#10B981' }, // Green
-  { slotNumber: 8, sceneType: 'arrival', cameraAngle: 2, color: '#34D399' }, // Light Green
+  { slotNumber: 7, sceneType: 'arrival', cameraAngle: 1, color: '#FF7A3D' }, // Medium Orange
+  { slotNumber: 8, sceneType: 'arrival', cameraAngle: 2, color: '#FFAB5E' }, // Warm Orange
 ];
