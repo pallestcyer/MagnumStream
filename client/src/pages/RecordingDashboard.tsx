@@ -199,7 +199,7 @@ export default function RecordingDashboard() {
           {/* Header with Pilot Info */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Flight Recording</h1>
+              <h1 className="text-3xl font-bold text-foreground">Video Recording</h1>
               <p className="text-muted-foreground mt-1">
                 Customers: <span className="font-semibold text-foreground">{pilotInfo.name || "Not set"}</span>
                 {pilotInfo.email && <span className="ml-4 text-sm">({pilotInfo.email})</span>}

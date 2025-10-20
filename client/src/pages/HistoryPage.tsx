@@ -109,7 +109,7 @@ export default function HistoryPage() {
             <div className="space-y-2">
               <h1 className="text-3xl font-bold text-foreground">Export History</h1>
               <p className="text-muted-foreground">
-                View all your past flight recordings and exports
+                View all your past video recordings and exports
               </p>
             </div>
 
@@ -168,10 +168,10 @@ export default function HistoryPage() {
                     <div className="flex items-start justify-between">
                       <div>
                         <h3 className="text-lg font-semibold text-foreground">
-                          {record.projectName}
+                          {record.pilotName}
                         </h3>
                         <p className="text-sm text-muted-foreground mt-1">
-                          Customers: {record.pilotName}
+                          {record.projectName}
                         </p>
                       </div>
                       {getStatusBadge(record.status)}

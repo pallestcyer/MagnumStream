@@ -12,7 +12,7 @@ export default function ManualPage() {
           </div>
           <div>
             <h1 className="text-3xl font-bold text-foreground">Staff Manual</h1>
-            <p className="text-muted-foreground">Step-by-step guide to using the Flight Recording Platform</p>
+            <p className="text-muted-foreground">Step-by-step guide to using Magnum Dashboard</p>
           </div>
         </div>
 
@@ -25,9 +25,9 @@ export default function ManualPage() {
             <div className="flex items-start gap-4">
               <Badge className="mt-1">Step 1</Badge>
               <div>
-                <h3 className="font-semibold text-foreground">Info Page - Pilot Setup</h3>
+                <h3 className="font-semibold text-foreground">Info Page - Customer Setup</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Enter the pilot's name, email, and select which staff member is recording. 
+                  Enter the customer's name(s), email, and select which staff member is recording. 
                   The system will show a live preview of both cameras to confirm they're working properly.
                 </p>
               </div>
@@ -80,7 +80,7 @@ export default function ManualPage() {
                   <li>Enter flight date and time (automatically rounded to nearest hour/half-hour)</li>
                   <li>System exports to DaVinci Resolve format</li>
                   <li>Video is uploaded to Google Drive</li>
-                  <li>SMS link sent to pilot's phone</li>
+                  <li>SMS link sent to customer's phone</li>
                 </ul>
               </div>
             </div>

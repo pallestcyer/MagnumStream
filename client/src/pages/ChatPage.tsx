@@ -18,7 +18,7 @@ export default function ChatPage() {
     {
       id: "1",
       role: "assistant",
-      content: "Hello! I'm your AI assistant for the Flight Recording Platform. I can help answer questions about:\n\n• How to use the recording system\n• Troubleshooting camera issues\n• Understanding the editing workflow\n• Export and sharing process\n\nWhat would you like to know?",
+      content: "Hello! I'm your AI assistant for Magnum Dashboard. I can help answer questions about:\n\n• How to use the recording system\n• Troubleshooting camera issues\n• Understanding the editing workflow\n• Export and sharing process\n\nWhat would you like to know?",
       timestamp: new Date(),
     },
   ]);
@@ -65,14 +65,14 @@ export default function ChatPage() {
     }
 
     if (q.includes("export") || q.includes("share") || q.includes("send")) {
-      return "The export process:\n\n1. Complete all slot selections in the Arrival editor\n2. Click 'Export Video'\n3. Enter flight date and time (auto-rounded to nearest hour/half-hour)\n4. System will:\n   • Export to DaVinci Resolve format\n   • Upload to Google Drive\n   • Send SMS link to pilot\n\nYou can review past exports in the History page!";
+      return "The export process:\n\n1. Complete all slot selections in the Arrival editor\n2. Click 'Export Video'\n3. Enter flight date and time (auto-rounded to nearest hour/half-hour)\n4. System will:\n   • Export to DaVinci Resolve format\n   • Upload to Google Drive\n   • Send SMS link to customer\n\nYou can review past exports in the History page!";
     }
 
     if (q.includes("phase") || q.includes("navigation") || q.includes("tab")) {
       return "Phase Navigation tabs let you jump between workflow stages:\n\n• Info → Recording → Editing → Export\n\nClick any tab at the top to move between phases. Completed phases are highlighted, and you can return to any previous phase at any time.";
     }
 
-    return "I can help with:\n\n• Camera setup and troubleshooting\n• Recording requirements (30-second minimum)\n• Editing slots and selecting clips\n• Export and sharing process\n• Navigation and workflow\n\nCould you rephrase your question or ask something more specific about the Flight Recording Platform?";
+    return "I can help with:\n\n• Camera setup and troubleshooting\n• Recording requirements (30-second minimum)\n• Editing slots and selecting clips\n• Export and sharing process\n• Navigation and workflow\n\nCould you rephrase your question or ask something more specific about Magnum Dashboard?";
   };
 
   return (
@@ -84,7 +84,7 @@ export default function ChatPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">AI Chat Assistant</h1>
-            <p className="text-sm text-muted-foreground">Ask questions about the Flight Recording Platform</p>
+            <p className="text-sm text-muted-foreground">Ask questions about Magnum Dashboard</p>
           </div>
         </div>
       </div>

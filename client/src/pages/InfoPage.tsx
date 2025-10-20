@@ -128,7 +128,7 @@ export default function InfoPage() {
         {/* Header */}
         <div className="text-center space-y-3">
           <h1 className="text-4xl font-bold text-foreground bg-gradient-purple-blue bg-clip-text text-transparent">
-            Flight Recording Setup
+            Video Recording Setup
           </h1>
           <p className="text-muted-foreground text-lg">
             Enter your information and confirm your cameras are ready
