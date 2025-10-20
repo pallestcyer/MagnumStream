@@ -222,12 +222,12 @@ export default function InfoPage() {
                 <div className="flex items-center justify-between">
                   <Label className="text-base">Camera 1 (Straight On)</Label>
                   {camera1Ready ? (
-                    <CheckCircle2 className="w-5 h-5 text-green-500" data-testid="status-camera1-ready" />
+                    <CheckCircle2 className="w-5 h-5 text-orange-500" data-testid="status-camera1-ready" />
                   ) : (
                     <VideoOff className="w-5 h-5 text-muted-foreground" />
                   )}
                 </div>
-                <div className="relative aspect-video bg-black/40 rounded-lg overflow-hidden border-2 border-blue-500/50">
+                <div className="relative aspect-video bg-black/40 rounded-lg overflow-hidden border-2 border-orange-500/50">
                   <video
                     ref={video1Ref}
                     className="w-full h-full object-cover"
@@ -249,12 +249,12 @@ export default function InfoPage() {
                 <div className="flex items-center justify-between">
                   <Label className="text-base">Camera 2 (Side View)</Label>
                   {camera2Ready ? (
-                    <CheckCircle2 className="w-5 h-5 text-green-500" data-testid="status-camera2-ready" />
+                    <CheckCircle2 className="w-5 h-5 text-orange-500" data-testid="status-camera2-ready" />
                   ) : (
                     <VideoOff className="w-5 h-5 text-muted-foreground" />
                   )}
                 </div>
-                <div className="relative aspect-video bg-black/40 rounded-lg overflow-hidden border-2 border-cyan-500/50">
+                <div className="relative aspect-video bg-black/40 rounded-lg overflow-hidden border-2 border-orange-500/50">
                   <video
                     ref={video2Ref}
                     className="w-full h-full object-cover"

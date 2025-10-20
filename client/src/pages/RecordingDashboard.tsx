@@ -243,7 +243,7 @@ export default function RecordingDashboard() {
                   >
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-semibold text-foreground">{scene.title}</span>
-                      {rec.completed && <CheckCircle2 className="w-5 h-5 text-green-500" />}
+                      {rec.completed && <CheckCircle2 className="w-5 h-5 text-orange-500" />}
                     </div>
                     <p className="text-xs text-muted-foreground">{scene.description}</p>
                   </button>
@@ -259,9 +259,9 @@ export default function RecordingDashboard() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-foreground">Camera 1 (Main)</span>
-                  <Video className="w-4 h-4 text-blue-500" />
+                  <Video className="w-4 h-4 text-orange-500" />
                 </div>
-                <div className="relative aspect-video bg-black rounded-lg overflow-hidden border-2 border-blue-500/50">
+                <div className="relative aspect-video bg-black rounded-lg overflow-hidden border-2 border-orange-500/50">
                   <video
                     ref={video1Ref}
                     className="w-full h-full object-cover"
@@ -282,9 +282,9 @@ export default function RecordingDashboard() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-foreground">Camera 2 (Side)</span>
-                  <Video className="w-4 h-4 text-cyan-500" />
+                  <Video className="w-4 h-4 text-orange-400" />
                 </div>
-                <div className="relative aspect-video bg-black rounded-lg overflow-hidden border-2 border-cyan-500/50">
+                <div className="relative aspect-video bg-black rounded-lg overflow-hidden border-2 border-orange-400/50">
                   <video
                     ref={video2Ref}
                     className="w-full h-full object-cover"

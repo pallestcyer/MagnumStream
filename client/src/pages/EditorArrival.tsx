@@ -165,7 +165,7 @@ export default function EditorArrival() {
                   Background Template
                 </h2>
               </div>
-              <div className="relative aspect-video bg-gradient-to-br from-green-950 to-emerald-950 rounded-lg overflow-hidden border-2 border-green-500/50">
+              <div className="relative aspect-video bg-gradient-to-br from-gray-950 to-gray-900 rounded-lg overflow-hidden border-2 border-orange-500/50">
                 {activeSlot && (
                   <div className="absolute bottom-3 left-3 bg-black/80 px-3 py-1 rounded text-sm text-white">
                     Slot {activeSlot} • Arrival • Camera {arrivalSlots.find(s => s.slotNumber === activeSlot)?.cameraAngle}
