@@ -1,5 +1,6 @@
-import { Video, Settings, Upload, HelpCircle } from "lucide-react";
+import { Video, Settings, Upload, HelpCircle, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLocation } from "wouter";
 
 interface NavigationSidebarProps {
   activeItem?: string;
@@ -7,11 +8,14 @@ interface NavigationSidebarProps {
 }
 
 export default function NavigationSidebar({ activeItem = "recording", onItemClick }: NavigationSidebarProps) {
+  const [, setLocation] = useLocation();
+  
   const navItems = [
-    { id: "recording", icon: Video, label: "Recording" },
-    { id: "settings", icon: Settings, label: "Settings" },
-    { id: "export", icon: Upload, label: "Export" },
-    { id: "help", icon: HelpCircle, label: "Help" },
+    { id: "recording", icon: Video, label: "Recording", path: "/recording" },
+    { id: "history", icon: History, label: "History", path: "/history" },
+    { id: "export", icon: Upload, label: "Export", path: null },
+    { id: "settings", icon: Settings, label: "Settings", path: null },
+    { id: "help", icon: HelpCircle, label: "Help", path: null },
   ];
 
   return (
@@ -29,6 +33,9 @@ export default function NavigationSidebar({ activeItem = "recording", onItemClic
             onClick={() => {
               console.log(`${item.label} clicked`);
               onItemClick?.(item.id);
+              if (item.path) {
+                setLocation(item.path);
+              }
             }}
             data-testid={`button-nav-${item.id}`}
           >

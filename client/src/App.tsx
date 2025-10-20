@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import InfoPage from "@/pages/InfoPage";
 import RecordingDashboard from "@/pages/RecordingDashboard";
 import SlotEditor from "@/pages/SlotEditor";
+import HistoryPage from "@/pages/HistoryPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -14,6 +15,7 @@ function Router() {
       <Route path="/" component={InfoPage} />
       <Route path="/recording" component={RecordingDashboard} />
       <Route path="/editor" component={SlotEditor} />
+      <Route path="/history" component={HistoryPage} />
       <Route component={NotFound} />
     </Switch>
   );
