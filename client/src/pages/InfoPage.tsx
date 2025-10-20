@@ -94,10 +94,10 @@ export default function InfoPage() {
   };
 
   const handleContinue = () => {
-    if (!firstName1.trim() || !firstName2.trim()) {
+    if (!firstName1.trim()) {
       toast({
-        title: "Names Required",
-        description: "Please enter both customer names to continue.",
+        title: "Name Required",
+        description: "Please enter at least the first customer name to continue.",
         variant: "destructive",
       });
       return;
@@ -113,7 +113,9 @@ export default function InfoPage() {
     }
 
     // Store info and navigate to recording
-    const combinedName = `${firstName1.trim()} & ${firstName2.trim()}`;
+    const combinedName = firstName2.trim() 
+      ? `${firstName1.trim()} & ${firstName2.trim()}`
+      : firstName1.trim();
     setPilotInfo({ name: combinedName, email, staffMember });
     setLocation("/recording");
   };
@@ -154,7 +156,7 @@ export default function InfoPage() {
                 </div>
                 <div className="text-2xl font-bold text-muted-foreground pb-3">&</div>
                 <div className="space-y-2">
-                  <Label htmlFor="first-name-2">First Name *</Label>
+                  <Label htmlFor="first-name-2">First Name (Optional)</Label>
                   <Input
                     id="first-name-2"
                     type="text"
@@ -201,7 +203,7 @@ export default function InfoPage() {
                   size="lg"
                   className="w-full bg-gradient-purple-blue h-14 text-lg"
                   onClick={handleContinue}
-                  disabled={!firstName1.trim() || !firstName2.trim() || !camera1Ready}
+                  disabled={!firstName1.trim() || !camera1Ready}
                   data-testid="button-continue-to-recording"
                 >
                   Continue to Recording
