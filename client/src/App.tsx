@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import InfoPage from "@/pages/InfoPage";
 import RecordingDashboard from "@/pages/RecordingDashboard";
-import ClipEditor from "@/pages/ClipEditor";
+import SlotEditor from "@/pages/SlotEditor";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -13,7 +13,7 @@ function Router() {
     <Switch>
       <Route path="/" component={InfoPage} />
       <Route path="/recording" component={RecordingDashboard} />
-      <Route path="/editor" component={ClipEditor} />
+      <Route path="/editor" component={SlotEditor} />
       <Route component={NotFound} />
     </Switch>
   );
