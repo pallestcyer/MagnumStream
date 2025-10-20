@@ -17,6 +17,7 @@ A dual-camera flight recording platform with an **8-slot template system**. The 
 - ✅ **3 separate editor sub-pages** (one for each scene) for easier viewing
 - ✅ **Interactive slot card selection** - click to activate, plays 3-second preview while adjusting
 - ✅ Window picker (not trim) - select which 3-second chunk from recording
+- ✅ **Dual preview system** - left shows 3-second clip preview, right shows background template/slot context
 - ✅ **Phase navigation tabs** (Info → Recording → Editing → Export)
 - ✅ **PilotContext** for sharing pilot info and staff member across all pages
 - ✅ **Auto-rounding flight time** to next hour or half-hour by default
