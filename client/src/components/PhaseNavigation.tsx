@@ -54,7 +54,7 @@ export default function PhaseNavigation({ currentPhase, completedPhases = [] }: 
                   className={`
                     flex items-center gap-3 px-4 py-3 rounded-lg transition-all w-full
                     ${isCurrent ? "bg-gradient-purple-blue text-white" : ""}
-                    ${isComplete && !isCurrent ? "bg-green-500/20 text-green-500" : ""}
+                    ${isComplete && !isCurrent ? "bg-orange-500/20 text-orange-500" : ""}
                     ${!isCurrent && !isComplete ? "hover-elevate" : ""}
                     ${!isAccessible ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}
                   `}
