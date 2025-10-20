@@ -7,6 +7,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -16,9 +23,14 @@ import {
   ShoppingCart,
   Users,
   Clock,
-  BarChart3
+  BarChart3,
+  Search,
+  Calendar,
+  Lock,
+  Unlock
 } from "lucide-react";
 import type { FlightRecording } from "@shared/schema";
+import { BUNDLE_OPTIONS } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -27,13 +39,27 @@ export default function SalesPage() {
   const [selectedRecording, setSelectedRecording] = useState<FlightRecording | null>(null);
   const [confirmEmail, setConfirmEmail] = useState("");
   const [confirmName, setConfirmName] = useState("");
-  const [saleAmount, setSaleAmount] = useState("49.99");
   const [staffMember, setStaffMember] = useState("");
+  const [selectedBundle, setSelectedBundle] = useState("video_photos");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [analyticsPassword, setAnalyticsPassword] = useState("");
+  const [isAnalyticsUnlocked, setIsAnalyticsUnlocked] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
   const { toast } = useToast();
 
-  // Fetch recordings
+  const ANALYTICS_PASSWORD = "admin123";
+
+  // Fetch recordings with optional date filter
+  const queryKey = selectedDate ? ["/api/recordings", { date: selectedDate }] : ["/api/recordings"];
   const { data: recordings = [], isLoading: recordingsLoading } = useQuery<FlightRecording[]>({
-    queryKey: ["/api/recordings"],
+    queryKey: queryKey as any,
+    queryFn: async () => {
+      const url = selectedDate ? `/api/recordings?date=${selectedDate}` : "/api/recordings";
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch recordings");
+      return res.json();
+    },
   });
 
   // Fetch analytics
@@ -44,8 +70,10 @@ export default function SalesPage() {
     conversionRate: number;
     staffSales: Record<string, number>;
     totalRevenue: number;
+    dailyBreakdown: Array<{ date: string; sales: number; revenue: number }>;
   }>({
     queryKey: ["/api/sales/analytics"],
+    enabled: isAnalyticsUnlocked,
   });
 
   // Create sale mutation
@@ -63,8 +91,8 @@ export default function SalesPage() {
       setSelectedRecording(null);
       setConfirmEmail("");
       setConfirmName("");
-      setSaleAmount("49.99");
       setStaffMember("");
+      setSelectedBundle("video_photos");
     },
     onError: () => {
       toast({
@@ -83,7 +111,7 @@ export default function SalesPage() {
   };
 
   const handleConfirmSale = () => {
-    if (!selectedRecording || !confirmEmail || !confirmName || !staffMember) {
+    if (!selectedRecording || !confirmEmail || !confirmName || !staffMember || !selectedBundle) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields",
@@ -92,17 +120,49 @@ export default function SalesPage() {
       return;
     }
 
+    const bundle = BUNDLE_OPTIONS.find(b => b.value === selectedBundle);
+    
     createSaleMutation.mutate({
       recordingId: selectedRecording.id,
       customerName: confirmName,
       customerEmail: confirmEmail,
       staffMember: staffMember,
-      saleAmount: parseFloat(saleAmount) || 0,
+      bundle: selectedBundle,
+      saleAmount: bundle?.price || 0,
+      driveShared: false,
     });
   };
 
-  const exportedRecordings = recordings.filter(r => r.exportStatus === "completed");
-  const availableRecordings = exportedRecordings.filter(r => !r.sold);
+  const handleUnlockAnalytics = () => {
+    if (passwordInput === ANALYTICS_PASSWORD) {
+      setIsAnalyticsUnlocked(true);
+      setPasswordInput("");
+      toast({
+        title: "Access Granted",
+        description: "Analytics unlocked successfully",
+      });
+    } else {
+      toast({
+        title: "Access Denied",
+        description: "Incorrect password",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Filter recordings by search query
+  const filteredRecordings = recordings.filter(r => 
+    r.pilotName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    r.pilotEmail?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    r.projectName.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const exportedRecordings = filteredRecordings.filter(r => r.exportStatus === "completed");
+  const unsoldRecordings = exportedRecordings.filter(r => !r.sold);
+  const soldRecordings = exportedRecordings.filter(r => r.sold);
+
+  // Get today's date for the date picker default
+  const today = new Date().toISOString().split('T')[0];
 
   return (
     <div className="min-h-screen bg-background p-8">
@@ -118,7 +178,7 @@ export default function SalesPage() {
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="text-lg px-4 py-2">
               <DollarSign className="w-4 h-4 mr-2" />
-              {availableRecordings.length} Available
+              {unsoldRecordings.length} Available
             </Badge>
           </div>
         </div>
@@ -137,41 +197,92 @@ export default function SalesPage() {
 
           {/* Front Desk Tab */}
           <TabsContent value="front-desk" className="space-y-6 mt-6">
+            {/* Search and Date Filter */}
+            <div className="flex gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by customer name or email..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                <Input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="w-48"
+                  data-testid="input-date-filter"
+                />
+                {selectedDate && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedDate("")}
+                    data-testid="button-clear-date"
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Unsold Videos */}
             <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border">
-              <h2 className="text-xl font-semibold text-foreground mb-4">Available Videos for Purchase</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                  <Video className="w-5 h-5" />
+                  Available for Sale ({unsoldRecordings.length})
+                </h2>
+              </div>
               
               {recordingsLoading ? (
                 <p className="text-muted-foreground text-center py-12">Loading videos...</p>
-              ) : availableRecordings.length === 0 ? (
+              ) : unsoldRecordings.length === 0 ? (
                 <div className="text-center py-12">
                   <Video className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-foreground mb-2">No Videos Available</h3>
                   <p className="text-sm text-muted-foreground">
-                    All exported videos have been sold or no videos are ready yet.
+                    {selectedDate ? "No videos found for this date" : "All exported videos have been sold or no videos are ready yet"}
                   </p>
                 </div>
               ) : (
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {availableRecordings.map((recording) => (
+                  {unsoldRecordings.map((recording) => (
                     <Card
                       key={recording.id}
                       className="p-4 bg-card/50 border-card-border hover-elevate"
-                      data-testid={`video-card-${recording.id}`}
+                      data-testid={`video-card-unsold-${recording.id}`}
                     >
                       <div className="space-y-3">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <h3 className="font-semibold text-foreground">{recording.pilotName}</h3>
-                            <p className="text-xs text-muted-foreground mt-1">{recording.projectName}</p>
+                            <h3 className="font-semibold text-foreground text-lg">{recording.pilotName}</h3>
+                            <p className="text-sm text-muted-foreground mt-1">{recording.projectName}</p>
                           </div>
                           <Badge variant="outline" className="bg-orange-500/20 text-orange-500 border-orange-500/50">
                             New
                           </Badge>
                         </div>
 
-                        <div className="text-xs text-muted-foreground space-y-1">
-                          <p>📅 {recording.flightDate} at {recording.flightTime}</p>
-                          <p>👤 Staff: {recording.staffMember || "Unknown"}</p>
+                        <div className="text-sm text-muted-foreground space-y-1 bg-muted/20 p-3 rounded-md">
+                          <p className="flex items-center gap-2">
+                            <Calendar className="w-3 h-3" />
+                            {recording.flightDate} at {recording.flightTime}
+                          </p>
+                          <p className="flex items-center gap-2">
+                            <Users className="w-3 h-3" />
+                            Staff: {recording.staffMember || "Unknown"}
+                          </p>
+                          {recording.pilotEmail && (
+                            <p className="flex items-center gap-2 text-xs truncate">
+                              📧 {recording.pilotEmail}
+                            </p>
+                          )}
                         </div>
 
                         <div className="flex gap-2">
@@ -194,7 +305,7 @@ export default function SalesPage() {
                             data-testid={`button-mark-sold-${recording.id}`}
                           >
                             <CheckCircle2 className="w-3 h-3 mr-1" />
-                            Sold
+                            Sell
                           </Button>
                         </div>
                       </div>
@@ -203,136 +314,199 @@ export default function SalesPage() {
                 </div>
               )}
             </Card>
+
+            {/* Sold Videos */}
+            {soldRecordings.length > 0 && (
+              <Card className="p-6 bg-card/20 backdrop-blur-md border-card-border">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-muted-foreground flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5" />
+                    Sold Videos ({soldRecordings.length})
+                  </h2>
+                </div>
+                
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {soldRecordings.map((recording) => (
+                    <Card
+                      key={recording.id}
+                      className="p-4 bg-card/30 border-card-border opacity-75"
+                      data-testid={`video-card-sold-${recording.id}`}
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-foreground">{recording.pilotName}</h3>
+                            <p className="text-xs text-muted-foreground mt-1">{recording.projectName}</p>
+                          </div>
+                          <Badge variant="outline" className="bg-green-500/20 text-green-500 border-green-500/50">
+                            Sold
+                          </Badge>
+                        </div>
+
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          <p>📅 {recording.flightDate} at {recording.flightTime}</p>
+                          <p>👤 Staff: {recording.staffMember || "Unknown"}</p>
+                        </div>
+
+                        {recording.driveFileUrl && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => window.open(recording.driveFileUrl!, '_blank')}
+                            className="w-full"
+                            data-testid={`button-view-sold-${recording.id}`}
+                          >
+                            <ExternalLink className="w-3 h-3 mr-1" />
+                            View
+                          </Button>
+                        )}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </Card>
+            )}
           </TabsContent>
 
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="space-y-6 mt-6">
-            {/* Key Metrics */}
-            <div className="grid md:grid-cols-4 gap-6">
-              <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Total Filmed</p>
-                    <h3 className="text-3xl font-bold text-foreground mt-1">
-                      {analytics?.totalRecordings || 0}
-                    </h3>
-                  </div>
-                  <Video className="w-10 h-10 text-primary/50" />
+            {!isAnalyticsUnlocked ? (
+              <Card className="p-12 bg-card/30 backdrop-blur-md border-card-border text-center">
+                <Lock className="w-16 h-16 text-muted-foreground mx-auto mb-6" />
+                <h2 className="text-2xl font-bold text-foreground mb-4">Analytics Access Required</h2>
+                <p className="text-muted-foreground mb-6">
+                  Enter the password to view analytics dashboard
+                </p>
+                <div className="max-w-sm mx-auto space-y-4">
+                  <Input
+                    type="password"
+                    placeholder="Enter password"
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleUnlockAnalytics()}
+                    data-testid="input-analytics-password"
+                  />
+                  <Button
+                    onClick={handleUnlockAnalytics}
+                    className="w-full bg-gradient-purple-blue"
+                    data-testid="button-unlock-analytics"
+                  >
+                    <Unlock className="w-4 h-4 mr-2" />
+                    Unlock Analytics
+                  </Button>
                 </div>
               </Card>
+            ) : (
+              <>
+                {/* Key Metrics */}
+                <div className="grid md:grid-cols-4 gap-6">
+                  <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Filmed</p>
+                        <h3 className="text-3xl font-bold text-foreground mt-1">
+                          {analytics?.totalRecordings || 0}
+                        </h3>
+                      </div>
+                      <Video className="w-10 h-10 text-primary/50" />
+                    </div>
+                  </Card>
 
-              <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Total Sales</p>
-                    <h3 className="text-3xl font-bold text-orange-500 mt-1">
-                      {analytics?.totalSales || 0}
-                    </h3>
-                  </div>
-                  <ShoppingCart className="w-10 h-10 text-orange-500/50" />
+                  <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Sales</p>
+                        <h3 className="text-3xl font-bold text-orange-500 mt-1">
+                          {analytics?.totalSales || 0}
+                        </h3>
+                      </div>
+                      <ShoppingCart className="w-10 h-10 text-orange-500/50" />
+                    </div>
+                  </Card>
+
+                  <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Conversion Rate</p>
+                        <h3 className="text-3xl font-bold text-foreground mt-1">
+                          {analytics?.conversionRate?.toFixed(1) || 0}%
+                        </h3>
+                      </div>
+                      <TrendingUp className="w-10 h-10 text-primary/50" />
+                    </div>
+                  </Card>
+
+                  <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Revenue</p>
+                        <h3 className="text-3xl font-bold text-foreground mt-1">
+                          ${analytics?.totalRevenue?.toFixed(2) || 0}
+                        </h3>
+                      </div>
+                      <DollarSign className="w-10 h-10 text-primary/50" />
+                    </div>
+                  </Card>
                 </div>
-              </Card>
 
-              <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Conversion Rate</p>
-                    <h3 className="text-3xl font-bold text-foreground mt-1">
-                      {analytics?.conversionRate?.toFixed(1) || 0}%
-                    </h3>
-                  </div>
-                  <TrendingUp className="w-10 h-10 text-primary/50" />
-                </div>
-              </Card>
-
-              <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Total Revenue</p>
-                    <h3 className="text-3xl font-bold text-foreground mt-1">
-                      ${analytics?.totalRevenue?.toFixed(2) || 0}
-                    </h3>
-                  </div>
-                  <DollarSign className="w-10 h-10 text-primary/50" />
-                </div>
-              </Card>
-            </div>
-
-            {/* Staff Performance */}
-            <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border">
-              <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                Staff Performance
-              </h2>
-              <div className="space-y-3">
-                {analytics?.staffSales && Object.keys(analytics.staffSales).length > 0 ? (
-                  Object.entries(analytics.staffSales as Record<string, number>)
-                    .sort(([, a], [, b]) => b - a)
-                    .map(([staff, count]) => (
-                      <div key={staff} className="flex items-center justify-between p-3 bg-card/50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-purple-blue flex items-center justify-center text-white font-semibold">
-                            {staff.charAt(0)}
-                          </div>
+                {/* Daily Breakdown */}
+                <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border">
+                  <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <Calendar className="w-5 h-5" />
+                    Daily Sales Breakdown
+                  </h2>
+                  <div className="space-y-2">
+                    {analytics?.dailyBreakdown && analytics.dailyBreakdown.length > 0 ? (
+                      analytics.dailyBreakdown.map((day) => (
+                        <div key={day.date} className="flex items-center justify-between p-3 bg-card/50 rounded-lg">
                           <div>
-                            <p className="font-semibold text-foreground">{staff}</p>
-                            <p className="text-xs text-muted-foreground">{count} sales</p>
+                            <p className="font-semibold text-foreground">{day.date}</p>
+                            <p className="text-xs text-muted-foreground">{day.sales} sales</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-orange-500">${day.revenue.toFixed(2)}</p>
                           </div>
                         </div>
-                        <Badge variant="outline" className="bg-orange-500/20 text-orange-500 border-orange-500/50">
-                          {count} sold
-                        </Badge>
-                      </div>
-                    ))
-                ) : (
-                  <p className="text-center text-muted-foreground py-8">No sales data yet</p>
-                )}
-              </div>
-            </Card>
-
-            {/* Production Metrics */}
-            <div className="grid md:grid-cols-2 gap-6">
-              <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border">
-                <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
-                  <Clock className="w-5 h-5" />
-                  Production Stats
-                </h2>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Videos Exported</span>
-                    <span className="font-semibold text-foreground">{analytics?.exportedRecordings || 0}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Available for Sale</span>
-                    <span className="font-semibold text-foreground">{availableRecordings.length}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Already Sold</span>
-                    <span className="font-semibold text-orange-500">{analytics?.totalSales || 0}</span>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border">
-                <h2 className="text-xl font-semibold text-foreground mb-4">Quick Insights</h2>
-                <div className="space-y-3 text-sm">
-                  <p className="text-muted-foreground">
-                    {analytics?.totalSales && analytics.totalSales > 0 ? (
-                      <>✅ Great job! You've sold {analytics.totalSales} videos so far.</>
+                      ))
                     ) : (
-                      <>📊 No sales yet. Start selling to see insights here!</>
+                      <p className="text-center text-muted-foreground py-8">No sales data yet</p>
                     )}
-                  </p>
-                  <p className="text-muted-foreground">
-                    {analytics?.conversionRate && analytics.conversionRate > 50 ? (
-                      <>🎯 Excellent conversion rate of {analytics.conversionRate.toFixed(1)}%!</>
+                  </div>
+                </Card>
+
+                {/* Staff Performance */}
+                <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border">
+                  <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    Staff Performance
+                  </h2>
+                  <div className="space-y-3">
+                    {analytics?.staffSales && Object.keys(analytics.staffSales).length > 0 ? (
+                      Object.entries(analytics.staffSales as Record<string, number>)
+                        .sort(([, a], [, b]) => b - a)
+                        .map(([staff, count]) => (
+                          <div key={staff} className="flex items-center justify-between p-3 bg-card/50 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-gradient-purple-blue flex items-center justify-center text-white font-semibold">
+                                {staff.charAt(0)}
+                              </div>
+                              <div>
+                                <p className="font-semibold text-foreground">{staff}</p>
+                                <p className="text-xs text-muted-foreground">{count} sales</p>
+                              </div>
+                            </div>
+                            <Badge variant="outline" className="bg-orange-500/20 text-orange-500 border-orange-500/50">
+                              {count} sold
+                            </Badge>
+                          </div>
+                        ))
                     ) : (
-                      <>💡 Conversion rate: {analytics?.conversionRate?.toFixed(1) || 0}%</>
+                      <p className="text-center text-muted-foreground py-8">No sales data yet</p>
                     )}
-                  </p>
-                </div>
-              </Card>
-            </div>
+                  </div>
+                </Card>
+              </>
+            )}
           </TabsContent>
         </Tabs>
 
@@ -375,16 +549,22 @@ export default function SalesPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="sale-amount">Sale Amount ($)</Label>
-                <Input
-                  id="sale-amount"
-                  type="number"
-                  step="0.01"
-                  value={saleAmount}
-                  onChange={(e) => setSaleAmount(e.target.value)}
-                  placeholder="49.99"
-                  data-testid="input-sale-amount"
-                />
+                <Label htmlFor="bundle-select">Bundle Selection</Label>
+                <Select value={selectedBundle} onValueChange={setSelectedBundle}>
+                  <SelectTrigger id="bundle-select" data-testid="select-bundle">
+                    <SelectValue placeholder="Select a bundle" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BUNDLE_OPTIONS.map((bundle) => (
+                      <SelectItem key={bundle.value} value={bundle.value} data-testid={`bundle-${bundle.value}`}>
+                        {bundle.label} - ${bundle.price}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Price: ${BUNDLE_OPTIONS.find(b => b.value === selectedBundle)?.price || 0}
+                </p>
               </div>
               <p className="text-xs text-muted-foreground">
                 This will mark the video as sold and add the customer email to the Google Drive folder for access.
