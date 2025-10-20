@@ -171,7 +171,7 @@ export default function HistoryPage() {
                           {record.projectName}
                         </h3>
                         <p className="text-sm text-muted-foreground mt-1">
-                          Pilot: {record.pilotName}
+                          Customers: {record.pilotName}
                         </p>
                       </div>
                       {getStatusBadge(record.status)}

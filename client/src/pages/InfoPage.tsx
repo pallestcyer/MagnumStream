@@ -20,7 +20,11 @@ export default function InfoPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { pilotInfo, setPilotInfo } = usePilot();
-  const [name, setName] = useState(pilotInfo.name || "");
+  
+  // Split existing name by " & " if it exists
+  const existingNames = pilotInfo.name ? pilotInfo.name.split(" & ") : ["", ""];
+  const [firstName1, setFirstName1] = useState(existingNames[0] || "");
+  const [firstName2, setFirstName2] = useState(existingNames[1] || "");
   const [email, setEmail] = useState(pilotInfo.email || "");
   const [staffMember, setStaffMember] = useState(pilotInfo.staffMember || "");
   const [camera1Stream, setCamera1Stream] = useState<MediaStream | null>(null);
@@ -90,10 +94,10 @@ export default function InfoPage() {
   };
 
   const handleContinue = () => {
-    if (!name.trim()) {
+    if (!firstName1.trim() || !firstName2.trim()) {
       toast({
-        title: "Name Required",
-        description: "Please enter your name to continue.",
+        title: "Names Required",
+        description: "Please enter both customer names to continue.",
         variant: "destructive",
       });
       return;
@@ -109,7 +113,8 @@ export default function InfoPage() {
     }
 
     // Store info and navigate to recording
-    setPilotInfo({ name, email, staffMember });
+    const combinedName = `${firstName1.trim()} & ${firstName2.trim()}`;
+    setPilotInfo({ name: combinedName, email, staffMember });
     setLocation("/recording");
   };
 
@@ -132,19 +137,34 @@ export default function InfoPage() {
         <div className="grid md:grid-cols-2 gap-8">
           {/* Info Form */}
           <Card className="p-8 bg-card/30 backdrop-blur-md border-card-border">
-            <h2 className="text-2xl font-semibold text-foreground mb-6">Pilot Information</h2>
+            <h2 className="text-2xl font-semibold text-foreground mb-6">Customer Information</h2>
             <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="pilot-name">Name *</Label>
-                <Input
-                  id="pilot-name"
-                  type="text"
-                  placeholder="Enter your name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="h-12"
-                  data-testid="input-pilot-name"
-                />
+              <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-end">
+                <div className="space-y-2">
+                  <Label htmlFor="first-name-1">First Name *</Label>
+                  <Input
+                    id="first-name-1"
+                    type="text"
+                    placeholder="Emily"
+                    value={firstName1}
+                    onChange={(e) => setFirstName1(e.target.value)}
+                    className="h-12"
+                    data-testid="input-first-name-1"
+                  />
+                </div>
+                <div className="text-2xl font-bold text-muted-foreground pb-3">&</div>
+                <div className="space-y-2">
+                  <Label htmlFor="first-name-2">First Name *</Label>
+                  <Input
+                    id="first-name-2"
+                    type="text"
+                    placeholder="John"
+                    value={firstName2}
+                    onChange={(e) => setFirstName2(e.target.value)}
+                    className="h-12"
+                    data-testid="input-first-name-2"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -181,7 +201,7 @@ export default function InfoPage() {
                   size="lg"
                   className="w-full bg-gradient-purple-blue h-14 text-lg"
                   onClick={handleContinue}
-                  disabled={!name.trim() || !camera1Ready}
+                  disabled={!firstName1.trim() || !firstName2.trim() || !camera1Ready}
                   data-testid="button-continue-to-recording"
                 >
                   Continue to Recording

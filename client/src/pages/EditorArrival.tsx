@@ -94,7 +94,7 @@ export default function EditorArrival() {
             <div>
               <h1 className="text-3xl font-bold text-foreground">Arrival Scene Editor</h1>
               <p className="text-muted-foreground mt-1">
-                Pilot: <span className="font-semibold text-foreground">{pilotInfo.name || "Not set"}</span>
+                Customers: <span className="font-semibold text-foreground">{pilotInfo.name || "Not set"}</span>
                 {pilotInfo.email && <span className="ml-4 text-sm">({pilotInfo.email})</span>}
               </p>
             </div>
