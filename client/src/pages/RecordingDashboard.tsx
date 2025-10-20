@@ -9,6 +9,7 @@ import IntroductionForm from "@/components/IntroductionForm";
 import Timeline from "@/components/Timeline";
 import CountdownOverlay from "@/components/CountdownOverlay";
 import StorageIndicator from "@/components/StorageIndicator";
+import { Button } from "@/components/ui/button";
 
 type RecordingState = "idle" | "countdown" | "recording" | "paused" | "stopped";
 type Phase = 1 | 2 | 3;
@@ -101,6 +102,13 @@ export default function RecordingDashboard() {
     setClips(clips.filter(c => c.id !== clipId));
   };
 
+  const handlePhaseSkip = (phase: Phase) => {
+    console.log(`Skipping to phase ${phase}`);
+    setCurrentPhase(phase);
+    setRecordingState("idle");
+    setElapsedTime(0);
+  };
+
   const currentPhaseHasRecording = clips.some(c => c.phaseId === currentPhase);
 
   return (
@@ -113,7 +121,39 @@ export default function RecordingDashboard() {
         <main className="flex-1 overflow-auto">
           <div className="h-full flex flex-col p-8 gap-6">
             <div className="flex items-center justify-between">
-              <PhaseIndicator currentPhase={currentPhase} phases={phases} />
+              <div className="flex items-center gap-6">
+                <PhaseIndicator currentPhase={currentPhase} phases={phases} />
+                <div className="flex items-center gap-2 px-4 py-2 bg-card/30 backdrop-blur-md rounded-lg border border-card-border">
+                  <span className="text-xs text-muted-foreground uppercase tracking-wide">Quick Nav:</span>
+                  <Button
+                    size="sm"
+                    variant={currentPhase === 1 ? "default" : "ghost"}
+                    onClick={() => handlePhaseSkip(1)}
+                    data-testid="button-skip-phase-1"
+                    className="h-7"
+                  >
+                    Phase 1
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={currentPhase === 2 ? "default" : "ghost"}
+                    onClick={() => handlePhaseSkip(2)}
+                    data-testid="button-skip-phase-2"
+                    className="h-7"
+                  >
+                    Phase 2
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={currentPhase === 3 ? "default" : "ghost"}
+                    onClick={() => handlePhaseSkip(3)}
+                    data-testid="button-skip-phase-3"
+                    className="h-7"
+                  >
+                    Phase 3
+                  </Button>
+                </div>
+              </div>
               <div className="flex items-center gap-4">
                 <RecordingStatus
                   isRecording={recordingState === "recording"}
