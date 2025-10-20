@@ -7,6 +7,7 @@ import NavigationSidebar from "@/components/NavigationSidebar";
 import Header from "@/components/Header";
 import FlightMetadataDialog from "@/components/FlightMetadataDialog";
 import ExportWorkflow from "@/components/ExportWorkflow";
+import VideoTrimmer from "@/components/VideoTrimmer";
 
 interface Clip {
   id: string;
@@ -185,47 +186,20 @@ export default function ClipEditor() {
                     onClick={() => setSelectedClipId(clip.id)}
                     data-testid={`clip-editor-${clip.id}`}
                   >
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <h3 className="font-medium text-foreground">{clip.title}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Duration: {formatTime(clip.duration)}
-                        </p>
-                      </div>
-                      <div className="text-sm font-mono text-muted-foreground">
-                        {formatTime(clip.trimStart || 0)} - {formatTime(clip.trimEnd || clip.duration)}
-                      </div>
+                    <div className="mb-4">
+                      <h3 className="font-medium text-foreground mb-1">{clip.title}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Full Duration: {formatTime(clip.duration)}
+                      </p>
                     </div>
 
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground w-16">Trim Start</span>
-                        <Slider
-                          value={[clip.trimStart || 0]}
-                          onValueChange={(value) => handleTrimStart(clip.id, value[0])}
-                          max={clip.duration}
-                          step={0.1}
-                          className="flex-1"
-                        />
-                        <span className="text-xs font-mono w-16 text-right">
-                          {formatTime(clip.trimStart || 0)}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground w-16">Trim End</span>
-                        <Slider
-                          value={[clip.trimEnd || clip.duration]}
-                          onValueChange={(value) => handleTrimEnd(clip.id, value[0])}
-                          max={clip.duration}
-                          step={0.1}
-                          className="flex-1"
-                        />
-                        <span className="text-xs font-mono w-16 text-right">
-                          {formatTime(clip.trimEnd || clip.duration)}
-                        </span>
-                      </div>
-                    </div>
+                    <VideoTrimmer
+                      duration={clip.duration}
+                      trimStart={clip.trimStart || 0}
+                      trimEnd={clip.trimEnd || clip.duration}
+                      onTrimStartChange={(value) => handleTrimStart(clip.id, value)}
+                      onTrimEndChange={(value) => handleTrimEnd(clip.id, value)}
+                    />
                   </div>
                 ))}
               </div>
