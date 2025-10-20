@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -18,9 +18,42 @@ interface FlightMetadataDialogProps {
   onSubmit: (flightDate: string, flightTime: string) => void;
 }
 
+// Round up to next hour or half-hour
+const getRoundedTime = () => {
+  const now = new Date();
+  const minutes = now.getMinutes();
+  
+  if (minutes === 0) {
+    // Already on the hour
+    return now;
+  } else if (minutes <= 30) {
+    // Round up to next half hour
+    now.setMinutes(30);
+  } else {
+    // Round up to next hour
+    now.setHours(now.getHours() + 1);
+    now.setMinutes(0);
+  }
+  
+  now.setSeconds(0);
+  now.setMilliseconds(0);
+  return now;
+};
+
 export default function FlightMetadataDialog({ open, onOpenChange, onSubmit }: FlightMetadataDialogProps) {
   const [flightDate, setFlightDate] = useState("");
   const [flightTime, setFlightTime] = useState("");
+  
+  // Auto-populate with current date and rounded time
+  useEffect(() => {
+    if (open && !flightDate && !flightTime) {
+      const rounded = getRoundedTime();
+      const dateStr = rounded.toISOString().split('T')[0];
+      const timeStr = `${rounded.getHours().toString().padStart(2, '0')}:${rounded.getMinutes().toString().padStart(2, '0')}`;
+      setFlightDate(dateStr);
+      setFlightTime(timeStr);
+    }
+  }, [open]);
 
   const handleSubmit = () => {
     if (!flightDate || !flightTime) {
@@ -58,7 +91,10 @@ export default function FlightMetadataDialog({ open, onOpenChange, onSubmit }: F
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="flight-time">Flight Time</Label>
+            <Label htmlFor="flight-time">
+              Flight Time
+              <span className="text-xs text-muted-foreground ml-2">(auto-rounded to next hour/half-hour)</span>
+            </Label>
             <Input
               id="flight-time"
               type="time"

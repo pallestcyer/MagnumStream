@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import PhaseNavigation from "@/components/PhaseNavigation";
 import { usePilot } from "@/contexts/PilotContext";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Video, 
   Circle, 
@@ -13,7 +14,8 @@ import {
   Play, 
   RotateCcw, 
   CheckCircle2, 
-  ArrowRight 
+  ArrowRight,
+  Target
 } from "lucide-react";
 
 type RecordingState = "idle" | "countdown" | "recording" | "paused" | "completed";
@@ -35,6 +37,7 @@ const SCENES: { type: SceneType; title: string; description: string }[] = [
 export default function RecordingDashboard() {
   const [, setLocation] = useLocation();
   const { pilotInfo } = usePilot();
+  const { toast } = useToast();
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -129,6 +132,16 @@ export default function RecordingDashboard() {
   };
 
   const handleStopRecording = () => {
+    // Check minimum duration
+    if (elapsedTime < 30) {
+      toast({
+        title: "Recording Too Short",
+        description: "Please record at least 30 seconds for each scene.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setRecordingState("completed");
     
     // Mark scene as completed
@@ -164,7 +177,7 @@ export default function RecordingDashboard() {
       setElapsedTime(0);
     } else {
       // All scenes done, go to editor
-      setLocation("/editor");
+      setLocation("/editor/cruising");
     }
   };
 
@@ -193,7 +206,7 @@ export default function RecordingDashboard() {
               </p>
             </div>
             <Button
-              onClick={() => setLocation("/editor")}
+              onClick={() => setLocation("/editor/cruising")}
               variant="outline"
               data-testid="button-skip-to-editor"
             >
@@ -306,8 +319,16 @@ export default function RecordingDashboard() {
                 <div className="text-3xl font-mono font-bold text-foreground">
                   {recordingState === "countdown" ? countdown : formatTime(elapsedTime)}
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {recordingState === "countdown" ? "Starting..." : recordingState === "recording" ? "Recording..." : "Ready"}
+                <div className="flex items-center gap-2 justify-end mt-1">
+                  {(recordingState === "recording" || recordingState === "paused") && (
+                    <div className={`flex items-center gap-1 text-sm ${elapsedTime >= 30 ? "text-green-500" : "text-yellow-500"}`}>
+                      <Target className="w-4 h-4" />
+                      <span>Min: 30s</span>
+                    </div>
+                  )}
+                  <div className="text-sm text-muted-foreground">
+                    {recordingState === "countdown" ? "Starting..." : recordingState === "recording" ? "Recording..." : recordingState === "paused" ? "Paused" : "Ready"}
+                  </div>
                 </div>
               </div>
             </div>
@@ -420,7 +441,7 @@ export default function RecordingDashboard() {
                 </div>
                 <Button
                   size="lg"
-                  onClick={() => setLocation("/editor")}
+                  onClick={() => setLocation("/editor/cruising")}
                   className="bg-gradient-purple-blue"
                   data-testid="button-proceed-to-editor"
                 >

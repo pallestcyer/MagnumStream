@@ -11,7 +11,7 @@ interface Phase {
 const PHASES: Phase[] = [
   { id: "info", label: "Info", path: "/", order: 1 },
   { id: "recording", label: "Recording", path: "/recording", order: 2 },
-  { id: "editing", label: "Editing", path: "/editor", order: 3 },
+  { id: "editing", label: "Editing", path: "/editor/cruising", order: 3 },
   { id: "export", label: "Export & Share", path: "/history", order: 4 },
 ];
 
