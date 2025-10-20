@@ -34,9 +34,9 @@ export default function RecordingDashboard() {
   const [activeNav, setActiveNav] = useState("recording");
 
   const phases = [
-    { id: 1, title: "Introduction", completed: clips.some(c => c.phaseId === 1) },
-    { id: 2, title: "Main Tour", completed: clips.some(c => c.phaseId === 2) },
-    { id: 3, title: "Closing", completed: clips.some(c => c.phaseId === 3) },
+    { id: 1, title: "Cruising Scene", completed: clips.some(c => c.phaseId === 1) },
+    { id: 2, title: "Chase Scene", completed: clips.some(c => c.phaseId === 2) },
+    { id: 3, title: "Arrival Scene", completed: clips.some(c => c.phaseId === 3) },
   ];
 
   useEffect(() => {
