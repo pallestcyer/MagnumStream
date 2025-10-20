@@ -1,44 +1,105 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import NavigationSidebar from "@/components/NavigationSidebar";
-import Header from "@/components/Header";
-import PhaseIndicator from "@/components/PhaseIndicator";
-import RecordingStatus from "@/components/RecordingStatus";
-import CameraPreview from "@/components/CameraPreview";
-import RecordingControls from "@/components/RecordingControls";
-import IntroductionForm from "@/components/IntroductionForm";
-import Timeline from "@/components/Timeline";
-import CountdownOverlay from "@/components/CountdownOverlay";
-import StorageIndicator from "@/components/StorageIndicator";
 import { Button } from "@/components/ui/button";
-import { Edit } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import PhaseNavigation from "@/components/PhaseNavigation";
+import { usePilot } from "@/contexts/PilotContext";
+import { 
+  Video, 
+  Circle, 
+  Square, 
+  Pause, 
+  Play, 
+  RotateCcw, 
+  CheckCircle2, 
+  ArrowRight 
+} from "lucide-react";
 
-type RecordingState = "idle" | "countdown" | "recording" | "paused" | "stopped";
-type Phase = 1 | 2 | 3;
+type RecordingState = "idle" | "countdown" | "recording" | "paused" | "completed";
+type SceneType = "cruising" | "chase" | "arrival";
 
-interface Clip {
-  id: string;
-  title: string;
-  duration: number;
-  phaseId: number;
+interface SceneRecording {
+  sceneType: SceneType;
+  camera1Duration: number;
+  camera2Duration: number;
+  completed: boolean;
 }
+
+const SCENES: { type: SceneType; title: string; description: string }[] = [
+  { type: "cruising", title: "Cruising Scene", description: "Record smooth cruising flight footage" },
+  { type: "chase", title: "Chase Scene", description: "Capture dynamic chase camera angles" },
+  { type: "arrival", title: "Arrival Scene", description: "Record the arrival and landing" },
+];
 
 export default function RecordingDashboard() {
   const [, setLocation] = useLocation();
-  const [currentPhase, setCurrentPhase] = useState<Phase>(1);
+  const { pilotInfo } = usePilot();
+  const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [clips, setClips] = useState<Clip[]>([]);
-  const [activeNav, setActiveNav] = useState("recording");
+  const [countdown, setCountdown] = useState(3);
+  const [sceneRecordings, setSceneRecordings] = useState<SceneRecording[]>(
+    SCENES.map(scene => ({
+      sceneType: scene.type,
+      camera1Duration: 0,
+      camera2Duration: 0,
+      completed: false,
+    }))
+  );
 
-  const phases = [
-    { id: 1, title: "Cruising Scene", completed: clips.some(c => c.phaseId === 1) },
-    { id: 2, title: "Chase Scene", completed: clips.some(c => c.phaseId === 2) },
-    { id: 3, title: "Arrival Scene", completed: clips.some(c => c.phaseId === 3) },
-  ];
+  const video1Ref = useRef<HTMLVideoElement>(null);
+  const video2Ref = useRef<HTMLVideoElement>(null);
+  const [camera1Stream, setCamera1Stream] = useState<MediaStream | null>(null);
+  const [camera2Stream, setCamera2Stream] = useState<MediaStream | null>(null);
 
+  const currentScene = SCENES[currentSceneIndex];
+
+  // Initialize cameras
+  useEffect(() => {
+    initializeCameras();
+    return () => {
+      stopCameras();
+    };
+  }, []);
+
+  const initializeCameras = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+      // Camera 1
+      const stream1 = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: videoDevices[0]?.deviceId }
+      });
+      setCamera1Stream(stream1);
+      if (video1Ref.current) {
+        video1Ref.current.srcObject = stream1;
+        video1Ref.current.play();
+      }
+
+      // Camera 2
+      if (videoDevices.length >= 2) {
+        const stream2 = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: videoDevices[1]?.deviceId }
+        });
+        setCamera2Stream(stream2);
+        if (video2Ref.current) {
+          video2Ref.current.srcObject = stream2;
+          video2Ref.current.play();
+        }
+      }
+    } catch (error) {
+      console.error("Camera access error:", error);
+    }
+  };
+
+  const stopCameras = () => {
+    camera1Stream?.getTracks().forEach(track => track.stop());
+    camera2Stream?.getTracks().forEach(track => track.stop());
+  };
+
+  // Timer management
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (recordingState === "recording") {
@@ -49,41 +110,33 @@ export default function RecordingDashboard() {
     return () => clearInterval(interval);
   }, [recordingState]);
 
-  const handleStartRecording = () => {
-    if (currentPhase === 1 && !name.trim()) {
-      alert("Please enter your name before recording");
-      return;
+  // Countdown management
+  useEffect(() => {
+    if (recordingState === "countdown") {
+      if (countdown > 0) {
+        const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+        return () => clearTimeout(timer);
+      } else {
+        setRecordingState("recording");
+        setCountdown(3);
+      }
     }
-    setRecordingState("countdown");
-  };
+  }, [recordingState, countdown]);
 
-  const handleCountdownComplete = () => {
-    setRecordingState("recording");
+  const handleStartRecording = () => {
+    setRecordingState("countdown");
     setElapsedTime(0);
   };
 
   const handleStopRecording = () => {
-    setRecordingState("stopped");
+    setRecordingState("completed");
     
-    const newClip: Clip = {
-      id: `clip-${Date.now()}`,
-      title: `Phase ${currentPhase}: ${phases[currentPhase - 1].title}`,
-      duration: elapsedTime,
-      phaseId: currentPhase,
-    };
-    
-    setClips([...clips, newClip]);
-    
-    if (currentPhase < 3) {
-      setTimeout(() => {
-        setCurrentPhase((prev) => (prev + 1) as Phase);
-        setRecordingState("idle");
-        setElapsedTime(0);
-      }, 1000);
-    } else {
-      setRecordingState("idle");
-      setElapsedTime(0);
-    }
+    // Mark scene as completed
+    setSceneRecordings(prev => prev.map((rec, idx) => 
+      idx === currentSceneIndex 
+        ? { ...rec, camera1Duration: elapsedTime, camera2Duration: elapsedTime, completed: true }
+        : rec
+    ));
   };
 
   const handlePauseRecording = () => {
@@ -95,164 +148,290 @@ export default function RecordingDashboard() {
   };
 
   const handleRetake = () => {
-    const updatedClips = clips.filter(c => c.phaseId !== currentPhase);
-    setClips(updatedClips);
     setRecordingState("idle");
     setElapsedTime(0);
+    setSceneRecordings(prev => prev.map((rec, idx) => 
+      idx === currentSceneIndex 
+        ? { ...rec, camera1Duration: 0, camera2Duration: 0, completed: false }
+        : rec
+    ));
   };
 
-  const handleDeleteClip = (clipId: string) => {
-    setClips(clips.filter(c => c.id !== clipId));
+  const handleNextScene = () => {
+    if (currentSceneIndex < SCENES.length - 1) {
+      setCurrentSceneIndex(currentSceneIndex + 1);
+      setRecordingState("idle");
+      setElapsedTime(0);
+    } else {
+      // All scenes done, go to editor
+      setLocation("/editor");
+    }
   };
 
-  const handlePhaseSkip = (phase: Phase) => {
-    console.log(`Skipping to phase ${phase}`);
-    setCurrentPhase(phase);
-    setRecordingState("idle");
-    setElapsedTime(0);
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const currentPhaseHasRecording = clips.some(c => c.phaseId === currentPhase);
+  const allScenesCompleted = sceneRecordings.every(rec => rec.completed);
+  const currentSceneCompleted = sceneRecordings[currentSceneIndex].completed;
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
-      <NavigationSidebar activeItem={activeNav} onItemClick={setActiveNav} />
+    <div className="min-h-screen bg-background flex flex-col">
+      <PhaseNavigation currentPhase="recording" completedPhases={["info"]} />
 
-      <div className="flex-1 flex flex-col">
-        <Header projectName="My Video Tour" />
-
-        <main className="flex-1 overflow-auto">
-          <div className="h-full flex flex-col p-8 gap-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-6">
-                <PhaseIndicator currentPhase={currentPhase} phases={phases} />
-                <div className="flex items-center gap-2 px-4 py-2 bg-card/30 backdrop-blur-md rounded-lg border border-card-border">
-                  <span className="text-xs text-muted-foreground uppercase tracking-wide">Quick Nav:</span>
-                  <Button
-                    size="sm"
-                    variant={currentPhase === 1 ? "default" : "ghost"}
-                    onClick={() => handlePhaseSkip(1)}
-                    data-testid="button-skip-phase-1"
-                    className="h-7"
-                  >
-                    Phase 1
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={currentPhase === 2 ? "default" : "ghost"}
-                    onClick={() => handlePhaseSkip(2)}
-                    data-testid="button-skip-phase-2"
-                    className="h-7"
-                  >
-                    Phase 2
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={currentPhase === 3 ? "default" : "ghost"}
-                    onClick={() => handlePhaseSkip(3)}
-                    data-testid="button-skip-phase-3"
-                    className="h-7"
-                  >
-                    Phase 3
-                  </Button>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <RecordingStatus
-                  isRecording={recordingState === "recording"}
-                  elapsedTime={elapsedTime}
-                />
-                <StorageIndicator usedGB={2.4} totalGB={10} />
-              </div>
+      <main className="flex-1 overflow-auto p-8">
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Header with Pilot Info */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Flight Recording</h1>
+              <p className="text-muted-foreground mt-1">
+                Pilot: <span className="font-semibold text-foreground">{pilotInfo.name || "Not set"}</span>
+                {pilotInfo.email && <span className="ml-4 text-sm">({pilotInfo.email})</span>}
+              </p>
             </div>
+            <Button
+              onClick={() => setLocation("/editor")}
+              variant="outline"
+              data-testid="button-skip-to-editor"
+            >
+              Skip to Editing
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
 
-            <div className="flex-1 grid grid-cols-2 gap-8">
-              <div className="flex flex-col gap-6">
-                {currentPhase === 1 && recordingState === "idle" && !currentPhaseHasRecording && (
-                  <div className="p-6 bg-card/30 backdrop-blur-md rounded-lg border border-card-border">
-                    <h2 className="text-2xl font-semibold text-foreground mb-6">
-                      Let's Get Started
-                    </h2>
-                    <IntroductionForm
-                      name={name}
-                      email={email}
-                      onNameChange={setName}
-                      onEmailChange={setEmail}
-                    />
-                  </div>
-                )}
+          {/* Scene Progress */}
+          <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-foreground">Recording Progress</h2>
+              <Badge variant="outline" className="px-3 py-1">
+                Scene {currentSceneIndex + 1} of {SCENES.length}
+              </Badge>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              {SCENES.map((scene, idx) => {
+                const rec = sceneRecordings[idx];
+                const isCurrent = idx === currentSceneIndex;
+                return (
+                  <button
+                    key={scene.type}
+                    onClick={() => {
+                      setCurrentSceneIndex(idx);
+                      setRecordingState("idle");
+                      setElapsedTime(0);
+                    }}
+                    className={`
+                      p-4 rounded-lg border-2 text-left transition-all hover-elevate
+                      ${isCurrent ? "border-primary bg-primary/10" : "border-border bg-card/20"}
+                    `}
+                    data-testid={`scene-button-${scene.type}`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-semibold text-foreground">{scene.title}</span>
+                      {rec.completed && <CheckCircle2 className="w-5 h-5 text-green-500" />}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{scene.description}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
 
-                <div className="flex-1 flex flex-col items-center justify-center gap-8">
-                  <div className="text-center">
-                    <h3 className="text-2xl font-semibold text-foreground mb-2">
-                      {recordingState === "stopped" && currentPhaseHasRecording
-                        ? "Recording Saved!"
-                        : phases[currentPhase - 1].title}
-                    </h3>
-                    <p className="text-muted-foreground">
-                      {recordingState === "idle" && !currentPhaseHasRecording &&
-                        "Click 'Start Recording' when you're ready"}
-                      {recordingState === "recording" && "Recording in progress..."}
-                      {recordingState === "paused" && "Recording paused"}
-                      {recordingState === "stopped" && currentPhaseHasRecording &&
-                        currentPhase < 3 &&
-                        "Moving to next phase..."}
-                      {recordingState === "stopped" && currentPhaseHasRecording &&
-                        currentPhase === 3 &&
-                        "All phases complete!"}
-                    </p>
-                  </div>
-
-                  <RecordingControls
-                    isRecording={recordingState === "recording" || recordingState === "paused"}
-                    isPaused={recordingState === "paused"}
-                    hasRecording={currentPhaseHasRecording && recordingState === "idle"}
-                    onStart={handleStartRecording}
-                    onStop={handleStopRecording}
-                    onPause={handlePauseRecording}
-                    onResume={handleResumeRecording}
-                    onRetake={handleRetake}
+          {/* Live Camera Feeds */}
+          <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border">
+            <h2 className="text-xl font-semibold text-foreground mb-4">Live Camera Feeds</h2>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-foreground">Camera 1 (Main)</span>
+                  <Video className="w-4 h-4 text-blue-500" />
+                </div>
+                <div className="relative aspect-video bg-black rounded-lg overflow-hidden border-2 border-blue-500/50">
+                  <video
+                    ref={video1Ref}
+                    className="w-full h-full object-cover"
+                    autoPlay
+                    playsInline
+                    muted
+                    data-testid="video-camera1-live"
                   />
+                  {recordingState === "recording" && (
+                    <div className="absolute top-3 right-3 flex items-center gap-2 px-3 py-1 bg-red-500 rounded-full">
+                      <Circle className="w-3 h-3 fill-current animate-pulse" />
+                      <span className="text-xs font-bold text-white">REC</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div>
-                <CameraPreview
-                  isRecording={recordingState === "recording"}
-                  hasVideo={currentPhaseHasRecording && recordingState === "idle"}
-                />
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-foreground">Camera 2 (Side)</span>
+                  <Video className="w-4 h-4 text-cyan-500" />
+                </div>
+                <div className="relative aspect-video bg-black rounded-lg overflow-hidden border-2 border-cyan-500/50">
+                  <video
+                    ref={video2Ref}
+                    className="w-full h-full object-cover"
+                    autoPlay
+                    playsInline
+                    muted
+                    data-testid="video-camera2-live"
+                  />
+                  {recordingState === "recording" && (
+                    <div className="absolute top-3 right-3 flex items-center gap-2 px-3 py-1 bg-red-500 rounded-full">
+                      <Circle className="w-3 h-3 fill-current animate-pulse" />
+                      <span className="text-xs font-bold text-white">REC</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          </Card>
 
-          {clips.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between px-6">
-                <h3 className="text-lg font-semibold text-foreground">Recorded Clips</h3>
+          {/* Recording Controls */}
+          <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-foreground">
+                  {currentScene.title}
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {currentScene.description}
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-mono font-bold text-foreground">
+                  {recordingState === "countdown" ? countdown : formatTime(elapsedTime)}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {recordingState === "countdown" ? "Starting..." : recordingState === "recording" ? "Recording..." : "Ready"}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center gap-4 mt-6">
+              {recordingState === "idle" && (
+                <>
+                  <Button
+                    size="lg"
+                    onClick={handleStartRecording}
+                    className="bg-gradient-purple-blue min-w-40"
+                    data-testid="button-start-recording"
+                  >
+                    <Circle className="w-5 h-5 mr-2 fill-current" />
+                    Start Recording
+                  </Button>
+                  {currentSceneCompleted && (
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      onClick={handleRetake}
+                      data-testid="button-retake"
+                    >
+                      <RotateCcw className="w-5 h-5 mr-2" />
+                      Retake
+                    </Button>
+                  )}
+                </>
+              )}
+
+              {recordingState === "recording" && (
+                <>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    onClick={handlePauseRecording}
+                    data-testid="button-pause-recording"
+                  >
+                    <Pause className="w-5 h-5 mr-2" />
+                    Pause
+                  </Button>
+                  <Button
+                    size="lg"
+                    onClick={handleStopRecording}
+                    className="bg-red-500 hover:bg-red-600"
+                    data-testid="button-stop-recording"
+                  >
+                    <Square className="w-5 h-5 mr-2" />
+                    Stop
+                  </Button>
+                </>
+              )}
+
+              {recordingState === "paused" && (
+                <>
+                  <Button
+                    size="lg"
+                    onClick={handleResumeRecording}
+                    className="bg-gradient-purple-blue"
+                    data-testid="button-resume-recording"
+                  >
+                    <Play className="w-5 h-5 mr-2" />
+                    Resume
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    onClick={handleStopRecording}
+                    data-testid="button-stop-paused"
+                  >
+                    <Square className="w-5 h-5 mr-2" />
+                    Stop
+                  </Button>
+                </>
+              )}
+
+              {recordingState === "completed" && (
                 <Button
-                  variant="default"
-                  className="bg-gradient-purple-blue"
-                  onClick={() => setLocation("/editor")}
-                  data-testid="button-edit-clips"
+                  size="lg"
+                  onClick={handleNextScene}
+                  className="bg-gradient-purple-blue min-w-40"
+                  data-testid="button-next-scene"
                 >
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit & Export Clips
+                  {currentSceneIndex < SCENES.length - 1 ? (
+                    <>
+                      Next Scene
+                      <ArrowRight className="w-5 h-5 ml-2" />
+                    </>
+                  ) : (
+                    <>
+                      Go to Editing
+                      <ArrowRight className="w-5 h-5 ml-2" />
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+          </Card>
+
+          {/* Progress Summary */}
+          {allScenesCompleted && (
+            <Card className="p-6 bg-green-500/10 border-green-500/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="w-8 h-8 text-green-500" />
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">All Scenes Recorded!</h3>
+                    <p className="text-sm text-muted-foreground">You can now proceed to editing your flight video.</p>
+                  </div>
+                </div>
+                <Button
+                  size="lg"
+                  onClick={() => setLocation("/editor")}
+                  className="bg-gradient-purple-blue"
+                  data-testid="button-proceed-to-editor"
+                >
+                  Proceed to Editing
+                  <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
               </div>
-              <Timeline
-                clips={clips}
-                onPlayClip={(id) => console.log("Play clip:", id)}
-                onDeleteClip={handleDeleteClip}
-                onAutoTrim={() => console.log("Auto-trim")}
-              />
-            </div>
+            </Card>
           )}
-        </main>
-      </div>
-
-      {recordingState === "countdown" && (
-        <CountdownOverlay onComplete={handleCountdownComplete} />
-      )}
+        </div>
+      </main>
     </div>
   );
 }

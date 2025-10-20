@@ -6,12 +6,15 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Video, VideoOff, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { usePilot } from "@/contexts/PilotContext";
+import PhaseNavigation from "@/components/PhaseNavigation";
 
 export default function InfoPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const { pilotInfo, setPilotInfo } = usePilot();
+  const [name, setName] = useState(pilotInfo.name || "");
+  const [email, setEmail] = useState(pilotInfo.email || "");
   const [camera1Stream, setCamera1Stream] = useState<MediaStream | null>(null);
   const [camera2Stream, setCamera2Stream] = useState<MediaStream | null>(null);
   const [camera1Ready, setCamera1Ready] = useState(false);
@@ -98,14 +101,15 @@ export default function InfoPage() {
     }
 
     // Store info and navigate to recording
-    sessionStorage.setItem("pilotName", name);
-    sessionStorage.setItem("pilotEmail", email);
+    setPilotInfo({ name, email });
     setLocation("/recording");
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-purple-950/20 to-gray-950 flex items-center justify-center p-8">
-      <div className="w-full max-w-6xl space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-purple-950/20 to-gray-950 flex flex-col">
+      <PhaseNavigation currentPhase="info" />
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="w-full max-w-6xl space-y-8">
         {/* Header */}
         <div className="text-center space-y-3">
           <h1 className="text-4xl font-bold text-foreground bg-gradient-purple-blue bg-clip-text text-transparent">
@@ -230,6 +234,7 @@ export default function InfoPage() {
               </p>
             </div>
           </Card>
+        </div>
         </div>
       </div>
     </div>
