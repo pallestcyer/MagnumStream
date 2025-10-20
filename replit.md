@@ -7,20 +7,25 @@ A dual-camera flight recording platform with an **8-slot template system**. The 
 **Last Updated:** October 20, 2025
 
 ### Completed Features
+- ✅ **Sidebar navigation** with Home, History, Manual, Chat, and Issue Reporting
 - ✅ 8-slot template system with fixed camera angle mapping
 - ✅ 3-scene recording workflow (Cruising, Chase, Arrival)
-- ✅ Info page with name/email capture and live dual-camera preview
+- ✅ Info page with **3 fields**: pilot name, email, and staff member dropdown
+- ✅ Live dual-camera preview on info page
 - ✅ Dual-camera recording for each scene
 - ✅ **30-second minimum recording duration** requirement per scene with validation
 - ✅ **3 separate editor sub-pages** (one for each scene) for easier viewing
 - ✅ **Interactive slot card selection** - click to activate, plays 3-second preview while adjusting
 - ✅ Window picker (not trim) - select which 3-second chunk from recording
 - ✅ **Phase navigation tabs** (Info → Recording → Editing → Export)
-- ✅ **PilotContext** for sharing pilot names across all pages
+- ✅ **PilotContext** for sharing pilot info and staff member across all pages
 - ✅ **Auto-rounding flight time** to next hour or half-hour by default
 - ✅ Flight metadata capture (date/time)
 - ✅ Export workflow simulation (DaVinci → Google Drive → SMS)
-- ✅ History page showing past recordings and exports
+- ✅ **History page** showing past recordings and exports
+- ✅ **Manual page** with complete staff instructions
+- ✅ **AI Chat page** for asking questions about the system
+- ✅ **Issue reporting page** for submitting errors and problems
 - ✅ Dark theme with glassmorphism effects
 - ✅ Purple/blue gradient design (#667eea to #764ba2)
 
@@ -57,20 +62,24 @@ A dual-camera flight recording platform with an **8-slot template system**. The 
 ### Architecture
 
 #### Pages
-- `/` - InfoPage: Name/email form with live dual-camera preview confirmation
+- `/` - InfoPage (Home): Pilot name, email, staff member dropdown with live dual-camera preview
 - `/recording` - RecordingDashboard: Main recording interface with 3 scenes (minimum 30s each)
 - `/editor/cruising` - EditorCruising: Edit slots 1-3 for Cruising scene with interactive preview
 - `/editor/chase` - EditorChase: Edit slots 4-6 for Chase scene with interactive preview
 - `/editor/arrival` - EditorArrival: Edit slots 7-8 for Arrival scene with interactive preview + export
 - `/history` - HistoryPage: View past recordings, exports, and metadata
+- `/manual` - ManualPage: Complete staff instructions and best practices
+- `/chat` - ChatPage: AI assistant for asking questions about the platform
+- `/issues` - IssuesPage: Submit error reports and technical issues
 
 #### Key Components
+- `AppSidebar`: Left sidebar navigation (Home, History, Manual, Chat, Issues)
 - `SlotSelector`: Color-coded 3-second window picker with timeline visualization
 - `CameraPreview`: Dual camera preview with side-by-side layout
 - `FlightMetadataDialog`: Capture flight date/time before export (auto-rounds to next hour/half-hour)
 - `ExportWorkflow`: Multi-stage export process (DaVinci → Drive → SMS)
 - `PhaseNavigation`: Tab-based navigation between workflow phases (Info → Recording → Editing → Export)
-- `PilotContext`: React context for sharing pilot information across all pages
+- `PilotContext`: React context for sharing pilot info and staff member across all pages
 
 #### 8-Slot Template System
 The template consists of 8 fixed slots, each locked to a specific scene and camera angle:
@@ -99,10 +108,17 @@ interface SlotConfig {
   maxDuration: 3;
 }
 
+interface PilotInfo {
+  name: string;
+  email: string;
+  staffMember: string;
+}
+
 interface Recording {
   id: string;
   pilotName: string;
   email: string;
+  staffMember: string;
   scenes: SceneRecording[];
   slotSelections: SlotSelection[];
 }
@@ -121,7 +137,7 @@ interface SlotSelection {
 - Shadcn UI components for consistency
 
 ### Workflow
-1. **Info Page:** User enters name/email and confirms camera setup with live preview
+1. **Info Page (Home):** Staff enters pilot name, email, and selects staff member from dropdown. Confirms camera setup with live dual-camera preview.
 2. **Recording:** Record 3 scenes (Cruising, Chase, Arrival) with 2 camera angles each (minimum 30 seconds per scene)
 3. **Editing (3 sub-pages):**
    - **Cruising Editor:** Click slots 1-3 to activate, select 3-second windows with live preview
@@ -129,6 +145,9 @@ interface SlotSelection {
    - **Arrival Editor:** Click slots 7-8 to activate, select 3-second windows with live preview
 4. **Export:** Add flight metadata (auto-rounded time), export to DaVinci, upload to Drive, send SMS
 5. **History:** Review past recordings and access export links
+6. **Manual:** Staff can reference complete instructions and best practices
+7. **Chat:** Ask AI assistant questions about using the platform
+8. **Issues:** Submit error reports and technical problems
 
 ### Testing Features
 - Scene skip buttons for quick navigation during testing
