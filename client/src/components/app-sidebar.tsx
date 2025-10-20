@@ -60,7 +60,7 @@ export function AppSidebar() {
             <Plane className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h2 className="font-bold text-sidebar-foreground">Flight Recording</h2>
+            <h2 className="font-bold text-sidebar-foreground">Magnum Dashboard</h2>
             <p className="text-xs text-sidebar-foreground/60">Video Platform</p>
           </div>
         </div>
@@ -94,7 +94,7 @@ export function AppSidebar() {
       <SidebarFooter className="p-4 border-t border-sidebar-border">
         <div className="text-xs text-sidebar-foreground/60">
           <p>Version 1.0.0</p>
-          <p className="mt-1">© 2025 Flight Recording Platform</p>
+          <p className="mt-1">© 2025 Magnum Dashboard</p>
         </div>
       </SidebarFooter>
     </Sidebar>
