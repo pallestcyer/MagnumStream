@@ -3,6 +3,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 interface PilotInfo {
   name: string;
   email: string;
+  staffMember: string;
 }
 
 interface PilotContextType {
@@ -22,14 +23,14 @@ export function PilotProvider({ children }: { children: ReactNode }) {
       try {
         return JSON.parse(stored);
       } catch {
-        return { name: "", email: "" };
+        return { name: "", email: "", staffMember: "" };
       }
     }
-    return { name: "", email: "" };
+    return { name: "", email: "", staffMember: "" };
   });
 
   useEffect(() => {
-    if (pilotInfo.name || pilotInfo.email) {
+    if (pilotInfo.name || pilotInfo.email || pilotInfo.staffMember) {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(pilotInfo));
     }
   }, [pilotInfo]);
@@ -39,7 +40,7 @@ export function PilotProvider({ children }: { children: ReactNode }) {
   };
 
   const clearPilotInfo = () => {
-    setPilotInfoState({ name: "", email: "" });
+    setPilotInfoState({ name: "", email: "", staffMember: "" });
     sessionStorage.removeItem(STORAGE_KEY);
   };
 

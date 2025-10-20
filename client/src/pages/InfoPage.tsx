@@ -4,6 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Video, VideoOff, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePilot } from "@/contexts/PilotContext";
@@ -15,6 +22,7 @@ export default function InfoPage() {
   const { pilotInfo, setPilotInfo } = usePilot();
   const [name, setName] = useState(pilotInfo.name || "");
   const [email, setEmail] = useState(pilotInfo.email || "");
+  const [staffMember, setStaffMember] = useState(pilotInfo.staffMember || "");
   const [camera1Stream, setCamera1Stream] = useState<MediaStream | null>(null);
   const [camera2Stream, setCamera2Stream] = useState<MediaStream | null>(null);
   const [camera1Ready, setCamera1Ready] = useState(false);
@@ -101,7 +109,7 @@ export default function InfoPage() {
     }
 
     // Store info and navigate to recording
-    setPilotInfo({ name, email });
+    setPilotInfo({ name, email, staffMember });
     setLocation("/recording");
   };
 
@@ -150,6 +158,22 @@ export default function InfoPage() {
                   className="h-12"
                   data-testid="input-pilot-email"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="staff-member">Staff Member Recording</Label>
+                <Select value={staffMember} onValueChange={setStaffMember}>
+                  <SelectTrigger id="staff-member" className="h-12" data-testid="select-staff-member">
+                    <SelectValue placeholder="Select staff member" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="john">John Smith</SelectItem>
+                    <SelectItem value="sarah">Sarah Johnson</SelectItem>
+                    <SelectItem value="michael">Michael Chen</SelectItem>
+                    <SelectItem value="emily">Emily Rodriguez</SelectItem>
+                    <SelectItem value="david">David Williams</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="pt-4">
