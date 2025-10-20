@@ -144,44 +144,17 @@ export default function EditorChase() {
               </div>
             </Card>
 
-            {/* Right: Background Slot Reference */}
+            {/* Right: Background Template Context */}
             <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border">
-              <div className="mb-4">
+              <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-semibold text-foreground">
-                  Slot Context
+                  Background Template
                 </h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {activeSlot 
-                    ? `Working on Slot ${activeSlot}` 
-                    : "Select a slot to see details"}
-                </p>
               </div>
-              <div className="relative aspect-video bg-gradient-to-br from-purple-950 to-pink-950 rounded-lg overflow-hidden flex items-center justify-center border-2 border-purple-500/50">
-                {activeSlot ? (
-                  <div className="text-center space-y-4">
-                    <div className={`w-20 h-20 rounded-lg mx-auto flex items-center justify-center text-3xl font-bold text-white`}
-                         style={{ backgroundColor: chaseSlots.find(s => s.slotNumber === activeSlot)?.color }}>
-                      {activeSlot}
-                    </div>
-                    <div className="space-y-2 text-white">
-                      <p className="text-2xl font-bold">Chase Scene</p>
-                      <p className="text-lg">
-                        Camera {chaseSlots.find(s => s.slotNumber === activeSlot)?.cameraAngle}
-                      </p>
-                      <p className="text-sm text-purple-200">
-                        Position: Slot {activeSlot} of 8
-                      </p>
-                      <p className="text-xs text-purple-300 mt-4">
-                        3-second maximum duration
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center">
-                    <div className="w-16 h-16 rounded-lg bg-purple-500/20 mx-auto mb-4 flex items-center justify-center">
-                      <Play className="w-8 h-8 text-purple-300" />
-                    </div>
-                    <p className="text-purple-200">Click a slot to see context</p>
+              <div className="relative aspect-video bg-gradient-to-br from-purple-950 to-pink-950 rounded-lg overflow-hidden border-2 border-purple-500/50">
+                {activeSlot && (
+                  <div className="absolute bottom-3 left-3 bg-black/80 px-3 py-1 rounded text-sm text-white">
+                    Slot {activeSlot} • Chase • Camera {chaseSlots.find(s => s.slotNumber === activeSlot)?.cameraAngle}
                   </div>
                 )}
               </div>
