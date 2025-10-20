@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import NavigationSidebar from "@/components/NavigationSidebar";
 import Header from "@/components/Header";
 import PhaseIndicator from "@/components/PhaseIndicator";
@@ -10,6 +11,7 @@ import Timeline from "@/components/Timeline";
 import CountdownOverlay from "@/components/CountdownOverlay";
 import StorageIndicator from "@/components/StorageIndicator";
 import { Button } from "@/components/ui/button";
+import { Edit } from "lucide-react";
 
 type RecordingState = "idle" | "countdown" | "recording" | "paused" | "stopped";
 type Phase = 1 | 2 | 3;
@@ -22,6 +24,7 @@ interface Clip {
 }
 
 export default function RecordingDashboard() {
+  const [, setLocation] = useLocation();
   const [currentPhase, setCurrentPhase] = useState<Phase>(1);
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -223,12 +226,26 @@ export default function RecordingDashboard() {
           </div>
 
           {clips.length > 0 && (
-            <Timeline
-              clips={clips}
-              onPlayClip={(id) => console.log("Play clip:", id)}
-              onDeleteClip={handleDeleteClip}
-              onAutoTrim={() => console.log("Auto-trim")}
-            />
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-6">
+                <h3 className="text-lg font-semibold text-foreground">Recorded Clips</h3>
+                <Button
+                  variant="default"
+                  className="bg-gradient-purple-blue"
+                  onClick={() => setLocation("/editor")}
+                  data-testid="button-edit-clips"
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit & Export Clips
+                </Button>
+              </div>
+              <Timeline
+                clips={clips}
+                onPlayClip={(id) => console.log("Play clip:", id)}
+                onDeleteClip={handleDeleteClip}
+                onAutoTrim={() => console.log("Auto-trim")}
+              />
+            </div>
           )}
         </main>
       </div>
