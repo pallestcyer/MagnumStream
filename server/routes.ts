@@ -5,10 +5,17 @@ import { insertSaleSchema, insertFlightRecordingSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  // Get all flight recordings
-  app.get("/api/recordings", async (_req, res) => {
+  // Get all flight recordings with optional date filter
+  app.get("/api/recordings", async (req, res) => {
     try {
-      const recordings = await storage.getAllFlightRecordings();
+      const { date } = req.query;
+      let recordings = await storage.getAllFlightRecordings();
+      
+      // Filter by date if provided
+      if (date && typeof date === 'string') {
+        recordings = recordings.filter(r => r.flightDate === date);
+      }
+      
       res.json(recordings);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -36,7 +43,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get sales analytics
+  // Get sales analytics with per-day breakdown
   app.get("/api/sales/analytics", async (_req, res) => {
     try {
       const sales = await storage.getAllSales();
@@ -56,6 +63,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Revenue
       const totalRevenue = sales.reduce((sum, sale) => sum + (sale.saleAmount || 0), 0);
       
+      // Per-day analytics
+      const dailyStats = sales.reduce((acc, sale) => {
+        const dateKey = sale.saleDate.toISOString().split('T')[0];
+        if (!acc[dateKey]) {
+          acc[dateKey] = { date: dateKey, sales: 0, revenue: 0 };
+        }
+        acc[dateKey].sales += 1;
+        acc[dateKey].revenue += sale.saleAmount || 0;
+        return acc;
+      }, {} as Record<string, { date: string; sales: number; revenue: number }>);
+      
+      const dailyBreakdown = Object.values(dailyStats).sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+      
       res.json({
         totalRecordings,
         totalSales,
@@ -63,6 +85,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conversionRate,
         staffSales,
         totalRevenue,
+        dailyBreakdown,
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
