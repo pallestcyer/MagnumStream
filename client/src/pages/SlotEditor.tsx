@@ -2,13 +2,13 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Save, Download, Play } from "lucide-react";
-import NavigationSidebar from "@/components/NavigationSidebar";
-import Header from "@/components/Header";
+import PhaseNavigation from "@/components/PhaseNavigation";
 import FlightMetadataDialog from "@/components/FlightMetadataDialog";
 import ExportWorkflow from "@/components/ExportWorkflow";
 import SlotSelector from "@/components/SlotSelector";
 import { SLOT_TEMPLATE, SlotConfig } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { usePilot } from "@/contexts/PilotContext";
 
 interface SceneData {
   id: string;
@@ -26,7 +26,7 @@ interface SlotSelection {
 export default function SlotEditor() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [activeNav, setActiveNav] = useState("recording");
+  const { pilotInfo } = usePilot();
   const [showMetadataDialog, setShowMetadataDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [flightMetadata, setFlightMetadata] = useState({ date: "", time: "" });
@@ -82,24 +82,20 @@ export default function SlotEditor() {
   const arrivalSlots = SLOT_TEMPLATE.filter(s => s.sceneType === 'arrival');
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
-      <NavigationSidebar activeItem={activeNav} onItemClick={setActiveNav} />
+    <div className="min-h-screen bg-background flex flex-col">
+      <PhaseNavigation currentPhase="editing" completedPhases={["info", "recording"]} />
 
-      <div className="flex-1 flex flex-col">
-        <Header projectName="Flight Video Editor" onExport={handleExportClick} />
-
-        <main className="flex-1 overflow-auto p-8">
+      <main className="flex-1 overflow-auto p-8">
           <div className="max-w-7xl mx-auto space-y-6">
-            {/* Back button and header */}
+            {/* Header with Pilot Info */}
             <div className="flex items-center justify-between">
-              <Button
-                variant="ghost"
-                onClick={() => setLocation("/recording")}
-                data-testid="button-back-to-recording"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Recording
-              </Button>
+              <div>
+                <h1 className="text-3xl font-bold text-foreground">Slot Editor</h1>
+                <p className="text-muted-foreground mt-1">
+                  Pilot: <span className="font-semibold text-foreground">{pilotInfo.name || "Not set"}</span>
+                  {pilotInfo.email && <span className="ml-4 text-sm">({pilotInfo.email})</span>}
+                </p>
+              </div>
               <div className="flex gap-3">
                 <Button
                   variant="outline"
@@ -242,7 +238,6 @@ export default function SlotEditor() {
             </div>
           </div>
         </main>
-      </div>
 
       <FlightMetadataDialog
         open={showMetadataDialog}

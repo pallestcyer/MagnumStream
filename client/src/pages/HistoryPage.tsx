@@ -2,8 +2,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import NavigationSidebar from "@/components/NavigationSidebar";
-import Header from "@/components/Header";
+import PhaseNavigation from "@/components/PhaseNavigation";
 import { 
   Calendar, 
   ExternalLink, 
@@ -27,7 +26,6 @@ interface ExportRecord {
 }
 
 export default function HistoryPage() {
-  const [activeNav, setActiveNav] = useState("history");
 
   // Mock data - in real app, this would come from API/database
   const [exportHistory] = useState<ExportRecord[]>([
@@ -102,13 +100,10 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
-      <NavigationSidebar activeItem={activeNav} onItemClick={setActiveNav} />
+    <div className="min-h-screen bg-background flex flex-col">
+      <PhaseNavigation currentPhase="export" completedPhases={["info", "recording", "editing"]} />
 
-      <div className="flex-1 flex flex-col">
-        <Header projectName="Export History" />
-
-        <main className="flex-1 overflow-auto p-8">
+      <main className="flex-1 overflow-auto p-8">
           <div className="max-w-7xl mx-auto space-y-6">
             {/* Header */}
             <div className="space-y-2">
@@ -267,7 +262,6 @@ export default function HistoryPage() {
             </div>
           </div>
         </main>
-      </div>
     </div>
   );
 }
