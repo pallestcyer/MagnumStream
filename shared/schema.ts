@@ -49,6 +49,7 @@ export const sales = pgTable("sales", {
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email").notNull(),
   staffMember: text("staff_member").notNull(),
+  bundle: text("bundle").notNull(), // 'video_photos' | 'video_only' | 'video_airtour_photos'
   saleAmount: real("sale_amount"),
   saleDate: timestamp("sale_date").notNull().defaultNow(),
   driveShared: boolean("drive_shared").notNull().default(false),
@@ -61,6 +62,12 @@ export const insertSaleSchema = createInsertSchema(sales).omit({
 
 export type InsertSale = z.infer<typeof insertSaleSchema>;
 export type Sale = typeof sales.$inferSelect;
+
+export const BUNDLE_OPTIONS = [
+  { value: 'video_photos', label: 'Video + Photos', price: 49.99 },
+  { value: 'video_only', label: 'Video Only', price: 39.99 },
+  { value: 'video_airtour_photos', label: 'Video + Air Tour + Photos', price: 79.99 },
+] as const;
 
 // Scene recordings (3 scenes per project)
 export const sceneRecordings = pgTable("scene_recordings", {
