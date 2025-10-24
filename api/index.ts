@@ -20,28 +20,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       app = express();
       app.use(express.json());
       
-      console.log('Testing Supabase import...');
-      try {
-        const { supabase } = await import('../server/db/supabase');
-        console.log('Supabase import successful');
-      } catch (importError) {
-        console.error('Supabase import failed:', importError);
-        throw importError;
-      }
-      
       console.log('Testing shared schema import...');
       try {
         const schema = await import('../shared/schema');
         console.log('Schema import successful, available exports:', Object.keys(schema));
       } catch (importError) {
         console.error('Schema import failed:', importError);
-        throw importError;
+        return res.status(500).json({
+          error: 'Schema import failed',
+          details: importError instanceof Error ? importError.message : 'Unknown error',
+          stack: importError instanceof Error ? importError.stack : undefined
+        });
       }
       
-      // Add a simple route
-      app.get('/', (req, res) => {
+      // Add a simple route for all methods and paths
+      app.all('*', (req, res) => {
         res.json({
           message: 'Import tests passed',
+          method: req.method,
+          url: req.url,
           environment: {
             NODE_ENV: process.env.NODE_ENV,
             USE_SUPABASE: process.env.USE_SUPABASE,
