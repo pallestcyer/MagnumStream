@@ -1,22 +1,36 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import express from 'express';
+
+let app: express.Application | null = null;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  console.log('Basic function test - starting');
+  console.log('Testing with Express - starting');
   
   try {
-    console.log('Basic function test - in try block');
+    if (!app) {
+      console.log('Creating Express app...');
+      app = express();
+      app.use(express.json());
+      
+      // Add a simple route
+      app.get('/', (req, res) => {
+        res.json({
+          message: 'Express function works',
+          timestamp: new Date().toISOString()
+        });
+      });
+      
+      console.log('Express app created successfully');
+    }
     
-    return res.status(200).json({ 
-      message: 'Basic function works',
-      method: req.method,
-      url: req.url,
-      timestamp: new Date().toISOString()
-    });
+    console.log(`Handling ${req.method} ${req.url} with Express`);
+    return app(req, res);
   } catch (error) {
-    console.error('Basic function error:', error);
+    console.error('Express function error:', error);
     return res.status(500).json({ 
-      error: 'Basic function failed',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      error: 'Express function failed',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
     });
   }
 }
