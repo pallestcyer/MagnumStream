@@ -1,12 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import 'dotenv/config';
 import express from 'express';
-import { initializeStorage } from '../server/storage';
 
 let app: express.Application | null = null;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  console.log('Testing with storage - starting');
+  console.log('Testing storage imports - starting');
   
   try {
     console.log('Environment check:', {
@@ -21,14 +20,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       app = express();
       app.use(express.json());
       
-      console.log('Initializing storage...');
-      await initializeStorage();
-      console.log('Storage initialized successfully');
+      console.log('Testing Supabase import...');
+      try {
+        const { supabase } = await import('../server/db/supabase');
+        console.log('Supabase import successful');
+      } catch (importError) {
+        console.error('Supabase import failed:', importError);
+        throw importError;
+      }
+      
+      console.log('Testing shared schema import...');
+      try {
+        const schema = await import('../shared/schema');
+        console.log('Schema import successful, available exports:', Object.keys(schema));
+      } catch (importError) {
+        console.error('Schema import failed:', importError);
+        throw importError;
+      }
       
       // Add a simple route
       app.get('/', (req, res) => {
         res.json({
-          message: 'Express + dotenv + storage function works',
+          message: 'Import tests passed',
           environment: {
             NODE_ENV: process.env.NODE_ENV,
             USE_SUPABASE: process.env.USE_SUPABASE,
@@ -38,15 +51,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       });
       
-      console.log('Express app with storage created successfully');
+      console.log('Express app with import tests created successfully');
     }
     
-    console.log(`Handling ${req.method} ${req.url} with Express + storage`);
+    console.log(`Handling ${req.method} ${req.url} with import tests`);
     return app(req, res);
   } catch (error) {
-    console.error('Express + storage function error:', error);
+    console.error('Import test function error:', error);
     return res.status(500).json({ 
-      error: 'Express + storage function failed',
+      error: 'Import test function failed',
       details: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined
     });
