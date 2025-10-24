@@ -173,27 +173,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
 
       // Video routes (delegated to local device)
-      app.post('/api/clips/generate', async (req, res) => {
+      app.post('/api/recordings/:recordingId/generate-clips', async (req, res) => {
         try {
-          const result = await videoOps.delegateToLocal('/clips/generate', req.body);
+          const result = await videoOps.delegateToLocal(`/recordings/${req.params.recordingId}/generate-clips`, req.body);
           res.json(result);
         } catch (error) {
           res.status(500).json({ error: error.message });
         }
       });
 
-      app.get('/api/clips/:recordingId', async (req, res) => {
+      app.get('/api/recordings/:recordingId/clips', async (req, res) => {
         try {
-          const result = await videoOps.delegateToLocal(`/clips/${req.params.recordingId}`);
+          const result = await videoOps.delegateToLocal(`/recordings/${req.params.recordingId}/clips`);
           res.json(result);
         } catch (error) {
           res.status(500).json({ error: error.message });
         }
       });
 
-      app.post('/api/export/:recordingId', async (req, res) => {
+      app.post('/api/recordings/:recordingId/create-davinci-job', async (req, res) => {
         try {
-          const result = await videoOps.delegateToLocal(`/export/${req.params.recordingId}`, req.body);
+          const result = await videoOps.delegateToLocal(`/recordings/${req.params.recordingId}/create-davinci-job`, req.body);
+          res.json(result);
+        } catch (error) {
+          res.status(500).json({ error: error.message });
+        }
+      });
+
+      app.get('/api/recordings/:recordingId/project-info', async (req, res) => {
+        try {
+          const result = await videoOps.delegateToLocal(`/recordings/${req.params.recordingId}/project-info`);
           res.json(result);
         } catch (error) {
           res.status(500).json({ error: error.message });
@@ -201,18 +210,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
 
       // Google Drive routes (delegated to local device)
-      app.get('/api/google/auth', async (req, res) => {
+      app.get('/api/google/auth-url', async (req, res) => {
         try {
-          const result = await videoOps.delegateToLocal('/google/auth');
+          const result = await videoOps.delegateToLocal('/google/auth-url');
           res.json(result);
         } catch (error) {
           res.status(500).json({ error: error.message });
         }
       });
 
-      app.post('/api/google/upload', async (req, res) => {
+      app.get('/api/google/auth-status', async (req, res) => {
         try {
-          const result = await videoOps.delegateToLocal('/google/upload', req.body);
+          const result = await videoOps.delegateToLocal('/google/auth-status');
+          res.json(result);
+        } catch (error) {
+          res.status(500).json({ error: error.message });
+        }
+      });
+
+      app.post('/api/google/upload-video', async (req, res) => {
+        try {
+          const result = await videoOps.delegateToLocal('/google/upload-video', req.body);
+          res.json(result);
+        } catch (error) {
+          res.status(500).json({ error: error.message });
+        }
+      });
+
+      app.post('/api/google/signout', async (req, res) => {
+        try {
+          const result = await videoOps.delegateToLocal('/google/signout', req.body);
           res.json(result);
         } catch (error) {
           res.status(500).json({ error: error.message });
@@ -238,9 +265,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           timestamp: new Date().toISOString(),
           endpoints: {
             database: ['GET /api/recordings', 'POST /api/recordings', 'GET /api/sales', 'POST /api/sales'],
-            video: ['POST /api/clips/generate', 'GET /api/clips/:id', 'POST /api/export/:id'],
-            google: ['GET /api/google/auth', 'POST /api/google/upload'],
+            video: [
+              'POST /api/recordings/:id/generate-clips', 
+              'GET /api/recordings/:id/clips',
+              'POST /api/recordings/:id/create-davinci-job',
+              'GET /api/recordings/:id/project-info'
+            ],
+            google: [
+              'GET /api/google/auth-url', 
+              'GET /api/google/auth-status',
+              'POST /api/google/upload-video',
+              'POST /api/google/signout'
+            ],
             health: ['GET /api/health']
+          },
+          architecture: {
+            database: 'Handled by Vercel + Supabase',
+            video: 'Delegated to local device',
+            google: 'Delegated to local device'
           }
         });
       });
