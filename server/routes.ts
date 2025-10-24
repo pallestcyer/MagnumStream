@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertSaleSchema, insertFlightRecordingSchema, SLOT_TEMPLATE } from "@shared/schema";
+import { insertSaleSchema, insertFlightRecordingSchema, SLOT_TEMPLATE } from "../shared/schema";
 import { ClipGenerator } from "./services/ClipGenerator";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 

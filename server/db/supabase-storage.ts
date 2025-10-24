@@ -7,7 +7,7 @@ import type {
   InsertFlightRecording,
   Sale,
   InsertSale
-} from "@shared/schema";
+} from "../../shared/schema";
 
 // Type-safe wrapper for Supabase operations  
 const db = supabase as any;
