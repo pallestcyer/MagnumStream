@@ -1,23 +1,15 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "dist/index.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "dist/public/**",
-      "use": "@vercel/static"
+  "buildCommand": "npm run build",
+  "functions": {
+    "dist/index.js": {
+      "runtime": "@vercel/node@20.10.0"
     }
-  ],
+  },
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/dist/index.js"
-    },
-    {
       "src": "/(.*)",
-      "dest": "/dist/public/$1"
+      "dest": "/dist/index.js"
     }
   ]
 }
