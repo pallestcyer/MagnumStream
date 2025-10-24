@@ -1,15 +1,10 @@
 {
   "version": 2,
   "buildCommand": "npm run build",
-  "functions": {
-    "dist/index.js": {
-      "runtime": "@vercel/node@20.10.0"
-    }
-  },
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "/dist/index.js"
+      "dest": "/api/index.ts"
     }
   ]
 }
