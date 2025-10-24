@@ -110,12 +110,28 @@ echo "✅ FFmpeg $(ffmpeg -version | head -n1)"
 
 # Check ngrok
 if ! command -v ngrok &> /dev/null; then
-    echo "⚠️  ngrok not found. Please install from https://ngrok.com/download"
-    echo "   Or install via Homebrew: brew install ngrok/ngrok/ngrok"
-    read -p "Continue without ngrok? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        exit 1
+    echo "⚠️  ngrok not found. Installing via Homebrew..."
+    if command -v brew &> /dev/null; then
+        brew install ngrok/ngrok/ngrok
+        if command -v ngrok &> /dev/null; then
+            echo "✅ ngrok installed successfully"
+        else
+            echo "❌ ngrok installation failed"
+            echo "📋 Manual install: https://ngrok.com/download"
+            read -p "Continue without ngrok? (y/N): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                exit 1
+            fi
+        fi
+    else
+        echo "❌ Homebrew not available for ngrok installation"
+        echo "📋 Manual install: https://ngrok.com/download"
+        read -p "Continue without ngrok? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
     fi
 else
     echo "✅ ngrok $(ngrok --version)"

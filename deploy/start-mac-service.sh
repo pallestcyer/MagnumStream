@@ -55,6 +55,12 @@ echo "✅ Server started successfully (PID: $SERVER_PID)"
 
 # Start ngrok tunnel
 echo "🌐 Starting ngrok tunnel..."
+if ngrok config check 2>/dev/null | grep -q "authtoken"; then
+    echo "✅ Using authenticated ngrok (stable URL)"
+else
+    echo "⚠️  Using unauthenticated ngrok (URL will change on restart)"
+    echo "   For stable URLs, get auth token from: https://ngrok.com/signup"
+fi
 nohup ngrok http 5000 --log=stdout > "$NGROK_LOG" 2>&1 &
 NGROK_PID=$!
 echo $NGROK_PID > "$LOG_DIR/ngrok.pid"
