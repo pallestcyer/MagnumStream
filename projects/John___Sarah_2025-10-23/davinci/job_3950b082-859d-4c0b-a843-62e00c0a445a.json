@@ -1,0 +1,32 @@
+{
+  "jobId": "3950b082-859d-4c0b-a843-62e00c0a445a",
+  "recordingId": "fbacbfc2-5e54-430a-9a95-0c3c9e26f143",
+  "projectName": "John & Sarah_2025-10-23",
+  "templateProject": "MagnumPI_Template",
+  "clips": {
+    "1": {
+      "filename": "slot_1_cruising_cam1.mp4",
+      "fullPath": "/Users/pallestcyer/Documents/MagnumStream/MagnumStream/projects/John___Sarah_2025-10-23/clips/slot_1_cruising_cam1.mp4",
+      "slotNumber": 1,
+      "sceneType": "cruising",
+      "cameraAngle": 1,
+      "duration": 3
+    },
+    "2": {
+      "filename": "slot_2_cruising_cam2.mp4",
+      "fullPath": "/Users/pallestcyer/Documents/MagnumStream/MagnumStream/projects/John___Sarah_2025-10-23/clips/slot_2_cruising_cam2.mp4",
+      "slotNumber": 2,
+      "sceneType": "cruising",
+      "cameraAngle": 2,
+      "duration": 3
+    },
+    "4": {
+      "filename": "slot_4_chase_cam1.mp4",
+      "fullPath": "/Users/pallestcyer/Documents/MagnumStream/MagnumStream/projects/John___Sarah_2025-10-23/clips/slot_4_chase_cam1.mp4",
+      "slotNumber": 4,
+      "sceneType": "chase",
+      "cameraAngle": 1,
+      "duration": 3
+    }
+  }
+}

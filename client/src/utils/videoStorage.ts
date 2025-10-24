@@ -1,0 +1,316 @@
+// IndexedDB utility for storing large video files
+const DB_NAME = 'MagnumStreamVideos';
+const DB_VERSION = 2; // Incremented to add sessionId index
+const STORE_NAME = 'recordings';
+
+interface VideoRecord {
+  id: string;
+  sessionId: string; // Customer names combined as session identifier
+  sceneType: 'cruising' | 'chase' | 'arrival';
+  cameraAngle: 1 | 2;
+  blob: Blob;
+  duration: number;
+  createdAt: Date;
+}
+
+class VideoStorage {
+  private db: IDBDatabase | null = null;
+
+
+  // Set current session (called when customer info is submitted)
+  setCurrentSession(customerNames: string): void {
+    // Create session ID from customer names (sanitized)
+    const sessionId = customerNames.toLowerCase().replace(/[^a-z0-9\s&]/g, '').replace(/\s+/g, '_');
+    const previousSessionId = localStorage.getItem('currentSessionId');
+    
+    if (previousSessionId && previousSessionId !== sessionId) {
+      console.log('🔄 Switching from session', previousSessionId, 'to', sessionId);
+    }
+    
+    localStorage.setItem('currentSessionId', sessionId);
+    console.log('📋 Set current session to:', sessionId);
+  }
+
+  // Clear current session (useful for starting completely fresh)
+  clearCurrentSession(): void {
+    localStorage.removeItem('currentSessionId');
+    console.log('🗑️ Cleared current session');
+  }
+
+  // Update project status in database via API
+  async updateProjectStatus(status: 'recorded' | 'in_progress' | 'exported'): Promise<void> {
+    const sessionId = this.getCurrentSessionId();
+    const customerName = sessionId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    
+    try {
+      // Map our status to export_status field
+      const exportStatus = status === 'exported' ? 'completed' : status === 'recorded' ? 'recorded' : 'in_progress';
+      
+      // Get pilot info from context
+      const pilotEmail = localStorage.getItem('pilotEmail') || '';
+      const staffMember = localStorage.getItem('staffMember') || '';
+      const currentDate = new Date().toISOString().split('T')[0];
+      const currentTime = new Date().toTimeString().split(' ')[0];
+      
+      const response = await fetch('/api/recordings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectName: `${customerName} Flight`,
+          pilotName: customerName,
+          pilotEmail: pilotEmail,
+          staffMember: staffMember,
+          flightDate: currentDate,
+          flightTime: currentTime,
+          exportStatus: exportStatus,
+          sessionId: sessionId
+        })
+      });
+      
+      if (response.ok) {
+        const recording = await response.json();
+        console.log(`📊 Updated project ${sessionId} status to: ${status}`, recording);
+        
+        // Store the recording ID for future use
+        localStorage.setItem('currentRecordingId', recording.id);
+      } else {
+        console.error('❌ Failed to update project status:', response.statusText);
+      }
+    } catch (error) {
+      console.error('❌ Failed to update project status:', error);
+    }
+  }
+
+  // Get current session ID (make it public for external access)
+  getCurrentSessionId(): string {
+    const sessionId = localStorage.getItem('currentSessionId');
+    if (sessionId) {
+      return sessionId;
+    }
+    
+    const fallbackId = `session_${Date.now()}`;
+    localStorage.setItem('currentSessionId', fallbackId);
+    return fallbackId;
+  }
+
+  // Set project status (for backward compatibility)
+  setProjectStatus(_sessionId: string, status: 'recorded' | 'in_progress' | 'exported'): void {
+    this.updateProjectStatus(status);
+  }
+
+  async init(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        this.db = request.result;
+        resolve();
+      };
+
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        const transaction = (event.target as IDBOpenDBRequest).transaction!;
+        
+        // Create object store if it doesn't exist
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+          store.createIndex('sessionId', 'sessionId', { unique: false });
+          store.createIndex('sceneType', 'sceneType', { unique: false });
+          store.createIndex('cameraAngle', 'cameraAngle', { unique: false });
+          console.log('📦 Created IndexedDB store for video recordings');
+        } else {
+          // Store exists, check if we need to add sessionId index
+          const store = transaction.objectStore(STORE_NAME);
+          if (!store.indexNames.contains('sessionId')) {
+            store.createIndex('sessionId', 'sessionId', { unique: false });
+            console.log('📦 Added sessionId index to existing store');
+          }
+        }
+      };
+    });
+  }
+
+  async storeVideo(
+    sceneType: 'cruising' | 'chase' | 'arrival',
+    cameraAngle: 1 | 2,
+    blob: Blob,
+    duration: number
+  ): Promise<string> {
+    if (!this.db) {
+      await this.init();
+    }
+
+    const sessionId = this.getCurrentSessionId();
+    const id = `${sessionId}_${sceneType}_camera${cameraAngle}_${Date.now()}`;
+    const record: VideoRecord = {
+      id,
+      sessionId,
+      sceneType,
+      cameraAngle,
+      blob,
+      duration,
+      createdAt: new Date()
+    };
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([STORE_NAME], 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.put(record);
+
+      request.onsuccess = () => {
+        console.log(`💾 Stored ${sceneType} camera ${cameraAngle} video (${blob.size} bytes) for session ${sessionId}`);
+        resolve(id);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getVideo(sceneType: 'cruising' | 'chase' | 'arrival', cameraAngle: 1 | 2): Promise<Blob | null> {
+    if (!this.db) {
+      await this.init();
+    }
+
+    const currentSessionId = this.getCurrentSessionId();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([STORE_NAME], 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      
+      // First try to get by sessionId
+      if (store.indexNames.contains('sessionId')) {
+        const index = store.index('sessionId');
+        const request = index.getAll(currentSessionId);
+
+        request.onsuccess = () => {
+          const records: VideoRecord[] = request.result;
+          console.log(`🔍 Found ${records.length} records for session ${currentSessionId}:`, records.map(r => ({ id: r.id, sceneType: r.sceneType, cameraAngle: r.cameraAngle, sessionId: r.sessionId || 'undefined' })));
+          
+          const match = records
+            .filter(r => r.sceneType === sceneType && r.cameraAngle === cameraAngle)
+            .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0]; // Get latest
+
+          if (match) {
+            console.log(`📹 Retrieved ${sceneType} camera ${cameraAngle} video for session ${currentSessionId}:`, {
+              size: match.blob.size,
+              type: match.blob.type,
+              createdAt: match.createdAt,
+              duration: match.duration
+            });
+            resolve(match.blob);
+          } else {
+            console.log(`📹 No video found for ${sceneType} camera ${cameraAngle} in current session ${currentSessionId}`);
+            resolve(null);
+          }
+        };
+        request.onerror = () => reject(request.error);
+      } else {
+        // No sessionId index available, assume no videos for current session
+        console.log(`📹 No sessionId index available, returning null for ${sceneType} camera ${cameraAngle}`);
+        resolve(null);
+      }
+    });
+  }
+
+
+  async getVideoDuration(sceneType: 'cruising' | 'chase' | 'arrival'): Promise<number | null> {
+    if (!this.db) {
+      await this.init();
+    }
+
+    const currentSessionId = this.getCurrentSessionId();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([STORE_NAME], 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      
+      // Only use sessionId index, don't fall back to old records
+      if (store.indexNames.contains('sessionId')) {
+        const index = store.index('sessionId');
+        const request = index.getAll(currentSessionId);
+
+        request.onsuccess = () => {
+          const records: VideoRecord[] = request.result;
+          const sceneRecords = records.filter(r => r.sceneType === sceneType);
+          console.log(`⏱️ Found ${sceneRecords.length} duration records for ${sceneType} in session ${currentSessionId}`);
+          
+          if (sceneRecords.length > 0) {
+            const latest = sceneRecords.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+            console.log(`⏱️ Returning duration ${latest.duration} for ${sceneType}`);
+            resolve(latest.duration);
+          } else {
+            console.log(`⏱️ No duration found for ${sceneType} in current session`);
+            resolve(null);
+          }
+        };
+        request.onerror = () => reject(request.error);
+      } else {
+        // No sessionId index available, assume no videos for current session
+        console.log(`⏱️ No sessionId index available, returning null duration for ${sceneType}`);
+        resolve(null);
+      }
+    });
+  }
+
+  async clearScene(sceneType: 'cruising' | 'chase' | 'arrival'): Promise<void> {
+    if (!this.db) {
+      await this.init();
+    }
+
+    const currentSessionId = this.getCurrentSessionId();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([STORE_NAME], 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const index = store.index('sessionId');
+      const request = index.getAll(currentSessionId);
+
+      request.onsuccess = () => {
+        const records: VideoRecord[] = request.result;
+        const sceneRecords = records.filter(r => r.sceneType === sceneType);
+        const deletePromises = sceneRecords.map(record => {
+          return new Promise<void>((deleteResolve, deleteReject) => {
+            const deleteRequest = store.delete(record.id);
+            deleteRequest.onsuccess = () => deleteResolve();
+            deleteRequest.onerror = () => deleteReject(deleteRequest.error);
+          });
+        });
+
+        Promise.all(deletePromises)
+          .then(() => {
+            console.log(`🗑️ Cleared ${sceneRecords.length} videos for ${sceneType} scene in session ${currentSessionId}`);
+            resolve();
+          })
+          .catch(reject);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getAllStorageInfo(): Promise<{ scene: string; cameras: number; totalSize: number }[]> {
+    if (!this.db) {
+      await this.init();
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([STORE_NAME], 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const records: VideoRecord[] = request.result;
+        const sceneStats = ['cruising', 'chase', 'arrival'].map(scene => {
+          const sceneRecords = records.filter(r => r.sceneType === scene);
+          const cameras = new Set(sceneRecords.map(r => r.cameraAngle)).size;
+          const totalSize = sceneRecords.reduce((sum, r) => sum + r.blob.size, 0);
+          return { scene, cameras, totalSize };
+        });
+        resolve(sceneStats);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+}
+
+// Export singleton instance
+export const videoStorage = new VideoStorage();

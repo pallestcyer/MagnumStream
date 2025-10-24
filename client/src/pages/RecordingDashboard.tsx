@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import PhaseNavigation from "@/components/PhaseNavigation";
 import { usePilot } from "@/contexts/PilotContext";
 import { useToast } from "@/hooks/use-toast";
+import { videoStorage } from "@/utils/videoStorage";
 import { 
   Video, 
   Circle, 
@@ -55,41 +56,191 @@ export default function RecordingDashboard() {
   const video2Ref = useRef<HTMLVideoElement>(null);
   const [camera1Stream, setCamera1Stream] = useState<MediaStream | null>(null);
   const [camera2Stream, setCamera2Stream] = useState<MediaStream | null>(null);
+  const [camera1Recorder, setCamera1Recorder] = useState<MediaRecorder | null>(null);
+  const [camera2Recorder, setCamera2Recorder] = useState<MediaRecorder | null>(null);
+  const [recordedChunks1, setRecordedChunks1] = useState<Blob[]>([]);
+  const [recordedChunks2, setRecordedChunks2] = useState<Blob[]>([]);
+  const [currentRecordingId, setCurrentRecordingId] = useState<string | null>(null);
 
   const currentScene = SCENES[currentSceneIndex];
 
-  // Initialize cameras
+  // Initialize cameras and setup recording
   useEffect(() => {
     initializeCameras();
+    checkExistingRecordings();
     return () => {
       stopCameras();
     };
   }, []);
 
+  // Check for existing recordings on load
+  const checkExistingRecordings = async () => {
+    try {
+      const currentSessionId = localStorage.getItem('currentSessionId');
+      console.log('🔍 Checking for existing recordings for session:', currentSessionId);
+      
+      for (const scene of SCENES) {
+        const camera1Blob = await videoStorage.getVideo(scene.type, 1);
+        const camera2Blob = await videoStorage.getVideo(scene.type, 2);
+        const duration = await videoStorage.getVideoDuration(scene.type);
+        
+        // Only consider it a valid existing recording if we have a duration from current session
+        if ((camera1Blob || camera2Blob) && duration !== null) {
+          console.log(`✅ Found existing recording for ${scene.type} in current session:`, {
+            camera1: camera1Blob ? `${camera1Blob.size} bytes` : 'None',
+            camera2: camera2Blob ? `${camera2Blob.size} bytes` : 'None',
+            duration: duration
+          });
+          
+          // Mark scene as completed
+          setSceneRecordings(prev => {
+            const updated = prev.map((rec, idx) => {
+              if (SCENES[idx].type === scene.type) {
+                return {
+                  ...rec,
+                  camera1Duration: duration || 0,
+                  camera2Duration: duration || 0,
+                  completed: true
+                };
+              }
+              return rec;
+            });
+            
+            // Auto-advance to next unrecorded scene after state updates
+            setTimeout(() => {
+              const firstUnrecordedIndex = updated.findIndex(rec => !rec.completed);
+              if (firstUnrecordedIndex !== -1 && firstUnrecordedIndex !== currentSceneIndex) {
+                console.log(`🔄 Auto-advancing to next unrecorded scene: ${SCENES[firstUnrecordedIndex].title}`);
+                setCurrentSceneIndex(firstUnrecordedIndex);
+              }
+            }, 100);
+            
+            return updated;
+          });
+        } else if (camera1Blob || camera2Blob) {
+          console.log(`⚠️ Found videos for ${scene.type} but no duration in current session - these are from a different session`);
+        } else {
+          console.log(`📭 No recordings found for ${scene.type} in current session`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error checking existing recordings:', error);
+    }
+  };
+
   const initializeCameras = async () => {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      
+      console.log('🎥 Available video devices:', videoDevices.length);
+      
+      if (videoDevices.length === 0) {
+        console.error('❌ No video devices found');
+        return;
+      }
 
       // Camera 1
+      console.log('🎥 Initializing Camera 1...');
       const stream1 = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: videoDevices[0]?.deviceId }
+        video: { 
+          deviceId: videoDevices[0]?.deviceId,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30 }
+        },
+        audio: true
       });
+      
+      // Validate video tracks
+      const videoTracks1 = stream1.getVideoTracks();
+      if (videoTracks1.length === 0) {
+        console.error('❌ No video tracks in camera 1 stream');
+        return;
+      }
+      
+      console.log('✅ Camera 1 stream created with', videoTracks1.length, 'video tracks');
+      console.log('📊 Camera 1 track settings:', videoTracks1[0].getSettings());
+      
       setCamera1Stream(stream1);
       if (video1Ref.current) {
         video1Ref.current.srcObject = stream1;
         video1Ref.current.play();
       }
 
+      // Setup MediaRecorder for Camera 1
+      console.log('🎬 Setting up MediaRecorder for Camera 1...');
+      
+      // Check supported MIME types - prioritize MP4 for Safari compatibility
+      const supportedTypes = ['video/mp4; codecs="avc1.42E01E,mp4a.40.2"', 'video/mp4', 'video/webm'];
+      const mimeType = supportedTypes.find(type => MediaRecorder.isTypeSupported(type)) || 'video/webm';
+      console.log('📋 Using MIME type:', mimeType);
+      console.log('📋 All supported types:', supportedTypes.filter(type => MediaRecorder.isTypeSupported(type)));
+      
+      const recorder1 = new MediaRecorder(stream1, { mimeType });
+      
+      recorder1.ondataavailable = (event) => {
+        console.log('📹 Camera 1 data available:', event.data.size, 'bytes');
+        if (event.data.size > 0) {
+          setRecordedChunks1(prev => {
+            const newChunks = [...prev, event.data];
+            console.log('📹 Camera 1 total chunks:', newChunks.length);
+            return newChunks;
+          });
+        }
+      };
+      
+      recorder1.onstart = () => console.log('🎬 Camera 1 recording started');
+      recorder1.onstop = () => console.log('🛑 Camera 1 recording stopped');
+      
+      setCamera1Recorder(recorder1);
+
       // Camera 2
       if (videoDevices.length >= 2) {
+        console.log('🎥 Initializing Camera 2...');
         const stream2 = await navigator.mediaDevices.getUserMedia({
-          video: { deviceId: videoDevices[1]?.deviceId }
+          video: { 
+            deviceId: videoDevices[1]?.deviceId,
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            frameRate: { ideal: 30 }
+          },
+          audio: true
         });
-        setCamera2Stream(stream2);
-        if (video2Ref.current) {
-          video2Ref.current.srcObject = stream2;
-          video2Ref.current.play();
+        
+        // Validate video tracks
+        const videoTracks2 = stream2.getVideoTracks();
+        if (videoTracks2.length === 0) {
+          console.error('❌ No video tracks in camera 2 stream');
+        } else {
+          console.log('✅ Camera 2 stream created with', videoTracks2.length, 'video tracks');
+          console.log('📊 Camera 2 track settings:', videoTracks2[0].getSettings());
+          
+          setCamera2Stream(stream2);
+          if (video2Ref.current) {
+            video2Ref.current.srcObject = stream2;
+            video2Ref.current.play();
+          }
+
+          // Setup MediaRecorder for Camera 2
+          console.log('🎬 Setting up MediaRecorder for Camera 2...');
+          const recorder2 = new MediaRecorder(stream2, { mimeType });
+        
+        recorder2.ondataavailable = (event) => {
+          console.log('📹 Camera 2 data available:', event.data.size, 'bytes');
+          if (event.data.size > 0) {
+            setRecordedChunks2(prev => {
+              const newChunks = [...prev, event.data];
+              console.log('📹 Camera 2 total chunks:', newChunks.length);
+              return newChunks;
+            });
+          }
+        };
+        
+        recorder2.onstart = () => console.log('🎬 Camera 2 recording started');
+        recorder2.onstop = () => console.log('🛑 Camera 2 recording stopped');
+        
+        setCamera2Recorder(recorder2);
         }
       }
     } catch (error) {
@@ -122,34 +273,178 @@ export default function RecordingDashboard() {
       } else {
         setRecordingState("recording");
         setCountdown(3);
+        
+        // Start actual recording
+        console.log('🎬 Starting recording - Camera states:', {
+          camera1State: camera1Recorder?.state,
+          camera2State: camera2Recorder?.state
+        });
+        
+        if (camera1Recorder && camera1Recorder.state === 'inactive') {
+          console.log('🎬 Starting Camera 1 recording');
+          setRecordedChunks1([]);
+          camera1Recorder.start(1000); // Record in 1-second chunks
+        }
+        if (camera2Recorder && camera2Recorder.state === 'inactive') {
+          console.log('🎬 Starting Camera 2 recording');
+          setRecordedChunks2([]);
+          camera2Recorder.start(1000);
+        }
       }
     }
-  }, [recordingState, countdown]);
+  }, [recordingState, countdown, camera1Recorder, camera2Recorder]);
 
-  const handleStartRecording = () => {
+  const handleStartRecording = async () => {
     setRecordingState("countdown");
     setElapsedTime(0);
+    
+    // Create a recording session
+    if (!currentRecordingId) {
+      const recordingId = crypto.randomUUID();
+      setCurrentRecordingId(recordingId);
+      
+      // Create flight recording in database
+      try {
+        await fetch('/api/recordings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectName: `${pilotInfo.name || 'Unknown'} Flight`,
+            pilotName: pilotInfo.name || 'Unknown Pilot',
+            pilotEmail: pilotInfo.email || '',
+            staffMember: pilotInfo.staffMember || 'Unknown',
+            flightDate: new Date().toISOString().split('T')[0],
+            flightTime: new Date().toTimeString().split(' ')[0],
+            exportStatus: 'recording'
+          })
+        });
+      } catch (error) {
+        console.error('Failed to create recording session:', error);
+      }
+    }
   };
 
-  const handleStopRecording = () => {
+  const handleStopRecording = async () => {
     // Check minimum duration
-    if (elapsedTime < 30) {
+    if (elapsedTime < 5) {
       toast({
         title: "Recording Too Short",
-        description: "Please record at least 30 seconds for each scene.",
+        description: "Please record at least 5 seconds for each scene.",
         variant: "destructive",
       });
       return;
     }
     
+    // Stop recording
+    if (camera1Recorder && camera1Recorder.state === 'recording') {
+      camera1Recorder.stop();
+    }
+    if (camera2Recorder && camera2Recorder.state === 'recording') {
+      camera2Recorder.stop();
+    }
+    
     setRecordingState("completed");
     
-    // Mark scene as completed
+    // Mark scene as completed and save video files
     setSceneRecordings(prev => prev.map((rec, idx) => 
       idx === currentSceneIndex 
         ? { ...rec, camera1Duration: elapsedTime, camera2Duration: elapsedTime, completed: true }
         : rec
     ));
+    
+    // Save recorded videos after a short delay to ensure recording stopped
+    setTimeout(() => {
+      saveRecordedVideos();
+    }, 1000);
+  };
+  
+  const saveRecordedVideos = async () => {
+    if (!currentRecordingId) return;
+    
+    try {
+      const currentSceneType = currentScene.type;
+      
+      console.log(`💾 Saving recorded videos for ${currentSceneType}:`, {
+        camera1Chunks: recordedChunks1.length,
+        camera2Chunks: recordedChunks2.length,
+        camera1Size: recordedChunks1.reduce((total, chunk) => total + chunk.size, 0),
+        camera2Size: recordedChunks2.reduce((total, chunk) => total + chunk.size, 0),
+        elapsedTime
+      });
+      
+      // Only create blobs if we have recorded data
+      if (recordedChunks1.length === 0 && recordedChunks2.length === 0) {
+        console.warn('⚠️ No recorded chunks found for any camera');
+        return;
+      }
+      
+      // Create blobs from recorded chunks with explicit MIME type - prioritize MP4
+      const supportedTypes = ['video/mp4; codecs="avc1.42E01E,mp4a.40.2"', 'video/mp4', 'video/webm'];
+      const recordingMimeType = supportedTypes.find(type => MediaRecorder.isTypeSupported(type)) || 'video/webm';
+      
+      const camera1Blob = recordedChunks1.length > 0 ? new Blob(recordedChunks1, { type: recordingMimeType }) : null;
+      const camera2Blob = recordedChunks2.length > 0 ? new Blob(recordedChunks2, { type: recordingMimeType }) : null;
+      
+      console.log('📦 Created blobs:', {
+        camera1Size: camera1Blob?.size || 0,
+        camera2Size: camera2Blob?.size || 0,
+        recordingMimeType,
+        camera1Type: camera1Blob?.type,
+        camera2Type: camera2Blob?.type
+      });
+      
+      // Store blobs in IndexedDB
+      if (camera1Blob) {
+        await videoStorage.storeVideo(currentSceneType, 1, camera1Blob, elapsedTime);
+        console.log('💾 Stored camera 1 in IndexedDB');
+      }
+      
+      if (camera2Blob) {
+        await videoStorage.storeVideo(currentSceneType, 2, camera2Blob, elapsedTime);
+        console.log('💾 Stored camera 2 in IndexedDB');
+      }
+      
+      // Check if all scenes are now recorded for this session
+      const currentSessionId = videoStorage.getCurrentSessionId();
+      let allScenesRecorded = true;
+      
+      for (const scene of SCENES) {
+        const camera1 = await videoStorage.getVideo(scene.type, 1);
+        const camera2 = await videoStorage.getVideo(scene.type, 2);
+        if (!camera1 && !camera2) {
+          allScenesRecorded = false;
+          break;
+        }
+      }
+      
+      if (allScenesRecorded) {
+        await videoStorage.updateProjectStatus('recorded');
+        console.log('🎯 All scenes recorded - project marked as recorded');
+      }
+      
+      // Store metadata in localStorage (small data)
+      localStorage.setItem(`scene_${currentSceneType}_duration`, elapsedTime.toString());
+      localStorage.setItem('currentRecordingId', currentRecordingId);
+      
+      console.log(`📹 Saved ${currentSceneType} scene videos:`, {
+        camera1: camera1Blob ? 'Stored in IndexedDB' : 'No data',
+        camera2: camera2Blob ? 'Stored in IndexedDB' : 'No data',
+        duration: elapsedTime
+      });
+      
+      toast({
+        title: "Scene Recorded",
+        description: `${currentSceneType} scene saved successfully`,
+      });
+      
+    } catch (error) {
+      console.error('Failed to save recorded videos:', error);
+      toast({
+        title: "Save Failed",
+        description: "Could not save recorded videos",
+        variant: "destructive",
+      });
+    }
   };
 
   const handlePauseRecording = () => {
@@ -160,7 +455,17 @@ export default function RecordingDashboard() {
     setRecordingState("recording");
   };
 
-  const handleRetake = () => {
+  const handleRetake = async () => {
+    const currentSceneType = currentScene.type;
+    
+    // Clear the scene from IndexedDB
+    try {
+      await videoStorage.clearScene(currentSceneType);
+      console.log(`🗑️ Cleared existing recording for ${currentSceneType}`);
+    } catch (error) {
+      console.error('❌ Error clearing scene:', error);
+    }
+    
     setRecordingState("idle");
     setElapsedTime(0);
     setSceneRecordings(prev => prev.map((rec, idx) => 
@@ -231,6 +536,14 @@ export default function RecordingDashboard() {
                   <button
                     key={scene.type}
                     onClick={() => {
+                      if (rec.completed && idx !== currentSceneIndex) {
+                        // Switching to a completed scene - show confirmation
+                        const confirm = window.confirm(
+                          `${scene.title} has already been recorded (${formatTime(rec.camera1Duration)}). Switch to re-record?`
+                        );
+                        if (!confirm) return;
+                      }
+                      
                       setCurrentSceneIndex(idx);
                       setRecordingState("idle");
                       setElapsedTime(0);
@@ -246,6 +559,13 @@ export default function RecordingDashboard() {
                       {rec.completed && <CheckCircle2 className="w-5 h-5 text-orange-500" />}
                     </div>
                     <p className="text-xs text-muted-foreground">{scene.description}</p>
+                    {rec.completed && (
+                      <div className="mt-2 text-xs text-orange-400">
+                        ✅ Recorded ({formatTime(rec.camera1Duration)})
+                        <br />
+                        <span className="text-muted-foreground">Click to re-record</span>
+                      </div>
+                    )}
                   </button>
                 );
               })}
@@ -321,9 +641,9 @@ export default function RecordingDashboard() {
                 </div>
                 <div className="flex items-center gap-2 justify-end mt-1">
                   {(recordingState === "recording" || recordingState === "paused") && (
-                    <div className={`flex items-center gap-1 text-sm ${elapsedTime >= 30 ? "text-green-500" : "text-yellow-500"}`}>
+                    <div className={`flex items-center gap-1 text-sm ${elapsedTime >= 5 ? "text-green-500" : "text-yellow-500"}`}>
                       <Target className="w-4 h-4" />
-                      <span>Min: 30s</span>
+                      <span>Min: 5s</span>
                     </div>
                   )}
                   <div className="text-sm text-muted-foreground">

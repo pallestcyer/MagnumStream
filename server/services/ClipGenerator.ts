@@ -1,0 +1,344 @@
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import path from 'path';
+import fs from 'fs/promises';
+import { randomUUID } from 'crypto';
+import { storage } from '../storage';
+
+const execAsync = promisify(exec);
+
+interface SlotSelection {
+  slotNumber: number;
+  windowStart: number;
+  sceneType: 'cruising' | 'chase' | 'arrival';
+  cameraAngle: 1 | 2;
+}
+
+interface ClipFile {
+  slotNumber: number;
+  filePath: string;
+  windowStart: number;
+  duration: number;
+  sceneType: string;
+  cameraAngle: number;
+  sceneId: string;
+}
+
+interface GeneratedClip {
+  id: string;
+  recordingId: string;
+  sceneId: string;
+  slotNumber: number;
+  filePath: string;
+  windowStart: number;
+  duration: number;
+  cameraAngle: number;
+  sceneType: string;
+  clipStatus: string;
+  createdAt: Date;
+}
+
+export class ClipGenerator {
+  private readonly baseDir = './projects';
+  
+  constructor() {
+    this.ensureBaseDirectory();
+  }
+
+  private async ensureBaseDirectory() {
+    try {
+      await fs.mkdir(this.baseDir, { recursive: true });
+    } catch (error) {
+      console.error('Failed to create projects directory:', error);
+    }
+  }
+
+  /**
+   * Generate project directory structure:
+   * ./projects/
+   *   └── John_Doe_2024-01-15/
+   *       ├── clips/
+   *       │   ├── slot_1_cruising_cam1.mp4
+   *       │   ├── slot_2_cruising_cam2.mp4
+   *       │   └── ...
+   *       └── davinci/
+   *           └── job_files/
+   */
+  private async getProjectDirectory(recordingId: string): Promise<string> {
+    // Get recording info for directory naming
+    const recording = await storage.getFlightRecording(recordingId);
+    
+    if (!recording) {
+      throw new Error(`Recording not found: ${recordingId}`);
+    }
+    
+    const { pilotName, createdAt } = recording;
+    const date = new Date(createdAt).toISOString().split('T')[0];
+    const sanitizedName = pilotName.replace(/[^a-zA-Z0-9]/g, '_');
+    
+    const projectDir = path.join(this.baseDir, `${sanitizedName}_${date}`);
+    
+    // Create subdirectories
+    const clipsDir = path.join(projectDir, 'clips');
+    const davinciDir = path.join(projectDir, 'davinci');
+    const sourceDir = path.join(projectDir, 'source'); // For extracted video files
+    
+    await fs.mkdir(clipsDir, { recursive: true });
+    await fs.mkdir(davinciDir, { recursive: true });
+    await fs.mkdir(sourceDir, { recursive: true });
+    
+    return projectDir;
+  }
+
+  async generateClipsFromSlotSelections(recordingId: string, slotSelections?: SlotSelection[]): Promise<ClipFile[]> {
+    const clipFiles: ClipFile[] = [];
+    const projectDir = await this.getProjectDirectory(recordingId);
+    const clipsDir = path.join(projectDir, 'clips');
+    const sourceDir = path.join(projectDir, 'source');
+    
+    console.log(`🎬 Generating clips for recording ${recordingId}`);
+    console.log(`📁 Project directory: ${projectDir}`);
+    
+    // If no slot selections provided, get them from the database
+    let slotsToProcess = slotSelections;
+    if (!slotsToProcess && storage.getVideoSlotsByRecordingId) {
+      console.log(`📊 Fetching saved video slots from database...`);
+      const savedSlots = await storage.getVideoSlotsByRecordingId(recordingId);
+      slotsToProcess = savedSlots.map(slot => ({
+        slotNumber: slot.slot_number,
+        windowStart: slot.window_start,
+        sceneType: this.getSceneTypeFromSlotNumber(slot.slot_number),
+        cameraAngle: slot.camera_angle
+      }));
+      console.log(`📊 Found ${slotsToProcess.length} saved slots`);
+    }
+    
+    if (!slotsToProcess || slotsToProcess.length === 0) {
+      console.warn(`⚠️ No slot selections found for recording ${recordingId}`);
+      return clipFiles;
+    }
+    
+    // Group slots by scene type for efficient processing
+    const slotsByScene = this.groupSlotsByScene(slotsToProcess);
+    
+    for (const [sceneType, sceneSlots] of Object.entries(slotsByScene)) {
+      console.log(`🎬 Processing ${sceneSlots.length} slots for ${sceneType} scene`);
+      
+      // Extract scene videos from storage to temporary files
+      const sceneVideos = await this.extractSceneVideos(recordingId, sceneType, sourceDir);
+      
+      for (const slot of sceneSlots) {
+        const outputFilename = `slot_${slot.slotNumber}_${slot.sceneType}_cam${slot.cameraAngle}.mp4`;
+        const outputPath = path.join(clipsDir, outputFilename);
+        
+        try {
+          // Get the appropriate source video file
+          const sourceVideo = sceneVideos[`camera${slot.cameraAngle}`];
+          if (!sourceVideo) {
+            console.warn(`⚠️ No camera ${slot.cameraAngle} video found for ${sceneType} scene, creating placeholder`);
+            await this.createMockClip(outputPath, slot.windowStart, 3.0);
+          } else {
+            // Generate clip using FFmpeg
+            await this.generateClipFromVideo(sourceVideo, outputPath, slot.windowStart, 3.0);
+          }
+          
+          const clipFile: ClipFile = {
+            slotNumber: slot.slotNumber,
+            filePath: outputPath,
+            windowStart: slot.windowStart,
+            duration: 3.0,
+            sceneType: slot.sceneType,
+            cameraAngle: slot.cameraAngle,
+            sceneId: `${recordingId}_${slot.sceneType}`
+          };
+          
+          clipFiles.push(clipFile);
+          console.log(`✅ Generated clip: ${outputFilename} (${slot.windowStart}s - ${slot.windowStart + 3}s)`);
+          
+        } catch (error) {
+          console.error(`❌ Failed to generate clip for slot ${slot.slotNumber}:`, error);
+        }
+      }
+    }
+    
+    console.log(`🎬 Clip generation complete: ${clipFiles.length} clips generated`);
+    return clipFiles;
+  }
+
+  private getSceneTypeFromSlotNumber(slotNumber: number): 'cruising' | 'chase' | 'arrival' {
+    // Based on SLOT_TEMPLATE: slots 1-3 = cruising, 4-6 = chase, 7-8 = arrival
+    if (slotNumber >= 1 && slotNumber <= 3) return 'cruising';
+    if (slotNumber >= 4 && slotNumber <= 6) return 'chase';
+    if (slotNumber >= 7 && slotNumber <= 8) return 'arrival';
+    throw new Error(`Invalid slot number: ${slotNumber}`);
+  }
+  
+  private groupSlotsByScene(slots: SlotSelection[]): Record<string, SlotSelection[]> {
+    return slots.reduce((groups, slot) => {
+      if (!groups[slot.sceneType]) {
+        groups[slot.sceneType] = [];
+      }
+      groups[slot.sceneType].push(slot);
+      return groups;
+    }, {} as Record<string, SlotSelection[]>);
+  }
+  
+  private async extractSceneVideos(recordingId: string, sceneType: string, sourceDir: string): Promise<Record<string, string>> {
+    const videos: Record<string, string> = {};
+    
+    // TODO: This method would need to integrate with your video storage system
+    // For now, we'll create placeholder files or use existing files if they exist
+    console.log(`📹 Extracting ${sceneType} scene videos for recording ${recordingId}`);
+    
+    const camera1Path = path.join(sourceDir, `${sceneType}_camera1.mp4`);
+    const camera2Path = path.join(sourceDir, `${sceneType}_camera2.mp4`);
+    
+    // Check if files already exist
+    try {
+      await fs.access(camera1Path);
+      videos.camera1 = camera1Path;
+      console.log(`📹 Found existing camera 1 file: ${camera1Path}`);
+    } catch {
+      console.log(`📹 Camera 1 file not found for ${sceneType}, will use placeholder`);
+    }
+    
+    try {
+      await fs.access(camera2Path);
+      videos.camera2 = camera2Path;
+      console.log(`📹 Found existing camera 2 file: ${camera2Path}`);
+    } catch {
+      console.log(`📹 Camera 2 file not found for ${sceneType}, will use placeholder`);
+    }
+    
+    return videos;
+  }
+  
+  private async generateClipFromVideo(sourceVideoPath: string, outputPath: string, startTime: number, duration: number): Promise<void> {
+    const ffmpegCommand = [
+      'ffmpeg', '-y',
+      '-i', `"${sourceVideoPath}"`,
+      '-ss', startTime.toString(),
+      '-t', duration.toString(),
+      '-c:v', 'libx264',
+      '-c:a', 'aac',
+      '-movflags', '+faststart',
+      `"${outputPath}"`
+    ].join(' ');
+    
+    console.log(`🔧 FFmpeg command: ${ffmpegCommand}`);
+    
+    try {
+      const { stdout, stderr } = await execAsync(ffmpegCommand);
+      if (stderr && !stderr.includes('frame=')) {
+        console.warn(`FFmpeg stderr: ${stderr}`);
+      }
+    } catch (error) {
+      console.error('FFmpeg error:', error);
+      // Fall back to creating a mock clip
+      await this.createMockClip(outputPath, startTime, duration);
+    }
+  }
+
+  private async createMockClip(outputPath: string, startTime: number, duration: number): Promise<void> {
+    // Create a simple test video using FFmpeg (black screen with timer)
+    const ffmpegCommand = [
+      'ffmpeg', '-y',
+      '-f', 'lavfi',
+      '-i', `color=black:size=1920x1080:duration=${duration}:rate=24`,
+      '-f', 'lavfi',
+      '-i', `sine=frequency=440:duration=${duration}`,
+      '-vf', `drawtext=text='Slot Demo ${startTime.toFixed(1)}s':fontcolor=white:fontsize=72:x=(w-text_w)/2:y=(h-text_h)/2`,
+      '-c:v', 'libx264',
+      '-c:a', 'aac',
+      '-movflags', '+faststart',
+      `"${outputPath}"`
+    ].join(' ');
+    
+    try {
+      await execAsync(ffmpegCommand);
+    } catch (error) {
+      // If FFmpeg is not available, create a placeholder file
+      console.warn('FFmpeg not available, creating placeholder file');
+      await fs.writeFile(outputPath, `Mock video clip - Slot demo ${startTime.toFixed(1)}s`);
+    }
+  }
+
+  async getProjectClips(recordingId: string): Promise<any[]> {
+    const projectDir = await this.getProjectDirectory(recordingId);
+    const clipsDir = path.join(projectDir, 'clips');
+    
+    try {
+      const files = await fs.readdir(clipsDir);
+      const clipFiles = files.filter(f => f.endsWith('.mp4')).map(filename => {
+        const match = filename.match(/slot_(\d+)_(\w+)_cam(\d+)\.mp4/);
+        if (match) {
+          const [, slotNumber, sceneType, cameraAngle] = match;
+          return {
+            slotNumber: parseInt(slotNumber),
+            sceneType,
+            cameraAngle: parseInt(cameraAngle),
+            filePath: path.join(clipsDir, filename),
+            filename
+          };
+        }
+        return null;
+      }).filter(Boolean);
+      
+      return clipFiles.sort((a, b) => a.slotNumber - b.slotNumber);
+    } catch (error) {
+      console.warn(`No clips directory found for recording ${recordingId}`);
+      return [];
+    }
+  }
+
+  async getProjectDirectoryPath(recordingId: string): Promise<string> {
+    return await this.getProjectDirectory(recordingId);
+  }
+
+  async createDaVinciJobFile(recordingId: string): Promise<string> {
+    const clips = await this.getProjectClips(recordingId);
+    const projectDir = await this.getProjectDirectory(recordingId);
+    const davinciDir = path.join(projectDir, 'davinci');
+    
+    const recording = await storage.getFlightRecording(recordingId);
+    
+    if (!recording) {
+      throw new Error(`Recording not found: ${recordingId}`);
+    }
+    
+    const jobData = {
+      jobId: randomUUID(),
+      recordingId,
+      projectName: `${recording.pilotName}_${new Date().toISOString().split('T')[0]}`,
+      templateProject: "MagnumPI_Template",
+      clips: {} as Record<number, any>,
+      metadata: {
+        pilotName: recording.pilotName,
+        pilotEmail: recording.pilotEmail,
+        flightDate: recording.flightDate,
+        flightTime: recording.flightTime,
+        createdAt: new Date().toISOString()
+      }
+    };
+    
+    // Map clips to DaVinci slot positions
+    clips.forEach(clip => {
+      jobData.clips[clip.slotNumber] = {
+        filename: clip.filename,
+        fullPath: path.resolve(clip.filePath),
+        slotNumber: clip.slotNumber,
+        sceneType: clip.sceneType,
+        cameraAngle: clip.cameraAngle,
+        duration: 3.0 // All clips are 3 seconds
+      };
+    });
+    
+    const jobFilePath = path.join(davinciDir, `job_${jobData.jobId}.json`);
+    await fs.writeFile(jobFilePath, JSON.stringify(jobData, null, 2));
+    
+    console.log(`📄 Created DaVinci job file: ${jobFilePath}`);
+    console.log(`📊 Job includes ${clips.length} clips for ${Object.keys(jobData.clips).length} slots`);
+    
+    return jobFilePath;
+  }
+}

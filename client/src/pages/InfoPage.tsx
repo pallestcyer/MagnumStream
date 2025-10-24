@@ -15,6 +15,7 @@ import { Video, VideoOff, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePilot } from "@/contexts/PilotContext";
 import PhaseNavigation from "@/components/PhaseNavigation";
+import { videoStorage } from "@/utils/videoStorage";
 
 export default function InfoPage() {
   const [, setLocation] = useLocation();
@@ -35,6 +36,8 @@ export default function InfoPage() {
   const video2Ref = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
+    // Clear any previous session when loading the info page
+    videoStorage.clearCurrentSession();
     initializeCameras();
     return () => {
       stopCameras();
@@ -116,6 +119,15 @@ export default function InfoPage() {
     const combinedName = firstName2.trim() 
       ? `${firstName1.trim()} & ${firstName2.trim()}`
       : firstName1.trim();
+    
+    // Set the current session for video storage isolation
+    console.log('🎯 Setting new session for customer:', combinedName);
+    videoStorage.setCurrentSession(combinedName);
+    
+    // Store additional info in localStorage for API calls
+    localStorage.setItem('pilotEmail', email);
+    localStorage.setItem('staffMember', staffMember);
+    
     setPilotInfo({ name: combinedName, email, staffMember });
     setLocation("/recording");
   };

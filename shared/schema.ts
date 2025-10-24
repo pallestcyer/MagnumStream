@@ -130,3 +130,26 @@ export const SLOT_TEMPLATE: SlotConfig[] = [
   { slotNumber: 7, sceneType: 'arrival', cameraAngle: 1, color: '#FF7A3D' }, // Medium Orange
   { slotNumber: 8, sceneType: 'arrival', cameraAngle: 2, color: '#FFAB5E' }, // Warm Orange
 ];
+
+// Generated clips table for local file storage
+export const generatedClips = pgTable("generated_clips", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  recordingId: varchar("recording_id").notNull(), // Links to flight_recordings
+  sceneId: varchar("scene_id").notNull(), // Links to scene_recordings  
+  slotNumber: integer("slot_number").notNull(), // 1-8
+  filePath: text("file_path").notNull(), // Local file path
+  windowStart: real("window_start").notNull(), // Start time in original scene
+  duration: real("duration").notNull().default(3), // Clip duration
+  cameraAngle: integer("camera_angle").notNull(), // 1 or 2
+  sceneType: text("scene_type").notNull(), // 'cruising' | 'chase' | 'arrival'
+  clipStatus: text("clip_status").notNull().default("pending"), // 'pending' | 'generated' | 'exported'
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertGeneratedClipSchema = createInsertSchema(generatedClips).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertGeneratedClip = z.infer<typeof insertGeneratedClipSchema>;
+export type GeneratedClip = typeof generatedClips.$inferSelect;

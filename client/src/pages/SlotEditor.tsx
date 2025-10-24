@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Save, Download, Play } from "lucide-react";
@@ -9,6 +9,7 @@ import SlotSelector from "@/components/SlotSelector";
 import { SLOT_TEMPLATE, SlotConfig } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { usePilot } from "@/contexts/PilotContext";
+import { videoStorage } from "@/utils/videoStorage";
 
 interface SceneData {
   id: string;
@@ -45,8 +46,54 @@ export default function SlotEditor() {
       windowStart: 0,
     }))
   );
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentRecordingId, setCurrentRecordingId] = useState<string | null>(null);
 
-  const handleWindowStartChange = (slotNumber: number, newStart: number) => {
+  // Load existing timeline positions on component mount
+  useEffect(() => {
+    const loadTimelinePositions = async () => {
+      try {
+        const recordingId = localStorage.getItem('currentRecordingId');
+        if (!recordingId) {
+          console.log('No current recording ID found');
+          setIsLoading(false);
+          return;
+        }
+        
+        setCurrentRecordingId(recordingId);
+        
+        // Fetch existing video slots for this recording
+        const response = await fetch(`/api/recordings/${recordingId}/video-slots`);
+        if (response.ok) {
+          const existingSlots = await response.json();
+          console.log('Loaded existing video slots:', existingSlots);
+          
+          // Update slot selections with saved timeline positions
+          if (existingSlots.length > 0) {
+            setSlotSelections(prev => 
+              prev.map(slot => {
+                const existingSlot = existingSlots.find(s => s.slot_number === slot.slotNumber);
+                return existingSlot 
+                  ? { ...slot, windowStart: existingSlot.window_start }
+                  : slot;
+              })
+            );
+          }
+        } else {
+          console.log('No existing video slots found for recording');
+        }
+      } catch (error) {
+        console.error('Failed to load timeline positions:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadTimelinePositions();
+  }, []);
+
+  const handleWindowStartChange = async (slotNumber: number, newStart: number) => {
+    // Update local state immediately for responsive UI
     setSlotSelections(prev =>
       prev.map(slot =>
         slot.slotNumber === slotNumber
@@ -54,17 +101,65 @@ export default function SlotEditor() {
           : slot
       )
     );
+    
+    // Save to database (debounced to avoid too many API calls)
+    if (currentRecordingId) {
+      try {
+        const response = await fetch(`/api/recordings/${currentRecordingId}/video-slots/${slotNumber}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ windowStart: newStart })
+        });
+        
+        if (response.ok) {
+          console.log(`Saved timeline position for slot ${slotNumber}: ${newStart}s`);
+        } else {
+          console.error('Failed to save timeline position:', response.statusText);
+        }
+      } catch (error) {
+        console.error('Error saving timeline position:', error);
+      }
+    }
   };
 
   const getSceneData = (sceneType: 'cruising' | 'chase' | 'arrival'): SceneData => {
     return scenes.find(s => s.type === sceneType) || scenes[0];
   };
 
-  const handleSave = () => {
-    toast({
-      title: "Selections Saved",
-      description: "Your slot selections have been saved successfully.",
-    });
+  const handleSave = async () => {
+    if (!currentRecordingId) {
+      toast({
+        title: "Error",
+        description: "No active recording found. Cannot save selections.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Save all current slot selections to the database
+      for (const slot of slotSelections) {
+        if (slot.windowStart > 0) { // Only save slots that have been modified
+          await fetch(`/api/recordings/${currentRecordingId}/video-slots/${slot.slotNumber}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ windowStart: slot.windowStart })
+          });
+        }
+      }
+
+      toast({
+        title: "Selections Saved",
+        description: "Your slot timeline positions have been saved successfully.",
+      });
+    } catch (error) {
+      console.error('Failed to save all selections:', error);
+      toast({
+        title: "Save Error",
+        description: "Failed to save some timeline positions. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleExportClick = () => {
@@ -95,6 +190,11 @@ export default function SlotEditor() {
                   Pilot: <span className="font-semibold text-foreground">{pilotInfo.name || "Not set"}</span>
                   {pilotInfo.email && <span className="ml-4 text-sm">({pilotInfo.email})</span>}
                 </p>
+                {isLoading && (
+                  <p className="text-sm text-primary mt-1">
+                    Loading timeline positions...
+                  </p>
+                )}
               </div>
               <div className="flex gap-3">
                 <Button

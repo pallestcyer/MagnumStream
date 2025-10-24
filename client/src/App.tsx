@@ -11,6 +11,7 @@ import RecordingDashboard from "@/pages/RecordingDashboard";
 import EditorCruising from "@/pages/EditorCruising";
 import EditorChase from "@/pages/EditorChase";
 import EditorArrival from "@/pages/EditorArrival";
+import RenderPage from "@/pages/RenderPage";
 import SlotEditor from "@/pages/SlotEditor";
 import SalesPage from "@/pages/SalesPage";
 import HistoryPage from "@/pages/HistoryPage";
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/editor/chase" component={EditorChase} />
       <Route path="/editor/arrival" component={EditorArrival} />
       <Route path="/editor" component={EditorCruising} />
+      <Route path="/render" component={RenderPage} />
       <Route path="/sales" component={SalesPage} />
       <Route path="/history" component={HistoryPage} />
       <Route path="/manual" component={ManualPage} />

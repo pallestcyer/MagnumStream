@@ -22,15 +22,13 @@ export default function DeviceSelector({
 }: DeviceSelectorProps) {
   //todo: remove mock functionality
   const camera1Options = [
-    { id: "front", name: "Front Camera" },
-    { id: "side", name: "Side Camera" },
-    { id: "gopro1", name: "GoPro 1" },
+    { id: "0", name: "Elgato 4K X (Camera 1)" },
+    { id: "1", name: "Elgato 4K X (Camera 2)" },
   ];
 
   const camera2Options = [
-    { id: "rear", name: "Rear Camera" },
-    { id: "top", name: "Top Camera" },
-    { id: "gopro2", name: "GoPro 2" },
+    { id: "0", name: "Elgato 4K X (Camera 1)" },
+    { id: "1", name: "Elgato 4K X (Camera 2)" },
   ];
 
   return (
@@ -39,7 +37,7 @@ export default function DeviceSelector({
         <Camera className="w-4 h-4 text-muted-foreground flex-shrink-0" />
         <span className="text-xs text-muted-foreground">Cam 1:</span>
         <Select
-          value={selectedCamera1 || "front"}
+          value={selectedCamera1 || "0"}
           onValueChange={(value) => {
             console.log("Camera 1 changed to:", value);
             onCamera1Change?.(value);
@@ -62,7 +60,7 @@ export default function DeviceSelector({
         <Camera className="w-4 h-4 text-muted-foreground flex-shrink-0" />
         <span className="text-xs text-muted-foreground">Cam 2:</span>
         <Select
-          value={selectedCamera2 || "rear"}
+          value={selectedCamera2 || "1"}
           onValueChange={(value) => {
             console.log("Camera 2 changed to:", value);
             onCamera2Change?.(value);

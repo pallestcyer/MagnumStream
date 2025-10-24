@@ -1,0 +1,47 @@
+{
+  "project_name": "MAG_FERRARI-BACKUP",
+  "timeline_name": "MAG_FERARRI", 
+  "frame_rate": 23.976,
+  "clips": [
+    {
+      "slot": 1,
+      "name": "FERRARI_CHASE-CAM_B.mov",
+      "start_frame": 86570,
+      "duration_frames": 39,
+      "start_seconds": 3610.694,
+      "duration_seconds": 1.627
+    },
+    {
+      "slot": 2,
+      "name": "FERRARI_CHASE-CAM_A.mov", 
+      "start_frame": 86633,
+      "duration_frames": 36,
+      "start_seconds": 3613.322,
+      "duration_seconds": 1.502
+    },
+    {
+      "slot": 3,
+      "name": "FERRARI_CHASE-CAM_A.mov",
+      "start_frame": 87135,
+      "duration_frames": 37,
+      "start_seconds": 3634.259,
+      "duration_seconds": 1.543
+    },
+    {
+      "slot": 4,
+      "name": "FERRARI_CHASE-CAM_A.mov",
+      "start_frame": 87328,
+      "duration_frames": 60,
+      "start_seconds": 3642.309,
+      "duration_seconds": 2.503
+    },
+    {
+      "slot": 5,
+      "name": "FERRARI_CHASE-CAM_A.mov",
+      "start_frame": 87565,
+      "duration_frames": 48,
+      "start_seconds": 3652.194,
+      "duration_seconds": 2.002
+    }
+  ]
+}

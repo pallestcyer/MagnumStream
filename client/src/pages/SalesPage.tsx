@@ -33,6 +33,7 @@ import type { FlightRecording } from "@shared/schema";
 import { BUNDLE_OPTIONS } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import VideoPreview from "@/components/VideoPreview";
 
 export default function SalesPage() {
   const [activeTab, setActiveTab] = useState("front-desk");
@@ -252,65 +253,69 @@ export default function SalesPage() {
                 </div>
               ) : (
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {unsoldRecordings.map((recording) => (
-                    <Card
-                      key={recording.id}
-                      className="p-4 bg-card/50 border-card-border hover-elevate"
-                      data-testid={`video-card-unsold-${recording.id}`}
-                    >
-                      <div className="space-y-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-foreground text-lg">{recording.pilotName}</h3>
-                            <p className="text-sm text-muted-foreground mt-1">{recording.projectName}</p>
+                  {unsoldRecordings.map((recording) => {
+                    // If recording has a Google Drive file, use VideoPreview component
+                    if (recording.driveFileUrl && recording.driveFileId) {
+                      return (
+                        <VideoPreview
+                          key={recording.id}
+                          driveFileId={recording.driveFileId}
+                          driveFileUrl={recording.driveFileUrl}
+                          customerName={recording.pilotName}
+                          flightDate={recording.flightDate || 'Unknown date'}
+                          flightTime={recording.flightTime || 'Unknown time'}
+                          onSale={() => handleMarkAsSold(recording)}
+                          showSaleButton={true}
+                        />
+                      );
+                    }
+                    
+                    // Fallback to legacy card for recordings without Drive files
+                    return (
+                      <Card
+                        key={recording.id}
+                        className="p-4 bg-card/50 border-card-border hover-elevate"
+                        data-testid={`video-card-unsold-${recording.id}`}
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-foreground text-lg">{recording.pilotName}</h3>
+                              <p className="text-sm text-muted-foreground mt-1">{recording.projectName}</p>
+                            </div>
+                            <Badge variant="outline" className="bg-orange-500/20 text-orange-500 border-orange-500/50">
+                              Processing
+                            </Badge>
                           </div>
-                          <Badge variant="outline" className="bg-orange-500/20 text-orange-500 border-orange-500/50">
-                            New
-                          </Badge>
-                        </div>
 
-                        <div className="text-sm text-muted-foreground space-y-1 bg-muted/20 p-3 rounded-md">
-                          <p className="flex items-center gap-2">
-                            <Calendar className="w-3 h-3" />
-                            {recording.flightDate} at {recording.flightTime}
-                          </p>
-                          <p className="flex items-center gap-2">
-                            <Users className="w-3 h-3" />
-                            Staff: {recording.staffMember || "Unknown"}
-                          </p>
-                          {recording.pilotEmail && (
-                            <p className="flex items-center gap-2 text-xs truncate">
-                              📧 {recording.pilotEmail}
+                          <div className="text-sm text-muted-foreground space-y-1 bg-muted/20 p-3 rounded-md">
+                            <p className="flex items-center gap-2">
+                              <Calendar className="w-3 h-3" />
+                              {recording.flightDate} at {recording.flightTime}
                             </p>
-                          )}
-                        </div>
+                            <p className="flex items-center gap-2">
+                              <Users className="w-3 h-3" />
+                              Staff: {recording.staffMember || "Unknown"}
+                            </p>
+                            {recording.pilotEmail && (
+                              <p className="flex items-center gap-2 text-xs truncate">
+                                📧 {recording.pilotEmail}
+                              </p>
+                            )}
+                          </div>
 
-                        <div className="flex gap-2">
-                          {recording.driveFileUrl && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => window.open(recording.driveFileUrl!, '_blank')}
-                              className="flex-1"
-                              data-testid={`button-preview-${recording.id}`}
-                            >
-                              <ExternalLink className="w-3 h-3 mr-1" />
-                              Preview
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            onClick={() => handleMarkAsSold(recording)}
-                            className="flex-1 bg-gradient-purple-blue"
-                            data-testid={`button-mark-sold-${recording.id}`}
-                          >
-                            <CheckCircle2 className="w-3 h-3 mr-1" />
-                            Sell
-                          </Button>
+                          <div className="text-center py-4">
+                            <p className="text-sm text-muted-foreground">
+                              Video still processing...
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Check back soon for preview and sale options
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    </Card>
-                  ))}
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
             </Card>
