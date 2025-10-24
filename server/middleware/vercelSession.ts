@@ -73,22 +73,28 @@ export class JWTSessionHandler {
 
 // Middleware to handle JWT sessions for Google OAuth
 export function jwtSessionMiddleware(req: any, res: any, next: any) {
-  const token = req.headers.authorization?.replace('Bearer ', '') || 
-                req.cookies?.session_token;
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '') || 
+                  req.cookies?.session_token;
 
-  if (token) {
-    const jwtHandler = new JWTSessionHandler(process.env.SESSION_SECRET!);
-    const decoded = jwtHandler.verifyToken(token);
-    if (decoded) {
-      req.session = req.session || {};
-      req.session.googleTokens = decoded.googleTokens;
-      req.session.googleUserInfo = decoded.googleUserInfo;
+    if (token) {
+      const secret = process.env.SESSION_SECRET || 'default-dev-secret';
+      const jwtHandler = new JWTSessionHandler(secret);
+      const decoded = jwtHandler.verifyToken(token);
+      if (decoded) {
+        req.session = req.session || {};
+        req.session.googleTokens = decoded.googleTokens;
+        req.session.googleUserInfo = decoded.googleUserInfo;
+      }
     }
+  } catch (error) {
+    console.error('JWT session middleware error:', error);
   }
 
   // Add helper to save session as JWT
   req.saveSessionAsJWT = (data: any) => {
-    const jwtHandler = new JWTSessionHandler(process.env.SESSION_SECRET!);
+    const secret = process.env.SESSION_SECRET || 'default-dev-secret';
+    const jwtHandler = new JWTSessionHandler(secret);
     const token = jwtHandler.createToken(data);
     
     res.cookie('session_token', token, {

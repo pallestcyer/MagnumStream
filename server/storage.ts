@@ -188,7 +188,7 @@ async function initializeStorage(): Promise<IStorage> {
   if (process.env.USE_SUPABASE === 'true') {
     // Use Supabase storage
     try {
-      const { SupabaseStorage } = await import('./db/supabase-storage.js');
+      const { SupabaseStorage } = await import('./db/supabase-storage');
       console.log('🔗 Using Supabase database');
       return new SupabaseStorage();
     } catch (error) {
