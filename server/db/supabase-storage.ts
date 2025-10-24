@@ -405,11 +405,11 @@ export class SupabaseStorage implements IStorage {
       .limit(1)
       .single();
     
-    if (error) {
+    if (error || !data) {
       return undefined;
     }
     
-    return data ? {
+    return {
       id: data.id,
       projectName: data.project_name,
       pilotName: data.pilot_name,
@@ -423,6 +423,6 @@ export class SupabaseStorage implements IStorage {
       smsPhoneNumber: data.sms_phone_number,
       sold: data.sold,
       createdAt: new Date(data.created_at)
-    } : undefined;
+    };
   }
 }

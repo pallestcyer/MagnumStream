@@ -5,6 +5,14 @@ import { insertSaleSchema, insertFlightRecordingSchema, SLOT_TEMPLATE } from "@s
 import { ClipGenerator } from "./services/ClipGenerator";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 
+// Extend session to include Google OAuth properties
+declare module 'express-session' {
+  interface SessionData {
+    googleTokens?: any;
+    googleUserInfo?: any;
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   
   // Get all flight recordings with optional date filter

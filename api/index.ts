@@ -1,11 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import 'dotenv/config';
-import express from 'express';
+import express, { type Express } from 'express';
 import { registerRoutes } from '../server/routes';
 import { initializeStorage } from '../server/storage';
 import { jwtSessionMiddleware } from '../server/middleware/vercelSession';
 
-let app: express.Application | null = null;
+let app: Express | null = null;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
@@ -38,7 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('Serverless function error:', error);
     return res.status(500).json({ 
       error: 'Internal server error',
-      details: error.message 
+      details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 }
