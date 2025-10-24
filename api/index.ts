@@ -258,8 +258,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       });
 
-      // Catch-all for client-side routing
-      app.get('*', (req, res) => {
+      // API status endpoint
+      app.get('/api', (req, res) => {
         res.json({
           message: 'MagnumStream API - Hybrid Architecture',
           timestamp: new Date().toISOString(),
