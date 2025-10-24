@@ -64,19 +64,19 @@ export class GoogleDriveOAuth {
         fields: 'files(id, name)'
       });
 
-      let folderId;
+      let folderId: string;
       if (folderSearch.data.files && folderSearch.data.files.length > 0) {
-        folderId = folderSearch.data.files[0].id;
+        folderId = folderSearch.data.files[0].id!;
       } else {
         // Create folder
         const folderResult = await drive.files.create({
-          resource: {
+          requestBody: {
             name: folderName,
             mimeType: 'application/vnd.google-apps.folder'
           },
           fields: 'id'
         });
-        folderId = folderResult.data.id;
+        folderId = folderResult.data.id!;
       }
 
       // Upload video to the folder
@@ -91,7 +91,7 @@ export class GoogleDriveOAuth {
       };
 
       const result = await drive.files.create({
-        resource: fileMetadata,
+        requestBody: fileMetadata,
         media: media,
         fields: 'id, webViewLink, webContentLink'
       });
@@ -99,7 +99,7 @@ export class GoogleDriveOAuth {
       // Make file shareable (anyone with link can view)
       await drive.permissions.create({
         fileId: result.data.id!,
-        resource: {
+        requestBody: {
           role: 'reader',
           type: 'anyone'
         }

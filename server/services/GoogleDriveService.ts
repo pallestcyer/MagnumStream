@@ -19,7 +19,7 @@ interface DriveFileInfo {
 
 export class GoogleDriveService {
   private drive: any;
-  private auth: JWT;
+  private auth: JWT | null = null;
 
   constructor() {
     // Initialize Google Drive API with service account
