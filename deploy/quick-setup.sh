@@ -19,14 +19,73 @@ echo "🔍 Checking prerequisites..."
 
 # Check Node.js
 if ! command -v node &> /dev/null; then
-    echo "❌ Node.js not found. Please install from https://nodejs.org/"
-    exit 1
+    echo "⚠️  Node.js not found. Installing via Homebrew..."
+    
+    # Check if Homebrew exists in common locations
+    BREW_PATH=""
+    if command -v brew &> /dev/null; then
+        BREW_PATH="brew"
+    elif [[ -f "/opt/homebrew/bin/brew" ]]; then
+        BREW_PATH="/opt/homebrew/bin/brew"
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    elif [[ -f "/usr/local/bin/brew" ]]; then
+        BREW_PATH="/usr/local/bin/brew"
+        eval "$(/usr/local/bin/brew shellenv)"
+    fi
+    
+    if [[ -z "$BREW_PATH" ]]; then
+        echo "📦 Installing Homebrew first..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        
+        # Add Homebrew to PATH for this session
+        if [[ -f "/opt/homebrew/bin/brew" ]]; then
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+            BREW_PATH="/opt/homebrew/bin/brew"
+        elif [[ -f "/usr/local/bin/brew" ]]; then
+            eval "$(/usr/local/bin/brew shellenv)"
+            BREW_PATH="/usr/local/bin/brew"
+        else
+            BREW_PATH="brew"
+        fi
+    fi
+    
+    echo "📦 Installing Node.js using: $BREW_PATH"
+    $BREW_PATH install node
+    
+    # Refresh PATH
+    hash -r
+    
+    # Verify installation with retry
+    for i in {1..3}; do
+        if command -v node &> /dev/null; then
+            echo "✅ Node.js successfully installed: $(node --version)"
+            break
+        else
+            echo "⏳ Attempt $i: Node.js not yet available, retrying..."
+            sleep 2
+            # Re-evaluate PATH
+            if [[ -f "/opt/homebrew/bin/brew" ]]; then
+                eval "$(/opt/homebrew/bin/brew shellenv)"
+            elif [[ -f "/usr/local/bin/brew" ]]; then
+                eval "$(/usr/local/bin/brew shellenv)"
+            fi
+            hash -r
+        fi
+        
+        if [[ $i -eq 3 ]]; then
+            echo "❌ Node.js installation failed after multiple attempts"
+            echo "🔧 Manual fallback option available: ./deploy/install-nodejs-mac.sh"
+            echo "📋 Or download from: https://nodejs.org/"
+            exit 1
+        fi
+    done
 fi
 echo "✅ Node.js $(node --version)"
 
-# Check npm
+# Check npm (should come with Node.js)
 if ! command -v npm &> /dev/null; then
-    echo "❌ npm not found"
+    echo "❌ npm not found even after Node.js installation. Something went wrong."
+    echo "Please install Node.js manually from https://nodejs.org/"
     exit 1
 fi
 echo "✅ npm $(npm --version)"
