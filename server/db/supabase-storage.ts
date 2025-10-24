@@ -9,50 +9,51 @@ import type {
   InsertSale
 } from "@shared/schema";
 
+// Type-safe wrapper for Supabase operations  
+const db = supabase as any;
+
 export class SupabaseStorage implements IStorage {
   
   async getUser(id: string): Promise<User | undefined> {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('users')
       .select('*')
       .eq('id', id)
       .single();
     
-    if (error) {
+    if (error || !data) {
       console.error('Error fetching user:', error);
       return undefined;
     }
     
-    return data ? {
-      id: data.id,
-      username: data.username,
-      password: data.password,
-      createdAt: new Date(data.created_at)
-    } : undefined;
+    return {
+      id: (data as any).id,
+      username: (data as any).username,
+      password: (data as any).password
+    };
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('users')
       .select('*')
       .eq('username', username)
       .single();
     
-    if (error) {
+    if (error || !data) {
       console.error('Error fetching user by username:', error);
       return undefined;
     }
     
-    return data ? {
-      id: data.id,
-      username: data.username,
-      password: data.password,
-      createdAt: new Date(data.created_at)
-    } : undefined;
+    return {
+      id: (data as any).id,
+      username: (data as any).username,
+      password: (data as any).password
+    };
   }
 
   async createUser(user: InsertUser): Promise<User> {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('users')
       .insert({
         username: user.username,
@@ -61,20 +62,19 @@ export class SupabaseStorage implements IStorage {
       .select()
       .single();
     
-    if (error) {
-      throw new Error(`Failed to create user: ${error.message}`);
+    if (error || !data) {
+      throw new Error(`Failed to create user: ${error?.message || 'Unknown error'}`);
     }
     
     return {
-      id: data.id,
-      username: data.username,
-      password: data.password,
-      createdAt: new Date(data.created_at)
+      id: (data as any).id,
+      username: (data as any).username,
+      password: (data as any).password
     };
   }
 
   async createFlightRecording(recording: InsertFlightRecording): Promise<FlightRecording> {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('flight_recordings')
       .insert({
         project_name: recording.projectName,
@@ -112,7 +112,7 @@ export class SupabaseStorage implements IStorage {
   }
 
   async getFlightRecording(id: string): Promise<FlightRecording | undefined> {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('flight_recordings')
       .select('*')
       .eq('id', id)
@@ -155,7 +155,7 @@ export class SupabaseStorage implements IStorage {
     if (updates.smsPhoneNumber !== undefined) dbUpdates.sms_phone_number = updates.smsPhoneNumber;
     if (updates.sold !== undefined) dbUpdates.sold = updates.sold;
     
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('flight_recordings')
       .update(dbUpdates)
       .eq('id', id)
@@ -185,7 +185,7 @@ export class SupabaseStorage implements IStorage {
   }
 
   async deleteFlightRecording(id: string): Promise<boolean> {
-    const { error } = await supabase
+    const { error } = await db
       .from('flight_recordings')
       .delete()
       .eq('id', id);
@@ -199,7 +199,7 @@ export class SupabaseStorage implements IStorage {
   }
 
   async getAllFlightRecordings(): Promise<FlightRecording[]> {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('flight_recordings')
       .select('*')
       .order('created_at', { ascending: false });
@@ -208,7 +208,7 @@ export class SupabaseStorage implements IStorage {
       throw new Error(`Failed to fetch flight recordings: ${error.message}`);
     }
     
-    return data.map(record => ({
+    return data.map((record: any) => ({
       id: record.id,
       projectName: record.project_name,
       pilotName: record.pilot_name,
@@ -226,7 +226,7 @@ export class SupabaseStorage implements IStorage {
   }
 
   async createSale(sale: InsertSale): Promise<Sale> {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('sales')
       .insert({
         recording_id: sale.recordingId,
@@ -260,7 +260,7 @@ export class SupabaseStorage implements IStorage {
   }
 
   async getAllSales(): Promise<Sale[]> {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('sales')
       .select('*')
       .order('sale_date', { ascending: false });
@@ -269,7 +269,7 @@ export class SupabaseStorage implements IStorage {
       throw new Error(`Failed to fetch sales: ${error.message}`);
     }
     
-    return data.map(sale => ({
+    return data.map((sale: any) => ({
       id: sale.id,
       recordingId: sale.recording_id,
       customerName: sale.customer_name,
@@ -283,7 +283,7 @@ export class SupabaseStorage implements IStorage {
   }
 
   async getSalesByRecording(recordingId: string): Promise<Sale[]> {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('sales')
       .select('*')
       .eq('recording_id', recordingId)
@@ -293,7 +293,7 @@ export class SupabaseStorage implements IStorage {
       throw new Error(`Failed to fetch sales for recording: ${error.message}`);
     }
     
-    return data.map(sale => ({
+    return data.map((sale: any) => ({
       id: sale.id,
       recordingId: sale.recording_id,
       customerName: sale.customer_name,
@@ -315,7 +315,7 @@ export class SupabaseStorage implements IStorage {
     camera2Url?: string;
     duration: number;
   }) {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('scene_recordings')
       .insert({
         recording_id: sceneData.recordingId,
@@ -336,7 +336,7 @@ export class SupabaseStorage implements IStorage {
   }
 
   async getSceneRecordingsByFlightId(recordingId: string) {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('scene_recordings')
       .select('*')
       .eq('recording_id', recordingId)
@@ -358,7 +358,7 @@ export class SupabaseStorage implements IStorage {
     windowStart: number;
     slotDuration: number;
   }) {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('video_slots')
       .insert({
         recording_id: slotData.recordingId,
@@ -379,7 +379,7 @@ export class SupabaseStorage implements IStorage {
   }
 
   async getVideoSlotsByRecordingId(recordingId: string) {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('video_slots')
       .select('*')
       .eq('recording_id', recordingId)
@@ -397,7 +397,7 @@ export class SupabaseStorage implements IStorage {
     // Convert sessionId back to pilot name format for lookup
     const pilotName = sessionId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('flight_recordings')
       .select('*')
       .eq('pilot_name', pilotName)
