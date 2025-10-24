@@ -20,9 +20,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       app = express();
       app.use(express.json());
       
-      console.log('Testing shared schema import...');
+      console.log('Testing server schema import...');
       try {
-        const schema = await import('../shared/schema');
+        const schema = await import('../server/schema');
         console.log('Schema import successful, available exports:', Object.keys(schema));
       } catch (importError) {
         console.error('Schema import failed:', importError);

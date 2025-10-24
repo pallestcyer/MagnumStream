@@ -5,7 +5,7 @@ import {
   type InsertFlightRecording,
   type Sale,
   type InsertSale
-} from "../shared/schema";
+} from "./schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
