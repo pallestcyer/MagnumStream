@@ -1,11 +1,5 @@
 import { Camera } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { useState, useEffect } from "react";
 
 interface DeviceSelectorProps {
   selectedCamera1?: string;
@@ -14,69 +8,70 @@ interface DeviceSelectorProps {
   onCamera2Change?: (value: string) => void;
 }
 
+// Fixed camera configuration - these will be set in environment variables
+const CAMERA_CONFIG = {
+  camera1: {
+    // This will be set from environment variable CAMERA_1_DEVICE_ID
+    deviceId: process.env.CAMERA_1_DEVICE_ID || "default-camera-1",
+    label: "Camera 1 (Straight View)"
+  },
+  camera2: {
+    // This will be set from environment variable CAMERA_2_DEVICE_ID  
+    deviceId: process.env.CAMERA_2_DEVICE_ID || "default-camera-2",
+    label: "Camera 2 (Side View)"
+  }
+};
+
 export default function DeviceSelector({
   selectedCamera1,
   selectedCamera2,
   onCamera1Change,
   onCamera2Change,
 }: DeviceSelectorProps) {
-  //todo: remove mock functionality
-  const camera1Options = [
-    { id: "0", name: "Elgato 4K X (Camera 1)" },
-    { id: "1", name: "Elgato 4K X (Camera 2)" },
-  ];
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  const camera2Options = [
-    { id: "0", name: "Elgato 4K X (Camera 1)" },
-    { id: "1", name: "Elgato 4K X (Camera 2)" },
-  ];
+  useEffect(() => {
+    // Auto-assign the configured cameras on component mount
+    if (!isInitialized) {
+      console.log('🎥 Using configured camera setup:');
+      console.log('Camera 1 (Straight):', CAMERA_CONFIG.camera1.deviceId);
+      console.log('Camera 2 (Side):', CAMERA_CONFIG.camera2.deviceId);
+      
+      if (!selectedCamera1 && onCamera1Change) {
+        onCamera1Change(CAMERA_CONFIG.camera1.deviceId);
+      }
+      if (!selectedCamera2 && onCamera2Change) {
+        onCamera2Change(CAMERA_CONFIG.camera2.deviceId);
+      }
+      
+      setIsInitialized(true);
+    }
+  }, [selectedCamera1, selectedCamera2, onCamera1Change, onCamera2Change, isInitialized]);
 
   return (
     <div className="flex items-center gap-4">
       <div className="flex items-center gap-2 min-w-0">
-        <Camera className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-        <span className="text-xs text-muted-foreground">Cam 1:</span>
-        <Select
-          value={selectedCamera1 || "0"}
-          onValueChange={(value) => {
-            console.log("Camera 1 changed to:", value);
-            onCamera1Change?.(value);
-          }}
-        >
-          <SelectTrigger className="w-40 h-9 bg-card/50 backdrop-blur-md" data-testid="select-camera-1">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {camera1Options.map((camera) => (
-              <SelectItem key={camera.id} value={camera.id}>
-                {camera.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Camera className="w-4 h-4 text-green-500 flex-shrink-0" />
+        <span className="text-xs text-muted-foreground">Camera 1 (Straight View):</span>
+        <div className="px-3 py-1.5 bg-green-100 dark:bg-green-900/30 rounded-md border">
+          <span className="text-xs font-mono text-green-700 dark:text-green-300">
+            {CAMERA_CONFIG.camera1.label}
+          </span>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 min-w-0">
-        <Camera className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-        <span className="text-xs text-muted-foreground">Cam 2:</span>
-        <Select
-          value={selectedCamera2 || "1"}
-          onValueChange={(value) => {
-            console.log("Camera 2 changed to:", value);
-            onCamera2Change?.(value);
-          }}
-        >
-          <SelectTrigger className="w-40 h-9 bg-card/50 backdrop-blur-md" data-testid="select-camera-2">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {camera2Options.map((camera) => (
-              <SelectItem key={camera.id} value={camera.id}>
-                {camera.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Camera className="w-4 h-4 text-blue-500 flex-shrink-0" />
+        <span className="text-xs text-muted-foreground">Camera 2 (Side View):</span>
+        <div className="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-md border">
+          <span className="text-xs font-mono text-blue-700 dark:text-blue-300">
+            {CAMERA_CONFIG.camera2.label}
+          </span>
+        </div>
+      </div>
+      
+      <div className="text-xs text-green-600 font-medium">
+        ✅ Fixed Camera Setup
       </div>
     </div>
   );
