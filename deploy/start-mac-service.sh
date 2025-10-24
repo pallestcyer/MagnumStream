@@ -66,14 +66,41 @@ NGROK_PID=$!
 echo $NGROK_PID > "$LOG_DIR/ngrok.pid"
 
 # Wait for ngrok to establish tunnel
-sleep 5
+echo "⏳ Waiting for ngrok to start..."
+sleep 10
 
-# Extract ngrok URL
-NGROK_URL=$(curl -s http://127.0.0.1:4040/api/tunnels | grep -o 'https://[^"]*\.ngrok\.io' | head -1)
+# Extract ngrok URL with retries
+for i in {1..6}; do
+    NGROK_URL=$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | jq -r '.tunnels[]?.public_url' 2>/dev/null | grep https | head -1)
+    
+    if [ -z "$NGROK_URL" ] || [ "$NGROK_URL" = "null" ]; then
+        # Fallback: try grep method
+        NGROK_URL=$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | grep -o 'https://[^"]*\.ngrok\.io' | head -1)
+    fi
+    
+    if [ -n "$NGROK_URL" ] && [ "$NGROK_URL" != "null" ]; then
+        echo "✅ ngrok tunnel established: $NGROK_URL"
+        break
+    fi
+    
+    echo "⏳ Attempt $i: Waiting for ngrok tunnel... (${i}0s)"
+    sleep 10
+done
 
-if [ -z "$NGROK_URL" ]; then
-    echo "❌ Failed to get ngrok URL. Check logs at $NGROK_LOG"
-    exit 1
+if [ -z "$NGROK_URL" ] || [ "$NGROK_URL" = "null" ]; then
+    echo "❌ Failed to get ngrok URL after multiple attempts"
+    echo "🔍 Checking ngrok status manually..."
+    echo "📋 Try: curl http://127.0.0.1:4040/api/tunnels"
+    echo "📋 Or check ngrok web interface at: http://127.0.0.1:4040"
+    echo "📋 Logs at: $NGROK_LOG"
+    
+    # Don't exit - show manual instructions
+    echo ""
+    echo "🔧 Manual steps to get URL:"
+    echo "1. Open http://127.0.0.1:4040 in browser"
+    echo "2. Copy the https://*.ngrok.io URL"
+    echo "3. Set LOCAL_DEVICE_URL in Vercel to that URL"
+    NGROK_URL="MANUAL_CHECK_REQUIRED"
 fi
 
 echo "✅ ngrok tunnel established: $NGROK_URL"
