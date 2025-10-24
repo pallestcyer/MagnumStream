@@ -1,56 +1,44 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import 'dotenv/config';
 import express from 'express';
-import session from 'express-session';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-// Import our routes and setup
 import { registerRoutes } from '../server/routes';
 import { initializeStorage } from '../server/storage';
-import { getVercelSessionConfig } from '../server/middleware/vercelSession';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { jwtSessionMiddleware } from '../server/middleware/vercelSession';
 
 let app: express.Application | null = null;
 
-async function createApp() {
-  if (app) return app;
-
-  app = express();
-  
-  // Basic middleware
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: false }));
-  
-  // Session middleware
-  app.use(session(getVercelSessionConfig()));
-  
-  // Initialize storage
-  await initializeStorage();
-  
-  // Register routes
-  await registerRoutes(app);
-  
-  // Serve static files from the built client
-  const staticPath = path.join(__dirname, '..', 'dist', 'public');
-  app.use(express.static(staticPath));
-  
-  // Fallback to index.html for SPA routes
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(staticPath, 'index.html'));
-  });
-  
-  return app;
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    const expressApp = await createApp();
-    return expressApp(req, res);
+    // Initialize Express app once
+    if (!app) {
+      app = express();
+      app.use(express.json());
+      app.use(express.urlencoded({ extended: false }));
+      
+      // Use JWT sessions for Vercel
+      app.use(jwtSessionMiddleware);
+      
+      // Initialize storage
+      await initializeStorage();
+      
+      // Register routes
+      await registerRoutes(app);
+      
+      // Error handler
+      app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+        const status = err.status || err.statusCode || 500;
+        const message = err.message || "Internal Server Error";
+        res.status(status).json({ message });
+      });
+    }
+    
+    // Handle the request
+    return app(req, res);
   } catch (error) {
     console.error('Serverless function error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message 
+    });
   }
 }
