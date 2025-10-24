@@ -2,6 +2,29 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import 'dotenv/config';
 import express from 'express';
 
+// Simple type definitions for testing
+interface User {
+  id: string;
+  username: string;
+  password: string;
+}
+
+interface FlightRecording {
+  id: string;
+  projectName: string;
+  pilotName: string;
+  pilotEmail?: string;
+  staffMember?: string;
+  flightDate?: string;
+  flightTime?: string;
+  exportStatus: string;
+  driveFileId?: string;
+  driveFileUrl?: string;
+  smsPhoneNumber?: string;
+  sold: boolean;
+  createdAt: Date;
+}
+
 let app: express.Application | null = null;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -20,16 +43,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       app = express();
       app.use(express.json());
       
-      console.log('Testing server schema import...');
+      console.log('Testing storage initialization...');
       try {
-        const schema = await import('../server/schema');
-        console.log('Schema import successful, available exports:', Object.keys(schema));
-      } catch (importError) {
-        console.error('Schema import failed:', importError);
+        const { initializeStorage } = await import('../server/storage');
+        console.log('Storage import successful');
+        
+        const storage = await initializeStorage();
+        console.log('Storage initialized successfully');
+      } catch (storageError) {
+        console.error('Storage initialization failed:', storageError);
         return res.status(500).json({
-          error: 'Schema import failed',
-          details: importError instanceof Error ? importError.message : 'Unknown error',
-          stack: importError instanceof Error ? importError.stack : undefined
+          error: 'Storage initialization failed',
+          details: storageError instanceof Error ? storageError.message : 'Unknown error',
+          stack: storageError instanceof Error ? storageError.stack : undefined
         });
       }
       
