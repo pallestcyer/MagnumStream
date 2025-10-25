@@ -58,6 +58,7 @@ export default function RecordingDashboard() {
   const [camera2Stream, setCamera2Stream] = useState<MediaStream | null>(null);
   const [camera1Recorder, setCamera1Recorder] = useState<MediaRecorder | null>(null);
   const [camera2Recorder, setCamera2Recorder] = useState<MediaRecorder | null>(null);
+  const [recordersStoppedCount, setRecordersStoppedCount] = useState(0);
   const [recordedChunks1, setRecordedChunks1] = useState<Blob[]>([]);
   const [recordedChunks2, setRecordedChunks2] = useState<Blob[]>([]);
   const [currentRecordingId, setCurrentRecordingId] = useState<string | null>(null);
@@ -192,13 +193,16 @@ export default function RecordingDashboard() {
       recorder1.onstart = () => console.log('🎬 Camera 1 recording started');
       recorder1.onstop = () => {
         console.log('🛑 Camera 1 recording stopped');
-        // Check if both recorders have stopped before saving
-        setTimeout(() => {
-          if (camera1Recorder?.state === 'inactive' && camera2Recorder?.state === 'inactive') {
+        setRecordersStoppedCount(prev => {
+          const newCount = prev + 1;
+          console.log(`📊 Recorders stopped: ${newCount}/2`);
+          if (newCount >= 2) {
             console.log('📊 Both recorders stopped, saving videos...');
-            saveRecordedVideos();
+            setTimeout(() => saveRecordedVideos(), 500);
+            return 0; // Reset for next recording
           }
-        }, 500);
+          return newCount;
+        });
       };
       
       setCamera1Recorder(recorder1);
@@ -249,13 +253,16 @@ export default function RecordingDashboard() {
         recorder2.onstart = () => console.log('🎬 Camera 2 recording started');
         recorder2.onstop = () => {
           console.log('🛑 Camera 2 recording stopped');
-          // Check if both recorders have stopped before saving
-          setTimeout(() => {
-            if (camera1Recorder?.state === 'inactive' && camera2Recorder?.state === 'inactive') {
+          setRecordersStoppedCount(prev => {
+            const newCount = prev + 1;
+            console.log(`📊 Recorders stopped: ${newCount}/2`);
+            if (newCount >= 2) {
               console.log('📊 Both recorders stopped, saving videos...');
-              saveRecordedVideos();
+              setTimeout(() => saveRecordedVideos(), 500);
+              return 0; // Reset for next recording
             }
-          }, 500);
+            return newCount;
+          });
         };
         
         setCamera2Recorder(recorder2);
@@ -296,6 +303,9 @@ export default function RecordingDashboard() {
           camera1State: camera1Recorder?.state,
           camera2State: camera2Recorder?.state
         });
+        
+        // Reset stop counter for new recording
+        setRecordersStoppedCount(0);
         
         if (camera1Recorder && camera1Recorder.state === 'inactive') {
           console.log('🎬 Starting Camera 1 recording');
