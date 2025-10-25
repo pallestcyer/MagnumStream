@@ -385,9 +385,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
   
   // Configure multer for video file uploads
-  const multer = require('multer');
-  const fs = require('fs').promises;
-  const path = require('path');
+  const multer = (await import('multer')).default;
+  const fs = (await import('fs')).promises;
+  const path = await import('path');
   
   const multerStorage = multer.memoryStorage();
   const upload = multer({ 
