@@ -31,13 +31,29 @@ class DatabaseStorage {
         staff_member: data.staffMember,
         flight_date: data.flightDate,
         flight_time: data.flightTime,
-        export_status: 'pending'
+        export_status: data.exportStatus || 'pending'
       })
       .select()
       .single();
       
     if (error) throw error;
-    return result;
+    
+    // Transform the result to match the client expectations
+    return {
+      id: result.id,
+      projectName: result.project_name,
+      pilotName: result.pilot_name,
+      pilotEmail: result.pilot_email,
+      staffMember: result.staff_member,
+      flightDate: result.flight_date,
+      flightTime: result.flight_time,
+      exportStatus: result.export_status,
+      driveFileId: result.drive_file_id,
+      driveFileUrl: result.drive_file_url,
+      smsPhoneNumber: result.sms_phone_number,
+      sold: result.sold,
+      createdAt: new Date(result.created_at)
+    };
   }
 
   async updateFlightRecording(id: string, data: any) {

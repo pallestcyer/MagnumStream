@@ -421,7 +421,7 @@ function ProjectCard({ record, getStatusBadge, formatDate }: ProjectCardProps) {
         
         {/* Resume editing for in-progress projects */}
         {(() => {
-          const canResume = ['recorded', 'in_progress'].includes(record.exportStatus);
+          const canResume = ['pending', 'recorded', 'in_progress'].includes(record.exportStatus);
           console.log(`📊 Project ${record.projectName} (${record.exportStatus}) can resume: ${canResume}`);
           return canResume;
         })() && (
