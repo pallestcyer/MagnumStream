@@ -608,6 +608,20 @@ export default function RecordingDashboard() {
           camera2Duration: r.camera2Duration
         })));
         
+        // Auto-advance to next unrecorded scene after recording completion
+        setTimeout(() => {
+          const firstUnrecordedIndex = updated.findIndex(rec => !rec.completed);
+          if (firstUnrecordedIndex !== -1 && firstUnrecordedIndex !== currentSceneIndex) {
+            console.log(`🔄 Auto-advancing to next unrecorded scene after recording: ${SCENES[firstUnrecordedIndex].title}`);
+            setCurrentSceneIndex(firstUnrecordedIndex);
+            setRecordingState("idle");
+            setElapsedTime(0);
+          } else if (firstUnrecordedIndex === -1) {
+            console.log(`🎉 All scenes completed! Staying on current scene to show completion.`);
+            // All scenes are done, stay on current scene to show completion
+          }
+        }, 100);
+        
         return updated;
       });
 
