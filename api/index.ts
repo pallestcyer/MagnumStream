@@ -105,10 +105,13 @@ class DatabaseStorage {
 
 // Video operations delegator (calls local device)
 class VideoOperations {
-  async delegateToLocal(endpoint: string, data?: any) {
+  async delegateToLocal(endpoint: string, data?: any, method: string = 'GET') {
     try {
+      // If data is provided but no method specified, default to POST
+      const httpMethod = data && method === 'GET' ? 'POST' : method;
+      
       const response = await fetch(`${localDeviceUrl}/api${endpoint}`, {
-        method: data ? 'POST' : 'GET',
+        method: httpMethod,
         headers: { 'Content-Type': 'application/json' },
         body: data ? JSON.stringify(data) : undefined
       });
@@ -221,7 +224,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       app.post('/api/recordings/:recordingId/video-slots', async (req, res) => {
         try {
-          const result = await videoOps.delegateToLocal(`/recordings/${req.params.recordingId}/video-slots`, req.body);
+          const result = await videoOps.delegateToLocal(`/recordings/${req.params.recordingId}/video-slots`, req.body, 'POST');
           res.json(result);
         } catch (error) {
           res.status(500).json({ error: error.message });
@@ -230,7 +233,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       app.patch('/api/recordings/:recordingId/video-slots/:slotNumber', async (req, res) => {
         try {
-          const result = await videoOps.delegateToLocal(`/recordings/${req.params.recordingId}/video-slots/${req.params.slotNumber}`, req.body);
+          const result = await videoOps.delegateToLocal(`/recordings/${req.params.recordingId}/video-slots/${req.params.slotNumber}`, req.body, 'PATCH');
           res.json(result);
         } catch (error) {
           res.status(500).json({ error: error.message });
