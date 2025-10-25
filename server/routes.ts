@@ -14,6 +14,21 @@ declare module 'express-session' {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  console.log('🔧 Starting route registration...');
+  
+  // Health check endpoint
+  app.get("/api/health", async (req, res) => {
+    try {
+      res.json({ 
+        status: "ok", 
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        service: "MagnumStream Local Device Service"
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
   
   // Get camera configuration
   app.get("/api/camera-config", async (req, res) => {
@@ -384,10 +399,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // VIDEO UPLOAD ENDPOINTS
   // ============================================================================
   
-  // Configure multer for video file uploads
-  const multer = (await import('multer')).default;
-  const fs = (await import('fs')).promises;
-  const path = await import('path');
+  console.log('🔧 Setting up video upload endpoints...');
+  
+  try {
+    console.log('🔧 Importing multer...');
+    const multer = (await import('multer')).default;
+    console.log('🔧 Importing fs...');
+    const fs = (await import('fs')).promises;
+    console.log('🔧 Importing path...');
+    const path = await import('path');
+    console.log('✅ All imports successful');
   
   const multerStorage = multer.memoryStorage();
   const upload = multer({ 
@@ -717,11 +738,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  } catch (error) {
+    console.error('❌ Error setting up video upload endpoints:', error);
+    throw error;
+  }
+
+  console.log('🔧 Setting up error handling middleware...');
+  
   // Add error handling middleware
   app.use(notFoundHandler);
   app.use(errorHandler);
 
+  console.log('🔧 Creating HTTP server...');
   const httpServer = createServer(app);
 
+  console.log('✅ Route registration completed successfully');
   return httpServer;
 }
