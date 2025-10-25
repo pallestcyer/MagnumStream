@@ -40,6 +40,47 @@ class DatabaseStorage {
     return result;
   }
 
+  async updateFlightRecording(id: string, data: any) {
+    const updateData: any = {};
+    
+    if (data.pilotName) updateData.pilot_name = data.pilotName;
+    if (data.pilotEmail) updateData.pilot_email = data.pilotEmail;
+    if (data.staffMember) updateData.staff_member = data.staffMember;
+    if (data.flightDate) updateData.flight_date = data.flightDate;
+    if (data.flightTime) updateData.flight_time = data.flightTime;
+    if (data.exportStatus) updateData.export_status = data.exportStatus;
+    if (data.driveFileId) updateData.drive_file_id = data.driveFileId;
+    if (data.driveFileUrl) updateData.drive_file_url = data.driveFileUrl;
+    if (data.smsPhoneNumber) updateData.sms_phone_number = data.smsPhoneNumber;
+    if (data.sold !== undefined) updateData.sold = data.sold;
+
+    const { data: result, error } = await (supabase as any)
+      .from('flight_recordings')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    
+    // Transform the result to match the client expectations
+    return {
+      id: result.id,
+      projectName: result.project_name,
+      pilotName: result.pilot_name,
+      pilotEmail: result.pilot_email,
+      staffMember: result.staff_member,
+      flightDate: result.flight_date,
+      flightTime: result.flight_time,
+      exportStatus: result.export_status,
+      driveFileId: result.drive_file_id,
+      driveFileUrl: result.drive_file_url,
+      smsPhoneNumber: result.sms_phone_number,
+      sold: result.sold,
+      createdAt: new Date(result.created_at)
+    };
+  }
+
   async getAllFlightRecordings() {
     const { data, error } = await (supabase as any)
       .from('flight_recordings')
@@ -154,6 +195,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           res.json(recording);
         } catch (error) {
           res.status(500).json({ error: 'Failed to create recording' });
+        }
+      });
+
+      app.patch('/api/recordings/:id', async (req, res) => {
+        try {
+          const recording = await storage.updateFlightRecording(req.params.id, req.body);
+          res.json(recording);
+        } catch (error) {
+          res.status(500).json({ error: 'Failed to update recording' });
         }
       });
 

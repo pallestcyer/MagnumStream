@@ -65,8 +65,33 @@ export default function ClipEditor() {
     setShowMetadataDialog(true);
   };
 
-  const handleMetadataSubmit = (flightDate: string, flightTime: string) => {
+  const handleMetadataSubmit = (flightDate: string, flightTime: string, pilotName?: string) => {
     setFlightMetadata({ date: flightDate, time: flightTime });
+    
+    // Update the recording with pilot name if provided
+    if (pilotName) {
+      const recordingId = localStorage.getItem('currentRecordingId');
+      if (recordingId) {
+        fetch(`/api/recordings/${recordingId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pilotName: pilotName,
+            flightDate: flightDate,
+            flightTime: flightTime
+          })
+        }).then(response => {
+          if (response.ok) {
+            console.log('📊 Updated recording with pilot name:', pilotName);
+          } else {
+            console.warn('⚠️ Failed to update recording with pilot name');
+          }
+        }).catch(error => {
+          console.error('❌ Error updating recording:', error);
+        });
+      }
+    }
+    
     setShowExportDialog(true);
   };
 

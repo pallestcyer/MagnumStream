@@ -10,12 +10,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Calendar } from "lucide-react";
 
 interface FlightMetadataDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (flightDate: string, flightTime: string) => void;
+  onSubmit: (flightDate: string, flightTime: string, pilotName?: string) => void;
 }
 
 // Round up to next hour or half-hour
@@ -43,6 +50,7 @@ const getRoundedTime = () => {
 export default function FlightMetadataDialog({ open, onOpenChange, onSubmit }: FlightMetadataDialogProps) {
   const [flightDate, setFlightDate] = useState("");
   const [flightTime, setFlightTime] = useState("");
+  const [pilotName, setPilotName] = useState("");
   
   // Auto-populate with current date and rounded time
   useEffect(() => {
@@ -60,7 +68,7 @@ export default function FlightMetadataDialog({ open, onOpenChange, onSubmit }: F
       alert("Please enter both flight date and time");
       return;
     }
-    onSubmit(flightDate, flightTime);
+    onSubmit(flightDate, flightTime, pilotName || undefined);
     onOpenChange(false);
   };
 
@@ -103,6 +111,28 @@ export default function FlightMetadataDialog({ open, onOpenChange, onSubmit }: F
               className="h-12"
               data-testid="input-flight-time"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="pilot-name">
+              Pilot Name (Optional)
+              <span className="text-xs text-muted-foreground ml-2">Select from common pilots</span>
+            </Label>
+            <Select value={pilotName} onValueChange={setPilotName}>
+              <SelectTrigger id="pilot-name" className="h-12" data-testid="select-pilot-name">
+                <SelectValue placeholder="Choose pilot (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="captain-james">Captain James Morrison</SelectItem>
+                <SelectItem value="captain-sarah">Captain Sarah Thompson</SelectItem>
+                <SelectItem value="captain-michael">Captain Michael Rodriguez</SelectItem>
+                <SelectItem value="captain-emily">Captain Emily Chen</SelectItem>
+                <SelectItem value="captain-david">Captain David Wilson</SelectItem>
+                <SelectItem value="captain-lisa">Captain Lisa Anderson</SelectItem>
+                <SelectItem value="captain-robert">Captain Robert Johnson</SelectItem>
+                <SelectItem value="captain-maria">Captain Maria Garcia</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 

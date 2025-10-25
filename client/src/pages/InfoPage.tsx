@@ -20,14 +20,13 @@ import { videoStorage } from "@/utils/videoStorage";
 export default function InfoPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { pilotInfo, setPilotInfo } = usePilot();
+  const { setPilotInfo } = usePilot();
   
-  // Split existing name by " & " if it exists
-  const existingNames = pilotInfo.name ? pilotInfo.name.split(" & ") : ["", ""];
-  const [firstName1, setFirstName1] = useState(existingNames[0] || "");
-  const [firstName2, setFirstName2] = useState(existingNames[1] || "");
-  const [email, setEmail] = useState(pilotInfo.email || "");
-  const [staffMember, setStaffMember] = useState(pilotInfo.staffMember || "");
+  // Always start with empty form fields for new projects
+  const [firstName1, setFirstName1] = useState("");
+  const [firstName2, setFirstName2] = useState("");
+  const [email, setEmail] = useState("");
+  const [staffMember, setStaffMember] = useState("");
   const [camera1Stream, setCamera1Stream] = useState<MediaStream | null>(null);
   const [camera2Stream, setCamera2Stream] = useState<MediaStream | null>(null);
   const [camera1Ready, setCamera1Ready] = useState(false);
@@ -38,11 +37,26 @@ export default function InfoPage() {
   useEffect(() => {
     // Clear any previous session when loading the info page
     videoStorage.clearCurrentSession();
+    
+    // Clear pilot context and recording ID for fresh start
+    setPilotInfo({ name: "", email: "", staffMember: "" });
+    localStorage.removeItem('currentRecordingId');
+    localStorage.removeItem('pilotEmail');
+    localStorage.removeItem('staffMember');
+    
+    // Reset form fields to empty
+    setFirstName1("");
+    setFirstName2("");
+    setEmail("");
+    setStaffMember("");
+    
+    console.log('🔄 InfoPage: Cleared all previous session data for new project');
+    
     initializeCameras();
     return () => {
       stopCameras();
     };
-  }, []);
+  }, [setPilotInfo]);
 
   const initializeCameras = async () => {
     try {
