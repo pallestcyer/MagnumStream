@@ -65,6 +65,7 @@ export default function RecordingDashboard() {
   const [recordedChunks2, setRecordedChunks2] = useState<Blob[]>([]);
   const chunksRef1 = useRef<Blob[]>([]);
   const chunksRef2 = useRef<Blob[]>([]);
+  const elapsedTimeRef = useRef<number>(0);
   const [currentRecordingId, setCurrentRecordingId] = useState<string | null>(null);
 
   const currentScene = SCENES[currentSceneIndex];
@@ -78,6 +79,12 @@ export default function RecordingDashboard() {
       camera2Duration: r.camera2Duration
     })));
   }, [sceneRecordings]);
+
+  // Keep elapsedTimeRef in sync with elapsedTime
+  useEffect(() => {
+    elapsedTimeRef.current = elapsedTime;
+    console.log(`🔍 DEBUG: Updated elapsedTimeRef to: ${elapsedTime}`);
+  }, [elapsedTime]);
 
   // Initialize cameras and setup recording
   useEffect(() => {
@@ -263,9 +270,9 @@ export default function RecordingDashboard() {
           console.log(`📊 Recorders stopped: ${newCount}/2`);
           if (newCount >= 2) {
             console.log('📊 Both recorders stopped, saving videos...');
-            // Capture the current elapsed time before it gets reset
-            const capturedElapsedTime = elapsedTime;
-            console.log(`🔍 DEBUG: Captured elapsed time for saving: ${capturedElapsedTime}s`);
+            // Capture the current elapsed time from ref (not closure)
+            const capturedElapsedTime = elapsedTimeRef.current;
+            console.log(`🔍 DEBUG: Captured elapsed time from ref for saving: ${capturedElapsedTime}s (state elapsedTime: ${elapsedTime}s)`);
             // Save with a longer delay to ensure state is updated
             setTimeout(() => saveRecordedVideos(capturedElapsedTime), 1000);
             return 0; // Reset for next recording
@@ -329,9 +336,9 @@ export default function RecordingDashboard() {
             console.log(`📊 Recorders stopped: ${newCount}/2`);
             if (newCount >= 2) {
               console.log('📊 Both recorders stopped, saving videos...');
-              // Capture the current elapsed time before it gets reset
-              const capturedElapsedTime = elapsedTime;
-              console.log(`🔍 DEBUG: Captured elapsed time for saving: ${capturedElapsedTime}s`);
+              // Capture the current elapsed time from ref (not closure)
+              const capturedElapsedTime = elapsedTimeRef.current;
+              console.log(`🔍 DEBUG: Captured elapsed time from ref for saving: ${capturedElapsedTime}s (state elapsedTime: ${elapsedTime}s)`);
               // Save with a longer delay to ensure state is updated
               setTimeout(() => saveRecordedVideos(capturedElapsedTime), 1000);
               return 0; // Reset for next recording
@@ -354,13 +361,24 @@ export default function RecordingDashboard() {
 
   // Timer management
   useEffect(() => {
+    console.log(`🔍 DEBUG: Timer useEffect triggered, recordingState: ${recordingState}, elapsedTime: ${elapsedTime}`);
     let interval: NodeJS.Timeout;
     if (recordingState === "recording") {
+      console.log(`🔍 DEBUG: Starting timer interval`);
       interval = setInterval(() => {
-        setElapsedTime((prev) => prev + 1);
+        setElapsedTime((prev) => {
+          const newTime = prev + 1;
+          console.log(`🔍 DEBUG: Timer tick - elapsedTime: ${prev} -> ${newTime}`);
+          return newTime;
+        });
       }, 1000);
+    } else {
+      console.log(`🔍 DEBUG: Not in recording state, timer stopped. elapsedTime: ${elapsedTime}`);
     }
-    return () => clearInterval(interval);
+    return () => {
+      console.log(`🔍 DEBUG: Timer cleanup called`);
+      clearInterval(interval);
+    };
   }, [recordingState]);
 
   // Countdown management
@@ -429,6 +447,8 @@ export default function RecordingDashboard() {
   };
 
   const handleStopRecording = async () => {
+    console.log(`🔍 DEBUG: handleStopRecording called with elapsedTime: ${elapsedTime}s`);
+    
     // Check minimum duration
     if (elapsedTime < 5) {
       toast({
@@ -440,13 +460,17 @@ export default function RecordingDashboard() {
     }
     
     // Stop recording
+    console.log(`🔍 DEBUG: About to stop recorders, elapsedTime: ${elapsedTime}s`);
     if (camera1Recorder && camera1Recorder.state === 'recording') {
+      console.log(`🔍 DEBUG: Stopping camera1Recorder, elapsedTime: ${elapsedTime}s`);
       camera1Recorder.stop();
     }
     if (camera2Recorder && camera2Recorder.state === 'recording') {
+      console.log(`🔍 DEBUG: Stopping camera2Recorder, elapsedTime: ${elapsedTime}s`);
       camera2Recorder.stop();
     }
     
+    console.log(`🔍 DEBUG: Setting recording state to completed, elapsedTime: ${elapsedTime}s`);
     setRecordingState("completed");
     
     // Videos will be saved automatically when both recorders stop (via onstop events)
