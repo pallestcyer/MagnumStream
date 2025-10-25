@@ -524,16 +524,16 @@ class DaVinciAutomation:
                 # Try different ways to get render status
                 status = None
                 try:
-                    # Method 1: Get status by job ID
-                    if job_id and job_id != True:
+                    # Method 1: Get status by job ID (if available)
+                    if job_id and job_id != True and hasattr(self.current_project, 'GetRenderJobStatus') and callable(getattr(self.current_project, 'GetRenderJobStatus', None)):
                         status = self.current_project.GetRenderJobStatus(job_id)
                     
-                    # Method 2: Get current render status
-                    if not status:
+                    # Method 2: Get current render status (if available)
+                    if not status and hasattr(self.current_project, 'GetCurrentRenderJobStatus') and callable(getattr(self.current_project, 'GetCurrentRenderJobStatus', None)):
                         status = self.current_project.GetCurrentRenderJobStatus()
                     
-                    # Method 3: Check if rendering is still active
-                    if not status:
+                    # Method 3: Check if rendering is still active (if available)
+                    if not status and hasattr(self.current_project, 'IsRenderingInProgress') and callable(getattr(self.current_project, 'IsRenderingInProgress', None)):
                         is_rendering = self.current_project.IsRenderingInProgress()
                         if not is_rendering:
                             # Rendering completed, check for output file
@@ -556,9 +556,29 @@ class DaVinciAutomation:
                             time.sleep(5)
                             render_timeout += 5
                             continue
+                    else:
+                        # No render status methods available, just wait and check for file
+                        logger.info(f"No render status methods available, checking for output file... ({render_timeout}s elapsed)")
+                        output_path = OUTPUT_FOLDER / f"{render_filename}.mp4"
+                        if output_path.exists():
+                            logger.info(f"Rendering completed successfully: {output_path}")
+                            return str(output_path)
+                        
+                        # Check with different extensions
+                        for ext in ['.mp4', '.mov', '.avi']:
+                            alt_path = OUTPUT_FOLDER / f"{render_filename}{ext}"
+                            if alt_path.exists():
+                                logger.info(f"Rendering completed successfully: {alt_path}")
+                                return str(alt_path)
                     
                 except Exception as status_error:
                     logger.warning(f"Error getting render status: {status_error}")
+                    # Still check for output file even if status check fails
+                    output_path = OUTPUT_FOLDER / f"{render_filename}.mp4"
+                    if output_path.exists():
+                        logger.info(f"Rendering completed successfully (status check failed): {output_path}")
+                        return str(output_path)
+                    
                     time.sleep(2)
                     render_timeout += 2
                     continue
