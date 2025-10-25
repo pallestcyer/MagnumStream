@@ -20,11 +20,20 @@ def load_davinci_api():
     """Load DaVinci Resolve Python API with proper path detection"""
     try:
         import DaVinciResolveScript as dvr
+        print("✅ DaVinci Resolve API loaded successfully")
         return dvr
     except ImportError:
-        print("DaVinci Resolve Script API not found in default path, searching...")
+        print("DaVinci Resolve Script API not found, checking environment...")
         
-        # DaVinci Resolve uses fusionscript.so for Python API
+        # Check if environment variables are set (from Mac service)
+        script_api_path = os.environ.get('RESOLVE_SCRIPT_API')
+        if script_api_path:
+            modules_path = os.path.join(script_api_path, 'Modules')
+            if modules_path not in sys.path:
+                sys.path.insert(0, modules_path)
+                print(f"Added environment path: {modules_path}")
+        
+        # Try standard DaVinci paths
         fusion_paths = [
             "/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Libraries/Fusion/",
             "/Applications/DaVinci Resolve Studio/DaVinci Resolve.app/Contents/Libraries/Fusion/",
@@ -54,6 +63,7 @@ def load_davinci_api():
         print("2. DaVinci Resolve is currently running")
         print("3. Scripting is enabled in DaVinci Resolve > Preferences > System > General")
         print("4. External scripting is set to 'Network' mode")
+        print("5. Environment variables are set: RESOLVE_SCRIPT_API, PYTHONPATH")
         sys.exit(1)
 
 # Load the DaVinci API
