@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { randomUUID } from 'crypto';
 import { storage } from '../storage';
+import { SLOT_TEMPLATE } from '../schema';
 
 const execAsync = promisify(exec);
 
@@ -154,26 +155,30 @@ export class ClipGenerator {
         try {
           // Get the appropriate source video file
           const sourceVideo = sceneVideos[`camera${slot.cameraAngle}`];
+          // Get the duration for this slot from SLOT_TEMPLATE
+          const slotConfig = SLOT_TEMPLATE.find(config => config.slotNumber === slot.slotNumber);
+          const clipDuration = slotConfig?.duration || 3.0; // Fallback to 3.0 if not found
+          
           if (!sourceVideo) {
             console.warn(`⚠️ No camera ${slot.cameraAngle} video found for ${sceneType} scene, creating placeholder`);
-            await this.createMockClip(outputPath, slot.windowStart, 3.0);
+            await this.createMockClip(outputPath, slot.windowStart, clipDuration);
           } else {
             // Generate clip using FFmpeg
-            await this.generateClipFromVideo(sourceVideo, outputPath, slot.windowStart, 3.0);
+            await this.generateClipFromVideo(sourceVideo, outputPath, slot.windowStart, clipDuration);
           }
           
           const clipFile: ClipFile = {
             slotNumber: slot.slotNumber,
             filePath: outputPath,
             windowStart: slot.windowStart,
-            duration: 3.0,
+            duration: clipDuration,
             sceneType: slot.sceneType,
             cameraAngle: slot.cameraAngle,
             sceneId: `${recordingId}_${slot.sceneType}`
           };
           
           clipFiles.push(clipFile);
-          console.log(`✅ Generated clip: ${outputFilename} (${slot.windowStart}s - ${slot.windowStart + 3}s)`);
+          console.log(`✅ Generated clip: ${outputFilename} (${slot.windowStart}s - ${slot.windowStart + clipDuration}s, duration: ${clipDuration}s)`);
           
         } catch (error) {
           console.error(`❌ Failed to generate clip for slot ${slot.slotNumber}:`, error);
@@ -349,13 +354,17 @@ export class ClipGenerator {
     
     // Map clips to DaVinci slot positions
     clips.forEach(clip => {
+      // Get the duration for this slot from SLOT_TEMPLATE
+      const slotConfig = SLOT_TEMPLATE.find(config => config.slotNumber === clip.slotNumber);
+      const clipDuration = slotConfig?.duration || 3.0; // Fallback to 3.0 if not found
+      
       jobData.clips[clip.slotNumber] = {
         filename: clip.filename,
         fullPath: path.resolve(clip.filePath),
         slotNumber: clip.slotNumber,
         sceneType: clip.sceneType,
         cameraAngle: clip.cameraAngle,
-        duration: 3.0 // All clips are 3 seconds
+        duration: clipDuration
       };
     });
     

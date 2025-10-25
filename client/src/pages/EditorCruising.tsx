@@ -299,16 +299,22 @@ export default function EditorCruising() {
     }
   };
 
-  // Stop video after 3 seconds
+  // Stop video after slot duration
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
     const handleTimeUpdate = () => {
       const selection = slotSelections.find(s => s.slotNumber === activeSlot);
-      if (selection && video.currentTime >= selection.windowStart + 3) {
-        video.pause();
-        video.currentTime = selection.windowStart;
+      if (selection) {
+        // Get the duration for this slot from SLOT_TEMPLATE
+        const slotConfig = SLOT_TEMPLATE.find(config => config.slotNumber === selection.slotNumber);
+        const slotDuration = slotConfig?.duration || 3; // Fallback to 3 seconds if not found
+        
+        if (video.currentTime >= selection.windowStart + slotDuration) {
+          video.pause();
+          video.currentTime = selection.windowStart;
+        }
       }
     };
 

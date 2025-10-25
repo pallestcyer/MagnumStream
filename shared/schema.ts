@@ -115,17 +115,18 @@ export interface SlotConfig {
   sceneType: 'cruising' | 'chase' | 'arrival';
   cameraAngle: 1 | 2;
   color: string;
+  duration: number; // Duration in seconds for DaVinci template compatibility
 }
 
 export const SLOT_TEMPLATE: SlotConfig[] = [
   // Cruising Scene (2 slots) - matches DaVinci template positions 1-2
-  { slotNumber: 1, sceneType: 'cruising', cameraAngle: 1, color: '#FF6B35' }, // Front view (only front slot)
-  { slotNumber: 2, sceneType: 'cruising', cameraAngle: 2, color: '#F7931E' }, // Side view
+  { slotNumber: 1, sceneType: 'cruising', cameraAngle: 1, color: '#FF6B35', duration: 1.627 }, // Front view (39 frames @ 23.976fps)
+  { slotNumber: 2, sceneType: 'cruising', cameraAngle: 2, color: '#F7931E', duration: 1.502 }, // Side view (36 frames @ 23.976fps)
   // Chase Scene (2 slots) - matches DaVinci template positions 3-4  
-  { slotNumber: 3, sceneType: 'chase', cameraAngle: 2, color: '#FFA500' }, // Side view
-  { slotNumber: 4, sceneType: 'chase', cameraAngle: 2, color: '#FF9E3D' }, // Side view
+  { slotNumber: 3, sceneType: 'chase', cameraAngle: 2, color: '#FFA500', duration: 1.543 }, // Side view (37 frames @ 23.976fps)
+  { slotNumber: 4, sceneType: 'chase', cameraAngle: 2, color: '#FF9E3D', duration: 2.503 }, // Side view (60 frames @ 23.976fps)
   // Arrival Scene (1 slot) - matches DaVinci template position 5
-  { slotNumber: 5, sceneType: 'arrival', cameraAngle: 2, color: '#FF7A3D' }, // Side view
+  { slotNumber: 5, sceneType: 'arrival', cameraAngle: 2, color: '#FF7A3D', duration: 2.002 }, // Side view (48 frames @ 23.976fps)
 ];
 
 // Generated clips table for local file storage

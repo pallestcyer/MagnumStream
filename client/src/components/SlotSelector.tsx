@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { Slider } from "@/components/ui/slider";
+import { SLOT_TEMPLATE } from "@/../../shared/schema";
 
 interface SlotSelectorProps {
   slotNumber: number;
   sceneDuration: number; // Total duration of the scene recording
-  windowStart: number; // Current start time of the 3-second window
+  windowStart: number; // Current start time of the slot window
   onWindowStartChange: (newStart: number) => void;
   color: string; // Color for this slot
   sceneType: string; // 'cruising' | 'chase' | 'arrival'
@@ -20,7 +21,9 @@ export default function SlotSelector({
   sceneType,
   cameraAngle,
 }: SlotSelectorProps) {
-  const SLOT_DURATION = 3; // Fixed 3-second slots
+  // Get the dynamic duration for this slot from SLOT_TEMPLATE
+  const slotConfig = SLOT_TEMPLATE.find(config => config.slotNumber === slotNumber);
+  const SLOT_DURATION = slotConfig?.duration || 3; // Fallback to 3 seconds if not found
   const maxStart = Math.max(0, sceneDuration - SLOT_DURATION);
 
   const formatTime = (seconds: number) => {
@@ -62,7 +65,7 @@ export default function SlotSelector({
             {formatTime(windowStart)} - {formatTime(windowEnd)}
           </div>
           <div className="text-xs text-muted-foreground">
-            3.00s window
+            {SLOT_DURATION.toFixed(2)}s window
           </div>
         </div>
       </div>
@@ -75,7 +78,7 @@ export default function SlotSelector({
             <div className="w-full h-full bg-gradient-to-r from-gray-800/50 to-gray-700/50" />
           </div>
 
-          {/* 3-second window highlight */}
+          {/* Slot duration window highlight */}
           <div
             className="absolute top-0 h-full border-2 pointer-events-none"
             style={{
@@ -87,7 +90,7 @@ export default function SlotSelector({
           >
             <div className="w-full h-full flex items-center justify-center">
               <span className="text-xs font-bold" style={{ color }}>
-                3s
+                {SLOT_DURATION.toFixed(1)}s
               </span>
             </div>
           </div>

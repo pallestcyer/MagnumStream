@@ -57,11 +57,11 @@ export default function ChatPage() {
     }
 
     if (q.includes("30 second") || q.includes("minimum") || q.includes("too short")) {
-      return "Each scene requires a minimum of 30 seconds:\n\n• This ensures you have enough footage to select quality 3-second clips\n• If you try to stop before 30 seconds, you'll see a warning message\n• Aim for 45-60 seconds per scene for best results\n\nThe 30-second minimum applies to all three scenes: Cruising, Chase, and Arrival.";
+      return "Each scene requires a minimum of 30 seconds:\n\n• This ensures you have enough footage to select quality clips\n• If you try to stop before 30 seconds, you'll see a warning message\n• Aim for 45-60 seconds per scene for best results\n\nThe 30-second minimum applies to all three scenes: Cruising, Chase, and Arrival.";
     }
 
     if (q.includes("slot") || q.includes("edit") || q.includes("clip")) {
-      return "To edit your clips:\n\n1. After recording, navigate to the Editing phase\n2. You'll see 3 separate pages (Cruising, Chase, Arrival)\n3. Click on a slot card to activate it\n4. The video preview will play your selected 3-second window\n5. Drag the timeline slider to choose which 3 seconds you want\n6. Click another slot to continue\n\nEach slot is limited to exactly 3 seconds and is color-coded by scene!";
+      return "To edit your clips:\n\n1. After recording, navigate to the Editing phase\n2. You'll see 3 separate pages (Cruising, Chase, Arrival)\n3. Click on a slot card to activate it\n4. The video preview will play your selected clip window\n5. Drag the timeline slider to choose the timing for your clip\n6. Click another slot to continue\n\nEach slot has a specific duration optimized for DaVinci Resolve and is color-coded by scene!";
     }
 
     if (q.includes("export") || q.includes("share") || q.includes("send")) {
