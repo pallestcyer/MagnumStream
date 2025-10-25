@@ -15,6 +15,27 @@ declare module 'express-session' {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
+  // Get camera configuration
+  app.get("/api/camera-config", async (req, res) => {
+    try {
+      const cameraConfig = {
+        camera1: {
+          deviceId: process.env.CAMERA_1_DEVICE_ID || "default-camera-1",
+          label: "Camera 1 (Straight View)"
+        },
+        camera2: {
+          deviceId: process.env.CAMERA_2_DEVICE_ID || "default-camera-2", 
+          label: "Camera 2 (Side View)"
+        }
+      };
+      
+      console.log('📹 Camera configuration requested:', cameraConfig);
+      res.json(cameraConfig);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
   // Get all flight recordings with optional date filter
   app.get("/api/recordings", async (req, res) => {
     try {

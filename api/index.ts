@@ -246,6 +246,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       });
 
+      // Camera configuration
+      app.get('/api/camera-config', async (req, res) => {
+        try {
+          const result = await videoOps.delegateToLocal('/camera-config');
+          res.json(result);
+        } catch (error) {
+          res.status(500).json({ error: error.message });
+        }
+      });
+
       // Health check
       app.get('/api/health', (req, res) => {
         res.json({
