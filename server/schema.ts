@@ -109,7 +109,7 @@ export const insertVideoSlotSchema = createInsertSchema(videoSlots).omit({
 export type InsertVideoSlot = z.infer<typeof insertVideoSlotSchema>;
 export type VideoSlot = typeof videoSlots.$inferSelect;
 
-// Scene configuration (defines the 8-slot template structure)
+// Scene configuration (defines the 5-slot template structure matching DaVinci template)
 export interface SlotConfig {
   slotNumber: number;
   sceneType: 'cruising' | 'chase' | 'arrival';
@@ -118,17 +118,14 @@ export interface SlotConfig {
 }
 
 export const SLOT_TEMPLATE: SlotConfig[] = [
-  // Cruising Scene (3 slots)
-  { slotNumber: 1, sceneType: 'cruising', cameraAngle: 1, color: '#FF6B35' }, // Vibrant Orange
-  { slotNumber: 2, sceneType: 'cruising', cameraAngle: 2, color: '#F7931E' }, // Bright Orange
-  { slotNumber: 3, sceneType: 'cruising', cameraAngle: 1, color: '#FF8C42' }, // Light Orange
-  // Chase Scene (3 slots)
-  { slotNumber: 4, sceneType: 'chase', cameraAngle: 1, color: '#FFA500' }, // Classic Orange
-  { slotNumber: 5, sceneType: 'chase', cameraAngle: 2, color: '#FF9E3D' }, // Amber Orange
-  { slotNumber: 6, sceneType: 'chase', cameraAngle: 1, color: '#FFB84D' }, // Soft Orange
-  // Arrival Scene (2 slots)
-  { slotNumber: 7, sceneType: 'arrival', cameraAngle: 1, color: '#FF7A3D' }, // Medium Orange
-  { slotNumber: 8, sceneType: 'arrival', cameraAngle: 2, color: '#FFAB5E' }, // Warm Orange
+  // Cruising Scene (2 slots) - matches DaVinci template positions 1-2
+  { slotNumber: 1, sceneType: 'cruising', cameraAngle: 1, color: '#FF6B35' }, // Front view (only front slot)
+  { slotNumber: 2, sceneType: 'cruising', cameraAngle: 2, color: '#F7931E' }, // Side view
+  // Chase Scene (2 slots) - matches DaVinci template positions 3-4  
+  { slotNumber: 3, sceneType: 'chase', cameraAngle: 2, color: '#FFA500' }, // Side view
+  { slotNumber: 4, sceneType: 'chase', cameraAngle: 2, color: '#FF9E3D' }, // Side view
+  // Arrival Scene (1 slot) - matches DaVinci template position 5
+  { slotNumber: 5, sceneType: 'arrival', cameraAngle: 2, color: '#FF7A3D' }, // Side view
 ];
 
 // Generated clips table for local file storage

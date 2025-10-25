@@ -186,11 +186,11 @@ export class ClipGenerator {
   }
 
   private getSceneTypeFromSlotNumber(slotNumber: number): 'cruising' | 'chase' | 'arrival' {
-    // Based on SLOT_TEMPLATE: slots 1-3 = cruising, 4-6 = chase, 7-8 = arrival
-    if (slotNumber >= 1 && slotNumber <= 3) return 'cruising';
-    if (slotNumber >= 4 && slotNumber <= 6) return 'chase';
-    if (slotNumber >= 7 && slotNumber <= 8) return 'arrival';
-    throw new Error(`Invalid slot number: ${slotNumber}`);
+    // Based on NEW SLOT_TEMPLATE: slots 1-2 = cruising, 3-4 = chase, 5 = arrival
+    if (slotNumber >= 1 && slotNumber <= 2) return 'cruising';
+    if (slotNumber >= 3 && slotNumber <= 4) return 'chase';
+    if (slotNumber === 5) return 'arrival';
+    throw new Error(`Invalid slot number: ${slotNumber}. Valid range is 1-5.`);
   }
   
   private groupSlotsByScene(slots: SlotSelection[]): Record<string, SlotSelection[]> {
