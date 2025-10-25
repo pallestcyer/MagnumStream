@@ -89,7 +89,7 @@ RENDER_FORMAT = "mp4"  # Output format
 RENDER_CODEC = "H.264"  # Video codec
 
 # Timeline Configuration - Updated for 5-slot MagnumStream template
-TIMELINE_NAME = "MAG_FERRARI"  # Name of timeline in your template
+TIMELINE_NAME = "MAG_FERARRI"  # Name of timeline in your template
 CLIP_TRACKS = {
     1: "V1",  # Track 1 for all clips (single track template)
 }
@@ -414,13 +414,21 @@ class DaVinciAutomation:
             last_progress = 0
             while True:
                 status = self.current_project.GetRenderJobStatus(job_id)
-                if status['JobStatus'] == 'Complete':
+                
+                # Handle different status response formats
+                if not status or not isinstance(status, dict):
+                    logger.warning(f"Invalid status response: {status}")
+                    time.sleep(2)
+                    continue
+                
+                job_status = status.get('JobStatus', 'Unknown')
+                if job_status == 'Complete':
                     output_path = OUTPUT_FOLDER / f"{project_name}.mp4"
                     logger.info(f"Rendering completed successfully: {output_path}")
                     return str(output_path)
-                elif status['JobStatus'] == 'Failed':
+                elif job_status == 'Failed':
                     raise Exception(f"Render failed: {status.get('Error', 'Unknown error')}")
-                elif status['JobStatus'] == 'Cancelled':
+                elif job_status == 'Cancelled':
                     raise Exception("Render was cancelled")
                 
                 # Show progress (only log when it changes significantly)
