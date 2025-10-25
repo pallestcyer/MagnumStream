@@ -383,7 +383,13 @@ export default function RecordingDashboard() {
   };
   
   const saveRecordedVideos = async () => {
-    if (!currentRecordingId) return;
+    // Use existing recording ID or create one if needed
+    let recordingId = currentRecordingId;
+    if (!recordingId) {
+      recordingId = crypto.randomUUID();
+      setCurrentRecordingId(recordingId);
+      console.log(`📊 Created recording ID for saving: ${recordingId}`);
+    }
     
     try {
       const currentSceneType = currentScene.type;
@@ -448,7 +454,7 @@ export default function RecordingDashboard() {
       
       // Store metadata in localStorage (small data)
       localStorage.setItem(`scene_${currentSceneType}_duration`, elapsedTime.toString());
-      localStorage.setItem('currentRecordingId', currentRecordingId);
+      localStorage.setItem('currentRecordingId', recordingId);
       
       console.log(`📹 Saved ${currentSceneType} scene videos:`, {
         camera1: camera1Blob ? 'Stored in IndexedDB' : 'No data',
