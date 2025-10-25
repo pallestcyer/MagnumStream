@@ -10,6 +10,7 @@ PROJECT_DIR="$HOME/MagnumStream"
 LOG_DIR="$PROJECT_DIR/logs"
 NGROK_LOG="$LOG_DIR/ngrok.log"
 SERVER_LOG="$LOG_DIR/server.log"
+DAVINCI_LOG="$LOG_DIR/davinci.log"
 
 # Ensure log directory exists
 mkdir -p "$LOG_DIR"
@@ -35,6 +36,83 @@ fi
 # Build the project
 echo "🔨 Building project..."
 npm run build
+
+# Check Python and DaVinci Resolve setup
+echo "🐍 Checking Python and DaVinci Resolve setup..."
+
+# Check if Python 3 is available
+if ! command -v python3 &> /dev/null; then
+    echo "❌ Python 3 not found. Please install Python 3 for DaVinci automation."
+    echo "   Install via: brew install python3"
+    exit 1
+fi
+
+echo "✅ Python 3 found: $(python3 --version)"
+
+# Check if DaVinci Resolve is installed (look for common installation paths)
+DAVINCI_PATHS=(
+    "/Applications/DaVinci Resolve/DaVinci Resolve.app"
+    "/Applications/DaVinci Resolve Studio/DaVinci Resolve.app"
+)
+
+DAVINCI_FOUND=false
+for path in "${DAVINCI_PATHS[@]}"; do
+    if [ -d "$path" ]; then
+        echo "✅ DaVinci Resolve found: $path"
+        DAVINCI_FOUND=true
+        break
+    fi
+done
+
+if [ "$DAVINCI_FOUND" = false ]; then
+    echo "⚠️  DaVinci Resolve not found in standard locations."
+    echo "   Please ensure DaVinci Resolve Studio is installed for video rendering."
+    echo "   Download from: https://www.blackmagicdesign.com/products/davinciresolve"
+    echo "   Note: Studio version required for scripting API"
+fi
+
+# Make DaVinci script executable
+if [ -f "$PROJECT_DIR/Davinci.py" ]; then
+    chmod +x "$PROJECT_DIR/Davinci.py"
+    echo "✅ DaVinci automation script ready"
+else
+    echo "⚠️  DaVinci.py not found at $PROJECT_DIR/Davinci.py"
+fi
+
+# Test DaVinci Python API (non-blocking check)
+echo "🔧 Testing DaVinci Resolve Python API..."
+python3 -c "
+try:
+    import DaVinciResolveScript as dvr
+    print('✅ DaVinci Resolve Python API available')
+except ImportError:
+    print('⚠️  DaVinci Resolve Python API not available')
+    print('   This is normal if DaVinci Resolve is not running')
+    print('   Start DaVinci Resolve and enable scripting in preferences')
+" 2>/dev/null || echo "⚠️  Could not test DaVinci API (this is normal if Resolve is not running)"
+
+# Pre-start DaVinci Resolve in background if available
+echo "🎬 Pre-starting DaVinci Resolve in background..."
+DAVINCI_PRESTART_PATHS=(
+    "/Applications/DaVinci Resolve/DaVinci Resolve.app"
+    "/Applications/DaVinci Resolve Studio/DaVinci Resolve.app"
+)
+
+DAVINCI_STARTED=false
+for path in "${DAVINCI_PRESTART_PATHS[@]}"; do
+    if [ -d "$path" ]; then
+        echo "🎬 Starting DaVinci Resolve in background: $path"
+        # Use 'open -g' to start in background without stealing focus
+        open -g "$path" 2>/dev/null &
+        DAVINCI_STARTED=true
+        echo "✅ DaVinci Resolve started in background (will minimize automatically during render)"
+        break
+    fi
+done
+
+if [ "$DAVINCI_STARTED" = false ]; then
+    echo "⚠️  DaVinci Resolve not started (will auto-start when needed)"
+fi
 
 # Start the Express server in background
 echo "🖥️  Starting local video processing server..."
@@ -133,5 +211,12 @@ echo ""
 echo "📋 Logs:"
 echo "   Server: $SERVER_LOG"
 echo "   ngrok:  $NGROK_LOG"
+echo "   DaVinci: $DAVINCI_LOG"
+echo ""
+echo "🎬 DaVinci Resolve Integration:"
+echo "   - Ensure DaVinci Resolve Studio is running"
+echo "   - Enable Scripting in DaVinci Resolve > Preferences > System > General"
+echo "   - Template project: 'MAG_FERRARI-BACKUP' with 5-slot timeline"
+echo "   - Clips will be processed: FFMPEG → DaVinci → Final render"
 echo ""
 echo "🛑 To stop the service: ./deploy/stop-mac-service.sh"

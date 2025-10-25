@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle2, Upload, MessageSquare, Loader2 } from "lucide-react";
+import { CheckCircle2, MessageSquare, Loader2 } from "lucide-react";
 
 // Get the local device URL for Mac service
 const getLocalDeviceUrl = async (): Promise<string> => {
@@ -117,19 +117,22 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
       
       setProgress(70);
       
-      // Step 3: Create DaVinci job file (30% progress)
-      console.log('📄 Creating DaVinci job file...');
-      const davinciResponse = await fetch(`${localDeviceUrl}/api/recordings/${recordingId}/create-davinci-job`, {
+      // Step 3: Create DaVinci job file and render final video (30% progress)
+      console.log('📄 Creating DaVinci job file and starting render...');
+      const davinciResponse = await fetch(`${localDeviceUrl}/api/recordings/${recordingId}/render-davinci`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          projectName: `${flightDate}_${flightTime.replace(':', '')}_Final` 
+        })
       });
       
       if (!davinciResponse.ok) {
-        throw new Error('Failed to create DaVinci job file');
+        throw new Error('Failed to render with DaVinci Resolve');
       }
       
-      const davinciResult = await davinciResponse.json();
-      console.log('📄 DaVinci job file created:', davinciResult);
+      const renderResult = await davinciResponse.json();
+      console.log('🎬 DaVinci render completed:', renderResult);
       
       setProgress(100);
       

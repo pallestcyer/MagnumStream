@@ -586,6 +586,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Render project with DaVinci Resolve (final step in workflow)
+  app.post("/api/recordings/:recordingId/render-davinci", async (req, res) => {
+    try {
+      const { recordingId } = req.params;
+      const { projectName } = req.body;
+      
+      console.log(`🎬 Starting DaVinci render for recording ${recordingId}`);
+      
+      // First ensure clips and job file exist
+      const clips = await clipGenerator.getProjectClips(recordingId);
+      if (clips.length === 0) {
+        return res.status(400).json({ error: "No clips found. Please generate clips first." });
+      }
+      
+      // Create job file if it doesn't exist
+      let jobFilePath;
+      try {
+        jobFilePath = await clipGenerator.createDaVinciJobFile(recordingId);
+        console.log(`📄 Using DaVinci job file: ${jobFilePath}`);
+      } catch (error) {
+        console.error('Failed to create job file:', error);
+        return res.status(500).json({ error: "Failed to create DaVinci job file" });
+      }
+      
+      // Execute DaVinci.py script to render the project
+      const { exec } = await import('child_process');
+      const { promisify } = await import('util');
+      const execAsync = promisify(exec);
+      const path = await import('path');
+      
+      // Get the absolute path to DaVinci.py (should be in project root)
+      const davinciScriptPath = path.resolve('./Davinci.py');
+      const davinciCommand = `python3 "${davinciScriptPath}" --job-file "${jobFilePath}"`;
+      
+      console.log(`🔧 Executing DaVinci command: ${davinciCommand}`);
+      
+      // Execute with timeout (DaVinci rendering can take a while)
+      const { stdout, stderr } = await execAsync(davinciCommand, { 
+        timeout: 30 * 60 * 1000 // 30 minutes timeout
+      });
+      
+      console.log(`🎬 DaVinci stdout: ${stdout}`);
+      if (stderr) {
+        console.warn(`🎬 DaVinci stderr: ${stderr}`);
+      }
+      
+      // Parse output to get result
+      if (stdout.includes('SUCCESS:')) {
+        const outputPath = stdout.split('SUCCESS: ')[1]?.trim();
+        console.log(`✅ DaVinci render completed: ${outputPath}`);
+        
+        res.json({
+          success: true,
+          message: "DaVinci render completed successfully",
+          outputPath,
+          renderInfo: {
+            recordingId,
+            projectName: projectName || `Project_${recordingId}`,
+            clipCount: clips.length,
+            completedAt: new Date().toISOString()
+          }
+        });
+      } else {
+        throw new Error("DaVinci render failed: " + stdout);
+      }
+      
+    } catch (error: any) {
+      console.error('DaVinci render error:', error);
+      res.status(500).json({ 
+        error: error.message,
+        details: "Make sure DaVinci Resolve Studio is running and scripting is enabled"
+      });
+    }
+  });
+
   // Get project directory structure
   app.get("/api/recordings/:recordingId/project-info", async (req, res) => {
     try {
