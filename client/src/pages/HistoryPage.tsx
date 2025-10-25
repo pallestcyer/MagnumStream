@@ -120,6 +120,14 @@ export default function HistoryPage() {
     ['completed', 'failed'].includes(p.exportStatus)
   );
 
+  // Debug logging
+  console.log('📊 HistoryPage projects loaded:', {
+    totalProjects: projects.length,
+    inProgress: inProgressProjects.length,
+    completed: completedProjects.length,
+    projectStatuses: projects.map(p => ({ name: p.projectName, status: p.exportStatus }))
+  });
+
   const getStatusBadge = (status: ProjectRecord['exportStatus']) => {
     switch (status) {
       case "completed":
@@ -412,7 +420,11 @@ function ProjectCard({ record, getStatusBadge, formatDate }: ProjectCardProps) {
         )}
         
         {/* Resume editing for in-progress projects */}
-        {['recorded', 'in_progress'].includes(record.exportStatus) && (
+        {(() => {
+          const canResume = ['recorded', 'in_progress'].includes(record.exportStatus);
+          console.log(`📊 Project ${record.projectName} (${record.exportStatus}) can resume: ${canResume}`);
+          return canResume;
+        })() && (
           <div className="flex gap-2 pt-2">
             <Button
               size="sm"
