@@ -422,7 +422,10 @@ export default function RecordingDashboard() {
         camera1Size: chunks1.reduce((total, chunk) => total + chunk.size, 0),
         camera2Size: chunks2.reduce((total, chunk) => total + chunk.size, 0),
         elapsedTime,
-        recordingId
+        recordingId,
+        sessionId: videoStorage.getCurrentSessionId(),
+        currentSceneIndex,
+        scenesArray: SCENES.map(s => s.type)
       });
       
       // Debug: Log the actual chunks
@@ -506,7 +509,8 @@ export default function RecordingDashboard() {
           const sessionId = localStorage.getItem('currentSessionId') || 'default';
           const completionKey = `scene_completed_${sessionId}_${currentSceneType}`;
           localStorage.setItem(completionKey, 'true');
-          console.log(`✅ Scene ${currentSceneType} marked as completed AFTER successful video saving`);
+          console.log(`✅ Scene ${currentSceneType} (index ${currentSceneIndex}) marked as completed AFTER successful video saving`);
+          console.log(`🔍 Completion key: ${completionKey}`);
           
           return updatedRec;
         }
@@ -552,6 +556,12 @@ export default function RecordingDashboard() {
     } catch (error) {
       console.error('❌ Error clearing scene:', error);
     }
+    
+    // Clear completion status from localStorage
+    const sessionId = localStorage.getItem('currentSessionId') || 'default';
+    const completionKey = `scene_completed_${sessionId}_${currentSceneType}`;
+    localStorage.removeItem(completionKey);
+    console.log(`🗑️ Cleared completion status for ${currentSceneType} re-recording`);
     
     setRecordingState("idle");
     setElapsedTime(0);
