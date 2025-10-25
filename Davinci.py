@@ -97,12 +97,14 @@ CLIP_TRACKS = {
 # Clip Mapping - Maps slot numbers to timeline positions (matches SLOT_TEMPLATE from schema.ts)
 # Updated for 5 slots with exact frame positions at 23.976fps to match schema durations
 # All clips are on video track V3 (track index 3)
+# Timeline starts at 1:00:00:00 timecode (86400 frames at 23.976fps)
+TIMELINE_START_FRAME = 86400  # 1 hour = 3600 seconds * 24 fps = 86400 frames at 24fps
 CLIP_POSITIONS = {
-    1: {"track": 3, "start_frame": 0},      # Slot 1: 0s, duration 1.627s (39 frames)
-    2: {"track": 3, "start_frame": 39},     # Slot 2: 1.627s, duration 1.502s (36 frames) 
-    3: {"track": 3, "start_frame": 75},     # Slot 3: 3.129s, duration 1.543s (37 frames)
-    4: {"track": 3, "start_frame": 112},    # Slot 4: 4.672s, duration 2.503s (60 frames)
-    5: {"track": 3, "start_frame": 172},    # Slot 5: 7.175s, duration 2.002s (48 frames)
+    1: {"track": 3, "start_frame": TIMELINE_START_FRAME + 0},      # Slot 1: 1:00:00:00, duration 1.627s (39 frames)
+    2: {"track": 3, "start_frame": TIMELINE_START_FRAME + 39},     # Slot 2: 1:00:01:15, duration 1.502s (36 frames) 
+    3: {"track": 3, "start_frame": TIMELINE_START_FRAME + 75},     # Slot 3: 1:00:03:03, duration 1.543s (37 frames)
+    4: {"track": 3, "start_frame": TIMELINE_START_FRAME + 112},    # Slot 4: 1:00:04:16, duration 2.503s (60 frames)
+    5: {"track": 3, "start_frame": TIMELINE_START_FRAME + 172},    # Slot 5: 1:00:07:04, duration 2.002s (48 frames)
 }
 
 # Logging Configuration
@@ -388,33 +390,13 @@ class DaVinciAutomation:
         return int(seconds * fps)
     
     def _save_project(self, project_name):
-        """Save the project with a consistent working name"""
+        """Save the current project state without renaming"""
         try:
-            # Use a consistent working project name instead of individual project names
-            working_project_name = "MAG_FERRARI-WORKING"
-            
-            # Save current state
+            # Just save the current project state - don't rename to avoid messing up the template
             self.project_manager.SaveProject()
             
-            # Check if working project already exists
-            existing_project = None
-            try:
-                existing_project = self.project_manager.LoadProject(working_project_name)
-                if existing_project:
-                    logger.info(f"Working project '{working_project_name}' already exists, will overwrite clips")
-                    # Close and reload the template to start fresh
-                    self.project_manager.CloseProject(existing_project)
-                    self.current_project = self.project_manager.LoadProject(TEMPLATE_PROJECT_NAME)
-            except:
-                # Working project doesn't exist yet, that's fine
-                pass
-            
-            # Rename current project to working name (this effectively creates a copy)
-            self.current_project.SetName(working_project_name)
-            self.project_manager.SaveProject()
-            
-            logger.info(f"Project saved as working project: {working_project_name}")
-            logger.info(f"Template project '{TEMPLATE_PROJECT_NAME}' remains unchanged")
+            logger.info(f"Project saved successfully: {TEMPLATE_PROJECT_NAME}")
+            logger.info(f"Clips have been updated in place")
             return True
             
         except Exception as e:
