@@ -275,10 +275,18 @@ class VideoStorage {
           const records: VideoRecord[] = request.result;
           const sceneRecords = records.filter(r => r.sceneType === sceneType);
           console.log(`⏱️ Found ${sceneRecords.length} duration records for ${sceneType} in session ${currentSessionId}`);
+          console.log(`⏱️ DEBUG: Scene records for ${sceneType}:`, sceneRecords.map(r => ({
+            id: r.id,
+            sessionId: r.sessionId,
+            sceneType: r.sceneType,
+            cameraAngle: r.cameraAngle,
+            duration: r.duration,
+            createdAt: r.createdAt
+          })));
           
           if (sceneRecords.length > 0) {
             const latest = sceneRecords.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
-            console.log(`⏱️ Returning duration ${latest.duration} for ${sceneType}`);
+            console.log(`⏱️ Returning duration ${latest.duration} for ${sceneType} (from record ${latest.id})`);
             resolve(latest.duration);
           } else {
             console.log(`⏱️ No duration found for ${sceneType} in current session`);
