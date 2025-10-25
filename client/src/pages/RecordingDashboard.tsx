@@ -66,7 +66,10 @@ export default function RecordingDashboard() {
 
   // Initialize cameras and setup recording
   useEffect(() => {
-    initializeCameras();
+    console.log('🚀 RecordingDashboard useEffect triggered');
+    initializeCameras().catch(error => {
+      console.error('❌ Failed to initialize cameras:', error);
+    });
     checkExistingRecordings();
     return () => {
       stopCameras();
@@ -193,6 +196,8 @@ export default function RecordingDashboard() {
 
       // Camera 2 (Side View)
       console.log('🎥 Initializing Camera 2 (Side View)...');
+      console.log('🎥 Camera 2 Device ID:', cameraConfig.camera2.deviceId);
+      
       const stream2 = await navigator.mediaDevices.getUserMedia({
         video: { 
           deviceId: { exact: cameraConfig.camera2.deviceId },
