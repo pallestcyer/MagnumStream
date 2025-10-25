@@ -17,8 +17,8 @@ class VideoStorage {
   private db: IDBDatabase | null = null;
 
 
-  // Set current session (called when customer info is submitted)
-  setCurrentSession(customerNames: string): void {
+  // Set current session (called when customer info is submitted or resuming project)
+  setCurrentSession(customerNames: string, isNewProject: boolean = true): void {
     // Create session ID from customer names (sanitized)
     const sessionId = customerNames.toLowerCase().replace(/[^a-z0-9\s&]/g, '').replace(/\s+/g, '_');
     const previousSessionId = localStorage.getItem('currentSessionId');
@@ -29,13 +29,17 @@ class VideoStorage {
       this.clearSceneCompletionStatus(previousSessionId);
     }
     
-    // Always clear completion status for new session to start fresh
-    this.clearSceneCompletionStatus(sessionId);
-    console.log('🧹 Cleared completion status for new session:', sessionId);
-    
-    // Also clear any recording ID from previous session
-    localStorage.removeItem('currentRecordingId');
-    console.log('🧹 Cleared recording ID for fresh start');
+    if (isNewProject) {
+      // Clear completion status for new projects to start fresh
+      this.clearSceneCompletionStatus(sessionId);
+      console.log('🧹 Cleared completion status for new project:', sessionId);
+      
+      // Also clear any recording ID from previous session
+      localStorage.removeItem('currentRecordingId');
+      console.log('🧹 Cleared recording ID for fresh start');
+    } else {
+      console.log('🔄 Resuming existing project session:', sessionId);
+    }
     
     localStorage.setItem('currentSessionId', sessionId);
     console.log('📋 Set current session to:', sessionId);

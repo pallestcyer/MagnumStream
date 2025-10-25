@@ -17,6 +17,7 @@ import {
   Target,
   Clapperboard
 } from "lucide-react";
+import { videoStorage } from "@/utils/videoStorage";
 
 interface ProjectRecord {
   id: string;
@@ -431,8 +432,7 @@ function ProjectCard({ record, getStatusBadge, formatDate }: ProjectCardProps) {
               className="bg-gradient-purple-blue"
               onClick={() => {
                 // Set the session and recording ID for resuming project
-                const sessionId = record.pilotName.toLowerCase().replace(/[^a-z0-9\s&]/g, '').replace(/\s+/g, '_');
-                localStorage.setItem('currentSessionId', sessionId);
+                videoStorage.setCurrentSession(record.pilotName, false); // false = resuming, not new project
                 localStorage.setItem('currentRecordingId', record.id);
                 localStorage.setItem('pilotEmail', record.pilotEmail || '');
                 localStorage.setItem('staffMember', record.staffMember || '');
