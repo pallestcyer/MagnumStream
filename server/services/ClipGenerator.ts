@@ -318,24 +318,32 @@ export class ClipGenerator {
     const projectDir = await this.getProjectDirectory(recordingId);
     const davinciDir = path.join(projectDir, 'davinci');
     
-    const recording = await storage.getFlightRecording(recordingId);
+    // For Mac service: Get project info from metadata instead of database lookup
+    const metadataPath = path.join(projectDir, '.expiration');
+    let projectMetadata: any = {};
     
-    if (!recording) {
-      throw new Error(`Recording not found: ${recordingId}`);
+    try {
+      const metadataContent = await fs.readFile(metadataPath, 'utf8');
+      projectMetadata = JSON.parse(metadataContent);
+      console.log('📄 Using project metadata for DaVinci job:', projectMetadata);
+    } catch (error) {
+      console.warn('📄 No project metadata found, using defaults');
     }
+    
+    const currentDate = new Date().toISOString().split('T')[0];
+    const projectName = projectMetadata.projectName || `Project_${currentDate}`;
     
     const jobData = {
       jobId: randomUUID(),
       recordingId,
-      projectName: `${recording.pilotName}_${new Date().toISOString().split('T')[0]}`,
+      projectName: `${projectName}_${currentDate}`,
       templateProject: "MagnumPI_Template",
       clips: {} as Record<number, any>,
       metadata: {
-        pilotName: recording.pilotName,
-        pilotEmail: recording.pilotEmail,
-        flightDate: recording.flightDate,
-        flightTime: recording.flightTime,
-        createdAt: new Date().toISOString()
+        projectName: projectName,
+        sessionId: projectMetadata.sessionId || 'unknown',
+        createdAt: new Date().toISOString(),
+        recordingId: recordingId
       }
     };
     
