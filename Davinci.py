@@ -96,12 +96,13 @@ CLIP_TRACKS = {
 
 # Clip Mapping - Maps slot numbers to timeline positions (matches SLOT_TEMPLATE from schema.ts)
 # Updated for 5 slots with exact frame positions at 23.976fps to match schema durations
+# All clips are on video track V3 (track index 3)
 CLIP_POSITIONS = {
-    1: {"track": 1, "start_frame": 0},      # Slot 1: 0s, duration 1.627s (39 frames)
-    2: {"track": 1, "start_frame": 39},     # Slot 2: 1.627s, duration 1.502s (36 frames) 
-    3: {"track": 1, "start_frame": 75},     # Slot 3: 3.129s, duration 1.543s (37 frames)
-    4: {"track": 1, "start_frame": 112},    # Slot 4: 4.672s, duration 2.503s (60 frames)
-    5: {"track": 1, "start_frame": 172},    # Slot 5: 7.175s, duration 2.002s (48 frames)
+    1: {"track": 3, "start_frame": 0},      # Slot 1: 0s, duration 1.627s (39 frames)
+    2: {"track": 3, "start_frame": 39},     # Slot 2: 1.627s, duration 1.502s (36 frames) 
+    3: {"track": 3, "start_frame": 75},     # Slot 3: 3.129s, duration 1.543s (37 frames)
+    4: {"track": 3, "start_frame": 112},    # Slot 4: 4.672s, duration 2.503s (60 frames)
+    5: {"track": 3, "start_frame": 172},    # Slot 5: 7.175s, duration 2.002s (48 frames)
 }
 
 # Logging Configuration
@@ -305,7 +306,7 @@ class DaVinciAutomation:
                     }
                     logger.info(f"Imported slot {slot_number}: {clip_info['filename']} ({clip_info.get('duration', 3.0)}s)")
             
-            # Replace clips on timeline using precise slot positions
+            # Replace clips on timeline using direct replacement method
             for slot_number, clip_data in media_items.items():
                 if slot_number not in CLIP_POSITIONS:
                     logger.warning(f"No position defined for slot {slot_number}")
@@ -315,28 +316,66 @@ class DaVinciAutomation:
                 track_index = position['track']
                 start_frame = position['start_frame']
                 
-                # Get the timeline item at this position
+                # Get all timeline items on the video track
                 timeline_items = self.timeline.GetItemListInTrack('video', track_index)
+                logger.info(f"Found {len(timeline_items)} items on video track {track_index}")
                 
-                # Find the item at our target position
-                for item in timeline_items:
+                # Find the item at our target position and replace it
+                replaced = False
+                for i, item in enumerate(timeline_items):
                     item_start = item.GetStart()
                     item_end = item.GetEnd()
                     
-                    # Check if this is the placeholder we want to replace
+                    logger.info(f"Item {i+1}: start={item_start}, end={item_end}, target={start_frame}")
+                    
+                    # Check if this item overlaps with our target position
                     if item_start <= start_frame < item_end:
-                        # Set in and out points on the media pool item
                         media_item = clip_data['media']
                         
-                        # Replace the clip using take system for clean replacement
-                        if item.AddTake(media_item):
-                            item.SelectTakeByIndex(item.GetTakesCount())
-                            logger.info(f"Replaced slot {slot_number} at frame {start_frame} with {clip_data['slot_info']['filename']}")
-                        else:
-                            # Fallback: Delete and add new clip
-                            logger.warning(f"Take system failed for slot {slot_number}, trying direct replacement")
-                            # This might require timeline edit operations depending on DaVinci version
-                        break
+                        # Try multiple replacement methods
+                        try:
+                            # Method 1: Replace source clip directly
+                            if hasattr(item, 'ReplaceClip'):
+                                if item.ReplaceClip(media_item):
+                                    logger.info(f"✅ Method 1: Replaced slot {slot_number} with {clip_data['slot_info']['filename']}")
+                                    replaced = True
+                                    break
+                            
+                            # Method 2: Use take system
+                            if item.AddTake(media_item):
+                                take_count = item.GetTakesCount()
+                                if item.SelectTakeByIndex(take_count):
+                                    logger.info(f"✅ Method 2: Added take for slot {slot_number} with {clip_data['slot_info']['filename']}")
+                                    replaced = True
+                                    break
+                            
+                            # Method 3: Delete and re-add
+                            item_duration = item_end - item_start
+                            self.timeline.DeleteClips([item])
+                            
+                            # Add new clip at the same position
+                            new_clip = {
+                                "mediaPoolItem": media_item,
+                                "startFrame": 0,
+                                "endFrame": int(clip_data['out_point']),
+                                "trackIndex": track_index,
+                                "recordFrame": start_frame
+                            }
+                            
+                            if self.media_pool.AppendToTimeline([new_clip]):
+                                logger.info(f"✅ Method 3: Replaced slot {slot_number} with {clip_data['slot_info']['filename']}")
+                                replaced = True
+                                break
+                                
+                        except Exception as replace_error:
+                            logger.warning(f"Replacement attempt failed for slot {slot_number}: {replace_error}")
+                            continue
+                
+                if not replaced:
+                    logger.warning(f"❌ Failed to replace slot {slot_number} - no suitable timeline item found at frame {start_frame}")
+                    # Log all timeline items for debugging
+                    for i, item in enumerate(timeline_items):
+                        logger.info(f"Timeline item {i+1}: {item.GetStart()}-{item.GetEnd()}")
             
             return True
             
@@ -393,7 +432,11 @@ class DaVinciAutomation:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             render_filename = f"MagnumStream_Render_{timestamp}"
             
-            # Set render settings for final output
+            # Get current template render settings to preserve aspect ratio and quality
+            current_settings = self.current_project.GetRenderSettings()
+            logger.info(f"Current template render settings: {current_settings}")
+            
+            # Only override essential settings while preserving template quality/aspect ratio
             render_settings = {
                 "SelectAllFrames": True,
                 "TargetDir": str(OUTPUT_FOLDER),
@@ -401,15 +444,21 @@ class DaVinciAutomation:
                 "UniqueFilenameStyle": 0,  # Don't add numbers
                 "ExportVideo": True,
                 "ExportAudio": True,
-                "FormatWidth": 1920,
-                "FormatHeight": 1080,
-                "FrameRate": "23.976",  # Match template frame rate
-                "VideoQuality": 0,  # 0 = Automatic
-                "AudioCodec": "aac",
-                "AudioBitDepth": 16,
-                "AudioSampleRate": 48000
             }
             
+            # Preserve template settings if they exist, otherwise use defaults
+            if current_settings:
+                # Keep original format settings to preserve aspect ratio
+                if "FormatWidth" in current_settings:
+                    render_settings["FormatWidth"] = current_settings["FormatWidth"]
+                if "FormatHeight" in current_settings:
+                    render_settings["FormatHeight"] = current_settings["FormatHeight"]
+                if "FrameRate" in current_settings:
+                    render_settings["FrameRate"] = current_settings["FrameRate"]
+                if "VideoQuality" in current_settings:
+                    render_settings["VideoQuality"] = current_settings["VideoQuality"]
+                    
+            logger.info(f"Final render settings: {render_settings}")
             self.current_project.SetRenderSettings(render_settings)
             
             # Load render preset if available
@@ -430,34 +479,78 @@ class DaVinciAutomation:
             
             logger.info(f"Rendering started with job ID: {job_id}")
             
-            # Wait for render to complete with progress tracking
+            # Wait for render to complete with improved status monitoring
             last_progress = 0
-            while True:
-                status = self.current_project.GetRenderJobStatus(job_id)
-                
-                # Handle different status response formats
-                if not status or not isinstance(status, dict):
-                    logger.warning(f"Invalid status response: {status}")
+            render_timeout = 0
+            max_timeout = 300  # 5 minutes max wait time
+            
+            while render_timeout < max_timeout:
+                # Try different ways to get render status
+                status = None
+                try:
+                    # Method 1: Get status by job ID
+                    if job_id and job_id != True:
+                        status = self.current_project.GetRenderJobStatus(job_id)
+                    
+                    # Method 2: Get current render status
+                    if not status:
+                        status = self.current_project.GetCurrentRenderJobStatus()
+                    
+                    # Method 3: Check if rendering is still active
+                    if not status:
+                        is_rendering = self.current_project.IsRenderingInProgress()
+                        if not is_rendering:
+                            # Rendering completed, check for output file
+                            output_path = OUTPUT_FOLDER / f"{render_filename}.mp4"
+                            if output_path.exists():
+                                logger.info(f"Rendering completed successfully: {output_path}")
+                                return str(output_path)
+                            else:
+                                # Check with different extensions
+                                for ext in ['.mp4', '.mov', '.avi']:
+                                    alt_path = OUTPUT_FOLDER / f"{render_filename}{ext}"
+                                    if alt_path.exists():
+                                        logger.info(f"Rendering completed successfully: {alt_path}")
+                                        return str(alt_path)
+                                        
+                                logger.warning("Rendering finished but output file not found")
+                                continue
+                        else:
+                            logger.info(f"Rendering in progress... ({render_timeout}s elapsed)")
+                            time.sleep(5)
+                            render_timeout += 5
+                            continue
+                    
+                except Exception as status_error:
+                    logger.warning(f"Error getting render status: {status_error}")
                     time.sleep(2)
+                    render_timeout += 2
                     continue
                 
-                job_status = status.get('JobStatus', 'Unknown')
-                if job_status == 'Complete':
-                    output_path = OUTPUT_FOLDER / f"{render_filename}.mp4"
-                    logger.info(f"Rendering completed successfully: {output_path}")
-                    return str(output_path)
-                elif job_status == 'Failed':
-                    raise Exception(f"Render failed: {status.get('Error', 'Unknown error')}")
-                elif job_status == 'Cancelled':
-                    raise Exception("Render was cancelled")
+                # Process status if we got one
+                if status and isinstance(status, dict):
+                    job_status = status.get('JobStatus', 'Unknown')
+                    if job_status == 'Complete':
+                        output_path = OUTPUT_FOLDER / f"{render_filename}.mp4"
+                        logger.info(f"Rendering completed successfully: {output_path}")
+                        return str(output_path)
+                    elif job_status == 'Failed':
+                        raise Exception(f"Render failed: {status.get('Error', 'Unknown error')}")
+                    elif job_status == 'Cancelled':
+                        raise Exception("Render was cancelled")
+                    
+                    # Show progress
+                    completion = status.get('CompletionPercentage', 0)
+                    if completion and completion - last_progress >= 10:
+                        logger.info(f"Rendering progress: {completion}%")
+                        last_progress = completion
+                else:
+                    logger.info(f"Waiting for render status... ({render_timeout}s elapsed)")
                 
-                # Show progress (only log when it changes significantly)
-                completion = status.get('CompletionPercentage', 0)
-                if completion - last_progress >= 10:  # Log every 10%
-                    logger.info(f"Rendering progress: {completion}%")
-                    last_progress = completion
-                
-                time.sleep(2)
+                time.sleep(5)
+                render_timeout += 5
+            
+            raise Exception(f"Render timeout after {max_timeout} seconds")
             
         except Exception as e:
             logger.error(f"Failed to render project: {e}")
