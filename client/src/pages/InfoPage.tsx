@@ -46,22 +46,26 @@ export default function InfoPage() {
 
   const initializeCameras = async () => {
     try {
-      // Get all video devices
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      console.log('🚀 InfoPage camera initialization started');
+      
+      // Get camera configuration from server
+      const cameraConfigResponse = await fetch('/api/camera-config');
+      const cameraConfig = await cameraConfigResponse.json();
+      
+      console.log('🎥 Using camera configuration:', cameraConfig);
 
-      if (videoDevices.length < 2) {
-        toast({
-          title: "Camera Setup",
-          description: `Found ${videoDevices.length} camera(s). Two cameras recommended for best results.`,
-          variant: "default",
-        });
-      }
-
-      // Camera 1 (straight on)
+      // Camera 1 (Straight View)
+      console.log('🎥 Initializing Camera 1 (Straight View)...');
       const stream1 = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: videoDevices[0]?.deviceId }
+        video: { 
+          deviceId: { exact: cameraConfig.camera1.deviceId },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30 }
+        }
       });
+      
+      console.log('✅ Camera 1 stream created');
       setCamera1Stream(stream1);
       if (video1Ref.current) {
         video1Ref.current.srcObject = stream1;
@@ -69,17 +73,23 @@ export default function InfoPage() {
         setCamera1Ready(true);
       }
 
-      // Camera 2 (side view) if available
-      if (videoDevices.length >= 2) {
-        const stream2 = await navigator.mediaDevices.getUserMedia({
-          video: { deviceId: videoDevices[1]?.deviceId }
-        });
-        setCamera2Stream(stream2);
-        if (video2Ref.current) {
-          video2Ref.current.srcObject = stream2;
-          video2Ref.current.play();
-          setCamera2Ready(true);
+      // Camera 2 (Side View)
+      console.log('🎥 Initializing Camera 2 (Side View)...');
+      const stream2 = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          deviceId: { exact: cameraConfig.camera2.deviceId },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30 }
         }
+      });
+      
+      console.log('✅ Camera 2 stream created');
+      setCamera2Stream(stream2);
+      if (video2Ref.current) {
+        video2Ref.current.srcObject = stream2;
+        video2Ref.current.play();
+        setCamera2Ready(true);
       }
     } catch (error) {
       console.error("Camera access error:", error);
