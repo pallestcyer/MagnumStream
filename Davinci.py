@@ -349,35 +349,55 @@ class DaVinciAutomation:
         return int(seconds * fps)
     
     def _save_project(self, project_name):
-        """Save the project with a new name"""
+        """Save the project with a consistent working name"""
         try:
+            # Use a consistent working project name instead of individual project names
+            working_project_name = "MAG_FERRARI-WORKING"
+            
             # Save current state
             self.project_manager.SaveProject()
             
-            # Create a new project with our name
-            # Note: DaVinci Resolve doesn't have a "Save As" in the API
-            # So we save the current project and then rename it
-            self.current_project.SetName(project_name)
+            # Check if working project already exists
+            existing_project = None
+            try:
+                existing_project = self.project_manager.LoadProject(working_project_name)
+                if existing_project:
+                    logger.info(f"Working project '{working_project_name}' already exists, will overwrite clips")
+                    # Close and reload the template to start fresh
+                    self.project_manager.CloseProject(existing_project)
+                    self.current_project = self.project_manager.LoadProject(TEMPLATE_PROJECT_NAME)
+            except:
+                # Working project doesn't exist yet, that's fine
+                pass
+            
+            # Rename current project to working name (this effectively creates a copy)
+            self.current_project.SetName(working_project_name)
             self.project_manager.SaveProject()
             
-            logger.info(f"Project saved and renamed to: {project_name}")
+            logger.info(f"Project saved as working project: {working_project_name}")
+            logger.info(f"Template project '{TEMPLATE_PROJECT_NAME}' remains unchanged")
             return True
             
         except Exception as e:
             logger.error(f"Failed to save project: {e}")
             return False
     
-    def _render_project(self, project_name):
+    def _render_project(self, original_project_name):
         """Set up and start rendering, returns output file path on success"""
         try:
             # Ensure output directory exists
             OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
             
+            # Use timestamp for unique render filename while keeping project name consistent
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            render_filename = f"MagnumStream_Render_{timestamp}"
+            
             # Set render settings for final output
             render_settings = {
                 "SelectAllFrames": True,
                 "TargetDir": str(OUTPUT_FOLDER),
-                "CustomName": project_name,
+                "CustomName": render_filename,
                 "UniqueFilenameStyle": 0,  # Don't add numbers
                 "ExportVideo": True,
                 "ExportAudio": True,
@@ -423,7 +443,7 @@ class DaVinciAutomation:
                 
                 job_status = status.get('JobStatus', 'Unknown')
                 if job_status == 'Complete':
-                    output_path = OUTPUT_FOLDER / f"{project_name}.mp4"
+                    output_path = OUTPUT_FOLDER / f"{render_filename}.mp4"
                     logger.info(f"Rendering completed successfully: {output_path}")
                     return str(output_path)
                 elif job_status == 'Failed':
