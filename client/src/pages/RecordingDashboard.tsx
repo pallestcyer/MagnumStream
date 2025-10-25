@@ -61,6 +61,8 @@ export default function RecordingDashboard() {
   const [recordersStoppedCount, setRecordersStoppedCount] = useState(0);
   const [recordedChunks1, setRecordedChunks1] = useState<Blob[]>([]);
   const [recordedChunks2, setRecordedChunks2] = useState<Blob[]>([]);
+  const chunksRef1 = useRef<Blob[]>([]);
+  const chunksRef2 = useRef<Blob[]>([]);
   const [currentRecordingId, setCurrentRecordingId] = useState<string | null>(null);
 
   const currentScene = SCENES[currentSceneIndex];
@@ -182,6 +184,8 @@ export default function RecordingDashboard() {
       recorder1.ondataavailable = (event) => {
         console.log('📹 Camera 1 data available:', event.data.size, 'bytes');
         if (event.data.size > 0) {
+          // Store in both ref (immediate) and state (for UI)
+          chunksRef1.current = [...chunksRef1.current, event.data];
           setRecordedChunks1(prev => {
             const newChunks = [...prev, event.data];
             console.log('📹 Camera 1 total chunks:', newChunks.length);
@@ -243,6 +247,8 @@ export default function RecordingDashboard() {
         recorder2.ondataavailable = (event) => {
           console.log('📹 Camera 2 data available:', event.data.size, 'bytes');
           if (event.data.size > 0) {
+            // Store in both ref (immediate) and state (for UI)
+            chunksRef2.current = [...chunksRef2.current, event.data];
             setRecordedChunks2(prev => {
               const newChunks = [...prev, event.data];
               console.log('📹 Camera 2 total chunks:', newChunks.length);
@@ -312,11 +318,13 @@ export default function RecordingDashboard() {
         if (camera1Recorder && camera1Recorder.state === 'inactive') {
           console.log('🎬 Starting Camera 1 recording');
           setRecordedChunks1([]);
+          chunksRef1.current = []; // Clear ref
           camera1Recorder.start(1000); // Record in 1-second chunks
         }
         if (camera2Recorder && camera2Recorder.state === 'inactive') {
           console.log('🎬 Starting Camera 2 recording');
           setRecordedChunks2([]);
+          chunksRef2.current = []; // Clear ref
           camera2Recorder.start(1000);
         }
       }
@@ -396,23 +404,27 @@ export default function RecordingDashboard() {
     try {
       const currentSceneType = currentScene.type;
       
+      // Use refs for immediate access to chunks
+      const chunks1 = chunksRef1.current;
+      const chunks2 = chunksRef2.current;
+      
       console.log(`💾 Saving recorded videos for ${currentSceneType}:`, {
-        camera1Chunks: recordedChunks1.length,
-        camera2Chunks: recordedChunks2.length,
-        camera1Size: recordedChunks1.reduce((total, chunk) => total + chunk.size, 0),
-        camera2Size: recordedChunks2.reduce((total, chunk) => total + chunk.size, 0),
+        camera1Chunks: chunks1.length,
+        camera2Chunks: chunks2.length,
+        camera1Size: chunks1.reduce((total, chunk) => total + chunk.size, 0),
+        camera2Size: chunks2.reduce((total, chunk) => total + chunk.size, 0),
         elapsedTime,
         recordingId
       });
       
       // Debug: Log the actual chunks
       console.log('🔍 Debug chunks:', {
-        chunks1: recordedChunks1.map(c => ({ size: c.size, type: c.type })),
-        chunks2: recordedChunks2.map(c => ({ size: c.size, type: c.type }))
+        chunks1: chunks1.map(c => ({ size: c.size, type: c.type })),
+        chunks2: chunks2.map(c => ({ size: c.size, type: c.type }))
       });
       
       // Only create blobs if we have recorded data
-      if (recordedChunks1.length === 0 && recordedChunks2.length === 0) {
+      if (chunks1.length === 0 && chunks2.length === 0) {
         console.warn('⚠️ No recorded chunks found for any camera');
         return;
       }
@@ -421,8 +433,8 @@ export default function RecordingDashboard() {
       const supportedTypes = ['video/mp4; codecs="avc1.42E01E,mp4a.40.2"', 'video/mp4', 'video/webm'];
       const recordingMimeType = supportedTypes.find(type => MediaRecorder.isTypeSupported(type)) || 'video/webm';
       
-      const camera1Blob = recordedChunks1.length > 0 ? new Blob(recordedChunks1, { type: recordingMimeType }) : null;
-      const camera2Blob = recordedChunks2.length > 0 ? new Blob(recordedChunks2, { type: recordingMimeType }) : null;
+      const camera1Blob = chunks1.length > 0 ? new Blob(chunks1, { type: recordingMimeType }) : null;
+      const camera2Blob = chunks2.length > 0 ? new Blob(chunks2, { type: recordingMimeType }) : null;
       
       console.log('📦 Created blobs:', {
         camera1Size: camera1Blob?.size || 0,
