@@ -13,6 +13,30 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { CheckCircle2, Upload, MessageSquare, Loader2 } from "lucide-react";
 
+// Get the local device URL for Mac service
+const getLocalDeviceUrl = async (): Promise<string> => {
+  try {
+    // Try to get local device URL from health endpoint
+    const healthResponse = await fetch('/api/health');
+    
+    if (healthResponse.ok) {
+      const healthData = await healthResponse.json();
+      
+      if (healthData.services?.localDevice) {
+        console.log('📡 Found local device URL:', healthData.services.localDevice);
+        return healthData.services.localDevice;
+      }
+    }
+  } catch (error) {
+    console.warn('Could not get local device URL from health endpoint:', error);
+  }
+  
+  // Fallback to localhost in development (Mac service runs on port 3001)
+  const fallbackUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '';
+  console.log('📡 Using fallback URL:', fallbackUrl);
+  return fallbackUrl;
+};
+
 interface ExportWorkflowProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -74,7 +98,11 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
         cameraAngle: slot.camera_angle
       }));
       
-      const clipsResponse = await fetch(`/api/recordings/${recordingId}/generate-clips`, {
+      // Get local device URL for Mac service FFmpeg processing
+      const localDeviceUrl = await getLocalDeviceUrl();
+      console.log('🎬 Using Mac service for clip generation:', localDeviceUrl);
+      
+      const clipsResponse = await fetch(`${localDeviceUrl}/api/recordings/${recordingId}/generate-clips`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slotSelections })
@@ -91,7 +119,7 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
       
       // Step 3: Create DaVinci job file (30% progress)
       console.log('📄 Creating DaVinci job file...');
-      const davinciResponse = await fetch(`/api/recordings/${recordingId}/create-davinci-job`, {
+      const davinciResponse = await fetch(`${localDeviceUrl}/api/recordings/${recordingId}/create-davinci-job`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
