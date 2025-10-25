@@ -16,12 +16,48 @@ import logging
 import argparse
 
 # DaVinci Resolve Script API
-try:
-    import DaVinciResolveScript as dvr
-except ImportError:
-    print("ERROR: DaVinci Resolve Script API not found.")
-    print("Please ensure DaVinci Resolve Studio is installed and scripting is enabled.")
-    sys.exit(1)
+def load_davinci_api():
+    """Load DaVinci Resolve Python API with proper path detection"""
+    try:
+        import DaVinciResolveScript as dvr
+        return dvr
+    except ImportError:
+        print("DaVinci Resolve Script API not found in default path, searching...")
+        
+        # DaVinci Resolve uses fusionscript.so for Python API
+        fusion_paths = [
+            "/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Libraries/Fusion/",
+            "/Applications/DaVinci Resolve Studio/DaVinci Resolve.app/Contents/Libraries/Fusion/",
+        ]
+        
+        for fusion_path in fusion_paths:
+            fusionscript_path = os.path.join(fusion_path, "fusionscript.so")
+            if os.path.exists(fusionscript_path):
+                print(f"Found fusionscript.so at: {fusionscript_path}")
+                
+                # Add the Fusion path to Python path
+                if fusion_path not in sys.path:
+                    sys.path.insert(0, fusion_path)
+                
+                # Try to import the DaVinci API
+                try:
+                    import DaVinciResolveScript as dvr
+                    print(f"✅ Successfully loaded DaVinci API from: {fusion_path}")
+                    return dvr
+                except ImportError as e:
+                    print(f"Found fusionscript.so but import failed: {e}")
+                    continue
+        
+        print("ERROR: DaVinci Resolve Script API not found.")
+        print("Please ensure:")
+        print("1. DaVinci Resolve Studio is installed (not the free version)")
+        print("2. DaVinci Resolve is currently running")
+        print("3. Scripting is enabled in DaVinci Resolve > Preferences > System > General")
+        print("4. External scripting is set to 'Network' mode")
+        sys.exit(1)
+
+# Load the DaVinci API
+dvr = load_davinci_api()
 
 # ============================================================================
 # CONFIGURATION
