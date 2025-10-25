@@ -306,6 +306,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       });
 
+
       // Google Drive routes (delegated to local device)
       app.get('/api/google/auth-url', async (req, res) => {
         try {

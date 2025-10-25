@@ -317,6 +317,25 @@ class VideoStorage {
     });
   }
 
+  // Get the local device URL for direct video uploads
+  private async getLocalDeviceUrl(): Promise<string> {
+    try {
+      // Try to get local device URL from health endpoint
+      const healthResponse = await fetch('/api/health');
+      if (healthResponse.ok) {
+        const healthData = await healthResponse.json();
+        if (healthData.services?.localDevice) {
+          return healthData.services.localDevice;
+        }
+      }
+    } catch (error) {
+      console.warn('Could not get local device URL from health endpoint:', error);
+    }
+    
+    // Fallback to localhost in development
+    return process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '';
+  }
+
   // Upload all videos for current session to the server for FFmpeg processing
   async uploadSessionVideosToServer(recordingId: string): Promise<boolean> {
     if (!this.db) {
@@ -325,6 +344,12 @@ class VideoStorage {
 
     const currentSessionId = this.getCurrentSessionId();
     console.log(`📤 Uploading videos for session ${currentSessionId} to server...`);
+    
+    const localDeviceUrl = await this.getLocalDeviceUrl();
+    if (!localDeviceUrl) {
+      throw new Error('Local device URL not available for video uploads');
+    }
+    console.log(`📤 Using local device URL: ${localDeviceUrl}`);
 
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([STORE_NAME], 'readonly');
@@ -348,7 +373,8 @@ class VideoStorage {
               formData.append('duration', record.duration.toString());
               formData.append('sessionId', currentSessionId);
 
-              const response = await fetch(`/api/recordings/${recordingId}/upload-scene-video`, {
+              // Upload directly to local device
+              const response = await fetch(`${localDeviceUrl}/api/recordings/${recordingId}/upload-scene-video`, {
                 method: 'POST',
                 body: formData
               });
