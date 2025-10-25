@@ -200,7 +200,7 @@ class VideoStorage {
       const transaction = this.db!.transaction([STORE_NAME], 'readonly');
       const store = transaction.objectStore(STORE_NAME);
       
-      // First try to get by sessionId
+      // First try current session, then fall back to any session with this scene type
       if (store.indexNames.contains('sessionId')) {
         const index = store.index('sessionId');
         const request = index.getAll(currentSessionId);
@@ -230,7 +230,8 @@ class VideoStorage {
             resolve(match.blob);
           } else {
             console.log(`📹 No video found for ${sceneType} camera ${cameraAngle} in current session ${currentSessionId}`);
-            resolve(null);
+            // Fallback: Search across ALL sessions for this scene type
+            this.findVideoAcrossAllSessions(sceneType, cameraAngle).then(resolve).catch(reject);
           }
         };
         request.onerror = () => reject(request.error);
@@ -270,7 +271,8 @@ class VideoStorage {
             resolve(latest.duration);
           } else {
             console.log(`⏱️ No duration found for ${sceneType} in current session`);
-            resolve(null);
+            // Fallback: Search across ALL sessions for this scene type duration
+            this.findDurationAcrossAllSessions(sceneType).then(resolve).catch(() => resolve(null));
           }
         };
         request.onerror = () => reject(request.error);
@@ -338,6 +340,70 @@ class VideoStorage {
         resolve(sceneStats);
       };
       request.onerror = () => reject(request.error);
+    });
+  }
+
+  // Fallback method to find duration across all sessions
+  private async findDurationAcrossAllSessions(sceneType: 'cruising' | 'chase' | 'arrival'): Promise<number | null> {
+    if (!this.db) {
+      await this.init();
+    }
+
+    return new Promise((resolve) => {
+      const transaction = this.db!.transaction([STORE_NAME], 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const allRecords: VideoRecord[] = request.result;
+        const sceneRecords = allRecords
+          .filter(r => r.sceneType === sceneType)
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()); // Get latest across all sessions
+
+        if (sceneRecords.length > 0) {
+          const latestMatch = sceneRecords[0];
+          console.log(`🔄 Found ${sceneType} duration in session ${latestMatch.sessionId} (fallback): ${latestMatch.duration}s`);
+          resolve(latestMatch.duration);
+        } else {
+          console.log(`❌ No ${sceneType} duration found in any session`);
+          resolve(null);
+        }
+      };
+      request.onerror = () => resolve(null);
+    });
+  }
+
+  // Fallback method to find video across all sessions
+  private async findVideoAcrossAllSessions(sceneType: 'cruising' | 'chase' | 'arrival', cameraAngle: 1 | 2): Promise<Blob | null> {
+    if (!this.db) {
+      await this.init();
+    }
+
+    return new Promise((resolve) => {
+      const transaction = this.db!.transaction([STORE_NAME], 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const allRecords: VideoRecord[] = request.result;
+        const matches = allRecords
+          .filter(r => r.sceneType === sceneType && r.cameraAngle === cameraAngle)
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()); // Get latest across all sessions
+
+        if (matches.length > 0) {
+          const latestMatch = matches[0];
+          console.log(`🔄 Found ${sceneType} camera ${cameraAngle} video in session ${latestMatch.sessionId} (fallback):`, {
+            size: latestMatch.blob.size,
+            fromSession: latestMatch.sessionId,
+            createdAt: latestMatch.createdAt
+          });
+          resolve(latestMatch.blob);
+        } else {
+          console.log(`❌ No ${sceneType} camera ${cameraAngle} video found in any session`);
+          resolve(null);
+        }
+      };
+      request.onerror = () => resolve(null);
     });
   }
 
