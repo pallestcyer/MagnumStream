@@ -35,7 +35,7 @@ export default function InfoPage() {
   const video2Ref = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    // Clear any previous session when loading the info page
+    // Clear any previous session when loading the info page (only on mount)
     videoStorage.clearCurrentSession();
     
     // Clear pilot context and recording ID for fresh start
@@ -44,19 +44,14 @@ export default function InfoPage() {
     localStorage.removeItem('pilotEmail');
     localStorage.removeItem('staffMember');
     
-    // Reset form fields to empty
-    setFirstName1("");
-    setFirstName2("");
-    setEmail("");
-    setStaffMember("");
-    
     console.log('🔄 InfoPage: Cleared all previous session data for new project');
     
     initializeCameras();
     return () => {
       stopCameras();
     };
-  }, [setPilotInfo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   const initializeCameras = async () => {
     try {

@@ -22,6 +22,8 @@ interface ProjectRecord {
   id: string;
   projectName: string;
   pilotName: string;
+  pilotEmail?: string;
+  staffMember?: string;
   flightDate: string;
   flightTime: string;
   exportStatus: "pending" | "recorded" | "in_progress" | "completed" | "failed";
@@ -72,6 +74,8 @@ export default function HistoryPage() {
                 id: recording.id,
                 projectName: recording.projectName,
                 pilotName: recording.pilotName,
+                pilotEmail: recording.pilotEmail,
+                staffMember: recording.staffMember,
                 flightDate: recording.flightDate || new Date().toISOString().split('T')[0],
                 flightTime: recording.flightTime || '00:00',
                 exportStatus: recording.exportStatus,
@@ -414,8 +418,13 @@ function ProjectCard({ record, getStatusBadge, formatDate }: ProjectCardProps) {
               size="sm"
               className="bg-gradient-purple-blue"
               onClick={() => {
-                // Set the session and navigate to editor
-                localStorage.setItem('currentSessionId', record.pilotName.toLowerCase().replace(/[^a-z0-9\s&]/g, '').replace(/\s+/g, '_'));
+                // Set the session and recording ID for resuming project
+                const sessionId = record.pilotName.toLowerCase().replace(/[^a-z0-9\s&]/g, '').replace(/\s+/g, '_');
+                localStorage.setItem('currentSessionId', sessionId);
+                localStorage.setItem('currentRecordingId', record.id);
+                localStorage.setItem('pilotEmail', record.pilotEmail || '');
+                localStorage.setItem('staffMember', record.staffMember || '');
+                console.log('🔄 Resuming project:', record.projectName, 'with recording ID:', record.id);
                 window.location.href = '/editor/cruising';
               }}
               data-testid={`button-resume-editing-${record.id}`}
