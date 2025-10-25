@@ -65,29 +65,49 @@ export class ClipGenerator {
    *           └── job_files/
    */
   private async getProjectDirectory(recordingId: string): Promise<string> {
-    // Get recording info for directory naming
-    const recording = await storage.getFlightRecording(recordingId);
+    // For Mac service: Find project directory by looking for existing uploads
+    // Since recording may not exist in local SQLite database
+    console.log(`🎬 Looking for project directory for recording: ${recordingId}`);
     
-    if (!recording) {
-      throw new Error(`Recording not found: ${recordingId}`);
+    try {
+      // Search for project directories that contain files for this recording
+      const projectDirs = await fs.readdir(this.baseDir);
+      console.log(`🎬 Found ${projectDirs.length} project directories to search`);
+      
+      for (const dirName of projectDirs) {
+        const projectPath = path.join(this.baseDir, dirName);
+        const metadataPath = path.join(projectPath, '.expiration');
+        
+        try {
+          // Check if this project contains our recording
+          const metadataContent = await fs.readFile(metadataPath, 'utf8');
+          const metadata = JSON.parse(metadataContent);
+          
+          if (metadata.recordingId === recordingId) {
+            console.log(`🎬 Found project directory: ${projectPath}`);
+            
+            // Create subdirectories
+            const clipsDir = path.join(projectPath, 'clips');
+            const davinciDir = path.join(projectPath, 'davinci');
+            const sourceDir = path.join(projectPath, 'source');
+            
+            await fs.mkdir(clipsDir, { recursive: true });
+            await fs.mkdir(davinciDir, { recursive: true });
+            await fs.mkdir(sourceDir, { recursive: true });
+            
+            return projectPath;
+          }
+        } catch (metadataError) {
+          // Skip directories without valid metadata
+          continue;
+        }
+      }
+      
+      throw new Error(`No project directory found for recording ${recordingId}`);
+    } catch (error) {
+      console.error(`🎬 Error finding project directory:`, error);
+      throw new Error(`Failed to locate project directory for recording ${recordingId}`);
     }
-    
-    const { pilotName, createdAt } = recording;
-    const date = new Date(createdAt).toISOString().split('T')[0];
-    const sanitizedName = pilotName.replace(/[^a-zA-Z0-9]/g, '_');
-    
-    const projectDir = path.join(this.baseDir, `${sanitizedName}_${date}`);
-    
-    // Create subdirectories
-    const clipsDir = path.join(projectDir, 'clips');
-    const davinciDir = path.join(projectDir, 'davinci');
-    const sourceDir = path.join(projectDir, 'source'); // For extracted video files
-    
-    await fs.mkdir(clipsDir, { recursive: true });
-    await fs.mkdir(davinciDir, { recursive: true });
-    await fs.mkdir(sourceDir, { recursive: true });
-    
-    return projectDir;
   }
 
   async generateClipsFromSlotSelections(recordingId: string, slotSelections?: SlotSelection[]): Promise<ClipFile[]> {
