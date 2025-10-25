@@ -35,76 +35,117 @@ export default function InfoPage() {
   const video2Ref = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    // Clear any previous session when loading the info page (only on mount)
+    // Clear any previous session when loading the info page
     videoStorage.clearCurrentSession();
-    
-    // Clear pilot context and recording ID for fresh start
-    setPilotInfo({ name: "", email: "", staffMember: "" });
     localStorage.removeItem('currentRecordingId');
     localStorage.removeItem('pilotEmail');
     localStorage.removeItem('staffMember');
     
-    console.log('🔄 InfoPage: Cleared all previous session data for new project');
+    // Clear pilot context 
+    setPilotInfo({ name: "", email: "", staffMember: "" });
     
+    console.log('🔄 InfoPage: Cleared session data for new project');
+    
+    // Initialize cameras
     initializeCameras();
+    
     return () => {
       stopCameras();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const initializeCameras = async () => {
     try {
       console.log('🚀 InfoPage camera initialization started');
       
-      // Get camera configuration from server
-      const cameraConfigResponse = await fetch('/api/camera-config');
-      const cameraConfig = await cameraConfigResponse.json();
-      
-      console.log('🎥 Using camera configuration:', cameraConfig);
+      let cameraConfig = {
+        camera1: { deviceId: 'default', label: 'Camera 1 (Straight View)' },
+        camera2: { deviceId: 'default', label: 'Camera 2 (Side View)' }
+      };
+
+      // Try to get camera configuration from server, but use fallback if it fails
+      try {
+        const cameraConfigResponse = await fetch('/api/camera-config');
+        if (cameraConfigResponse.ok) {
+          cameraConfig = await cameraConfigResponse.json();
+          console.log('🎥 Using camera configuration from server:', cameraConfig);
+        } else {
+          console.warn('⚠️ Camera config API failed, using default cameras');
+        }
+      } catch (configError) {
+        console.warn('⚠️ Camera config API unavailable, using default cameras:', configError);
+      }
 
       // Camera 1 (Straight View)
       console.log('🎥 Initializing Camera 1 (Straight View)...');
-      const stream1 = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          deviceId: { exact: cameraConfig.camera1.deviceId },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          frameRate: { ideal: 30 }
+      try {
+        const constraints = cameraConfig.camera1.deviceId === 'default' 
+          ? { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } }
+          : { video: { 
+              deviceId: { exact: cameraConfig.camera1.deviceId },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              frameRate: { ideal: 30 }
+            }};
+            
+        const stream1 = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        console.log('✅ Camera 1 stream created');
+        setCamera1Stream(stream1);
+        if (video1Ref.current) {
+          video1Ref.current.srcObject = stream1;
+          video1Ref.current.play();
+          setCamera1Ready(true);
         }
-      });
-      
-      console.log('✅ Camera 1 stream created');
-      setCamera1Stream(stream1);
-      if (video1Ref.current) {
-        video1Ref.current.srcObject = stream1;
-        video1Ref.current.play();
-        setCamera1Ready(true);
+      } catch (cam1Error) {
+        console.error('❌ Camera 1 failed, trying fallback:', cam1Error);
+        // Try with any available camera
+        try {
+          const fallbackStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 1920 }, height: { ideal: 1080 } }
+          });
+          setCamera1Stream(fallbackStream);
+          if (video1Ref.current) {
+            video1Ref.current.srcObject = fallbackStream;
+            video1Ref.current.play();
+            setCamera1Ready(true);
+          }
+        } catch (fallbackError) {
+          console.error('❌ Camera 1 fallback also failed:', fallbackError);
+        }
       }
 
       // Camera 2 (Side View)
       console.log('🎥 Initializing Camera 2 (Side View)...');
-      const stream2 = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          deviceId: { exact: cameraConfig.camera2.deviceId },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          frameRate: { ideal: 30 }
+      try {
+        const constraints = cameraConfig.camera2.deviceId === 'default' 
+          ? { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } }
+          : { video: { 
+              deviceId: { exact: cameraConfig.camera2.deviceId },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              frameRate: { ideal: 30 }
+            }};
+            
+        const stream2 = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        console.log('✅ Camera 2 stream created');
+        setCamera2Stream(stream2);
+        if (video2Ref.current) {
+          video2Ref.current.srcObject = stream2;
+          video2Ref.current.play();
+          setCamera2Ready(true);
         }
-      });
-      
-      console.log('✅ Camera 2 stream created');
-      setCamera2Stream(stream2);
-      if (video2Ref.current) {
-        video2Ref.current.srcObject = stream2;
-        video2Ref.current.play();
-        setCamera2Ready(true);
+      } catch (cam2Error) {
+        console.error('❌ Camera 2 failed:', cam2Error);
+        // Camera 2 failure is not critical for basic functionality
       }
+      
     } catch (error) {
       console.error("Camera access error:", error);
       toast({
         title: "Camera Access Denied",
-        description: "Please allow camera access to continue.",
+        description: "Please allow camera access to continue. You can still proceed with at least Camera 1 working.",
         variant: "destructive",
       });
     }
