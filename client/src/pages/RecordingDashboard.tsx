@@ -90,24 +90,38 @@ export default function RecordingDashboard() {
         const camera2Blob = await videoStorage.getVideo(scene.type, 2);
         const duration = await videoStorage.getVideoDuration(scene.type);
         
-        // Only consider it a valid existing recording if we have a duration from current session
-        if ((camera1Blob || camera2Blob) && duration !== null) {
+        // Check for persisted completion status
+        const sessionId = localStorage.getItem('currentSessionId') || 'default';
+        const completionKey = `scene_completed_${sessionId}_${scene.type}`;
+        const isCompleted = localStorage.getItem(completionKey) === 'true';
+        
+        // Consider it a valid existing recording if we have duration OR persisted completion status
+        if (((camera1Blob || camera2Blob) && duration !== null) || isCompleted) {
           console.log(`✅ Found existing recording for ${scene.type} in current session:`, {
             camera1: camera1Blob ? `${camera1Blob.size} bytes` : 'None',
             camera2: camera2Blob ? `${camera2Blob.size} bytes` : 'None',
-            duration: duration
+            duration: duration,
+            persistedCompletion: isCompleted
           });
           
-          // Mark scene as completed
+          // Mark scene as completed and persist the status
           setSceneRecordings(prev => {
             const updated = prev.map((rec, idx) => {
               if (SCENES[idx].type === scene.type) {
-                return {
+                const updatedRec = {
                   ...rec,
                   camera1Duration: duration || 0,
                   camera2Duration: duration || 0,
                   completed: true
                 };
+                
+                // Persist completion status to localStorage
+                const sessionId = localStorage.getItem('currentSessionId') || 'default';
+                const completionKey = `scene_completed_${sessionId}_${scene.type}`;
+                localStorage.setItem(completionKey, 'true');
+                console.log(`💾 Persisted completion status for ${scene.type}`);
+                
+                return updatedRec;
               }
               return rec;
             });
@@ -383,11 +397,21 @@ export default function RecordingDashboard() {
     setRecordingState("completed");
     
     // Mark scene as completed and save video files
-    setSceneRecordings(prev => prev.map((rec, idx) => 
-      idx === currentSceneIndex 
-        ? { ...rec, camera1Duration: elapsedTime, camera2Duration: elapsedTime, completed: true }
-        : rec
-    ));
+    setSceneRecordings(prev => prev.map((rec, idx) => {
+      if (idx === currentSceneIndex) {
+        const updatedRec = { ...rec, camera1Duration: elapsedTime, camera2Duration: elapsedTime, completed: true };
+        
+        // Persist completion status to localStorage
+        const sessionId = localStorage.getItem('currentSessionId') || 'default';
+        const sceneType = SCENES[currentSceneIndex].type;
+        const completionKey = `scene_completed_${sessionId}_${sceneType}`;
+        localStorage.setItem(completionKey, 'true');
+        console.log(`💾 Persisted completion status for ${sceneType} after recording`);
+        
+        return updatedRec;
+      }
+      return rec;
+    }));
     
     // Videos will be saved automatically when both recorders stop (via onstop events)
   };

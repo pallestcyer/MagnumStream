@@ -25,14 +25,30 @@ class VideoStorage {
     
     if (previousSessionId && previousSessionId !== sessionId) {
       console.log('🔄 Switching from session', previousSessionId, 'to', sessionId);
+      // Clear previous session's scene completion status
+      this.clearSceneCompletionStatus(previousSessionId);
     }
     
     localStorage.setItem('currentSessionId', sessionId);
     console.log('📋 Set current session to:', sessionId);
   }
 
+  // Clear scene completion status for a session
+  private clearSceneCompletionStatus(sessionId: string): void {
+    const sceneTypes = ['cruising', 'chase', 'arrival'];
+    sceneTypes.forEach(sceneType => {
+      const completionKey = `scene_completed_${sessionId}_${sceneType}`;
+      localStorage.removeItem(completionKey);
+    });
+    console.log(`🗑️ Cleared scene completion status for session: ${sessionId}`);
+  }
+
   // Clear current session (useful for starting completely fresh)
   clearCurrentSession(): void {
+    const currentSessionId = localStorage.getItem('currentSessionId');
+    if (currentSessionId) {
+      this.clearSceneCompletionStatus(currentSessionId);
+    }
     localStorage.removeItem('currentSessionId');
     console.log('🗑️ Cleared current session');
   }
