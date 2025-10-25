@@ -182,6 +182,7 @@ class VideoStorage {
 
       request.onsuccess = () => {
         console.log(`💾 Stored ${sceneType} camera ${cameraAngle} video (${blob.size} bytes) for session ${sessionId}`);
+        console.log(`🔍 Stored record details:`, { id, sessionId, sceneType, cameraAngle, duration, blobSize: blob.size });
         resolve(id);
       };
       request.onerror = () => reject(request.error);
@@ -207,6 +208,13 @@ class VideoStorage {
         request.onsuccess = () => {
           const records: VideoRecord[] = request.result;
           console.log(`🔍 Found ${records.length} records for session ${currentSessionId}:`, records.map(r => ({ id: r.id, sceneType: r.sceneType, cameraAngle: r.cameraAngle, sessionId: r.sessionId || 'undefined' })));
+          
+          // Debug: Show breakdown by scene type
+          const sceneBreakdown = records.reduce((acc, r) => {
+            acc[r.sceneType] = (acc[r.sceneType] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>);
+          console.log(`🔍 Scene type breakdown for session ${currentSessionId}:`, sceneBreakdown);
           
           const match = records
             .filter(r => r.sceneType === sceneType && r.cameraAngle === cameraAngle)
@@ -330,6 +338,47 @@ class VideoStorage {
         resolve(sceneStats);
       };
       request.onerror = () => reject(request.error);
+    });
+  }
+
+  // Debug function to show all records in IndexedDB
+  async debugAllRecords(): Promise<void> {
+    if (!this.db) {
+      await this.init();
+    }
+
+    return new Promise((resolve) => {
+      const transaction = this.db!.transaction([STORE_NAME], 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const records: VideoRecord[] = request.result;
+        console.log(`🔍 DEBUG: All ${records.length} records in IndexedDB:`, records.map(r => ({
+          id: r.id,
+          sessionId: r.sessionId,
+          sceneType: r.sceneType,
+          cameraAngle: r.cameraAngle,
+          blobSize: r.blob.size,
+          duration: r.duration,
+          createdAt: r.createdAt
+        })));
+        
+        const sessionBreakdown = records.reduce((acc, r) => {
+          acc[r.sessionId] = (acc[r.sessionId] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        console.log(`🔍 DEBUG: Session breakdown:`, sessionBreakdown);
+        
+        const sceneBreakdown = records.reduce((acc, r) => {
+          acc[r.sceneType] = (acc[r.sceneType] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        console.log(`🔍 DEBUG: Scene type breakdown:`, sceneBreakdown);
+        
+        resolve();
+      };
+      request.onerror = () => resolve();
     });
   }
 

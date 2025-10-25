@@ -96,6 +96,9 @@ export default function EditorChase() {
         const currentSessionId = localStorage.getItem('currentSessionId');
         console.log('🔍 Current session ID for chase scene:', currentSessionId);
         
+        // Debug: Show all records in IndexedDB
+        await videoStorage.debugAllRecords();
+        
         // Load videos from IndexedDB
         const camera1Blob = await videoStorage.getVideo('chase', 1);
         const camera2Blob = await videoStorage.getVideo('chase', 2);
