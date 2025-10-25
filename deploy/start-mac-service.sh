@@ -79,17 +79,27 @@ else
     echo "⚠️  DaVinci.py not found at $PROJECT_DIR/Davinci.py"
 fi
 
-# Test DaVinci Python API (non-blocking check)
+# Setup DaVinci Resolve Python API environment
+echo "🔧 Setting up DaVinci Resolve Python API environment..."
+export RESOLVE_SCRIPT_LIB="/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Libraries/Fusion/fusionscript.so"
+export RESOLVE_SCRIPT_API="/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting"
+export PYTHONPATH="${PYTHONPATH}:/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting/Modules"
+
+# Test DaVinci Python API
 echo "🔧 Testing DaVinci Resolve Python API..."
 python3 -c "
 try:
     import DaVinciResolveScript as dvr
-    print('✅ DaVinci Resolve Python API available')
+    resolve = dvr.scriptapp('Resolve')
+    if resolve:
+        print('✅ DaVinci Resolve Python API connected successfully')
+    else:
+        print('⚠️  DaVinci Resolve not running or scripting not enabled')
+        print('   Please enable: DaVinci Resolve > Preferences > System > General > External scripting using > Network')
 except ImportError:
     print('⚠️  DaVinci Resolve Python API not available')
-    print('   This is normal if DaVinci Resolve is not running')
-    print('   Start DaVinci Resolve and enable scripting in preferences')
-" 2>/dev/null || echo "⚠️  Could not test DaVinci API (this is normal if Resolve is not running)"
+    print('   Please check DaVinci Resolve installation')
+" 2>/dev/null || echo "⚠️  Could not test DaVinci API"
 
 # Pre-start DaVinci Resolve in background if available
 echo "🎬 Pre-starting DaVinci Resolve in background..."

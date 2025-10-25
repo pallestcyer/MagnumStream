@@ -618,13 +618,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get the absolute path to DaVinci.py (should be in project root)
       const davinciScriptPath = path.resolve('./Davinci.py');
+      
+      // Set up DaVinci environment variables for the Python script
+      const davinciEnv = {
+        ...process.env,
+        RESOLVE_SCRIPT_LIB: "/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Libraries/Fusion/fusionscript.so",
+        RESOLVE_SCRIPT_API: "/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting",
+        PYTHONPATH: `${process.env.PYTHONPATH || ''}:/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting/Modules`
+      };
+      
       const davinciCommand = `python3 "${davinciScriptPath}" --job-file "${jobFilePath}"`;
       
       console.log(`🔧 Executing DaVinci command: ${davinciCommand}`);
+      console.log(`🔧 DaVinci environment: RESOLVE_SCRIPT_API=${davinciEnv.RESOLVE_SCRIPT_API}`);
       
-      // Execute with timeout (DaVinci rendering can take a while)
+      // Execute with timeout and proper environment (DaVinci rendering can take a while)
       const { stdout, stderr } = await execAsync(davinciCommand, { 
-        timeout: 30 * 60 * 1000 // 30 minutes timeout
+        timeout: 30 * 60 * 1000, // 30 minutes timeout
+        env: davinciEnv
       });
       
       console.log(`🎬 DaVinci stdout: ${stdout}`);
