@@ -322,18 +322,27 @@ class VideoStorage {
     try {
       // Try to get local device URL from health endpoint
       const healthResponse = await fetch('/api/health');
+      console.log('📡 Health endpoint response status:', healthResponse.status);
+      
       if (healthResponse.ok) {
         const healthData = await healthResponse.json();
+        console.log('📡 Health endpoint data:', healthData);
+        
         if (healthData.services?.localDevice) {
+          console.log('📡 Found local device URL:', healthData.services.localDevice);
           return healthData.services.localDevice;
+        } else {
+          console.warn('📡 No localDevice URL in health response');
         }
       }
     } catch (error) {
       console.warn('Could not get local device URL from health endpoint:', error);
     }
     
-    // Fallback to localhost in development
-    return process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '';
+    // Fallback to localhost in development (Mac service runs on port 3001)
+    const fallbackUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '';
+    console.log('📡 Using fallback URL:', fallbackUrl);
+    return fallbackUrl;
   }
 
   // Upload all videos for current session to the server for FFmpeg processing
