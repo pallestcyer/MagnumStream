@@ -130,21 +130,17 @@ export default function RecordingDashboard() {
 
   const initializeCameras = async () => {
     try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      // Get camera configuration from server
+      const cameraConfigResponse = await fetch('/api/camera-config');
+      const cameraConfig = await cameraConfigResponse.json();
       
-      console.log('🎥 Available video devices:', videoDevices.length);
-      
-      if (videoDevices.length === 0) {
-        console.error('❌ No video devices found');
-        return;
-      }
+      console.log('🎥 Using camera configuration:', cameraConfig);
 
-      // Camera 1
-      console.log('🎥 Initializing Camera 1...');
+      // Camera 1 (Straight View)
+      console.log('🎥 Initializing Camera 1 (Straight View)...');
       const stream1 = await navigator.mediaDevices.getUserMedia({
         video: { 
-          deviceId: videoDevices[0]?.deviceId,
+          deviceId: { exact: cameraConfig.camera1.deviceId },
           width: { ideal: 1920 },
           height: { ideal: 1080 },
           frameRate: { ideal: 30 }
@@ -195,18 +191,17 @@ export default function RecordingDashboard() {
       
       setCamera1Recorder(recorder1);
 
-      // Camera 2
-      if (videoDevices.length >= 2) {
-        console.log('🎥 Initializing Camera 2...');
-        const stream2 = await navigator.mediaDevices.getUserMedia({
-          video: { 
-            deviceId: videoDevices[1]?.deviceId,
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-            frameRate: { ideal: 30 }
-          },
-          audio: true
-        });
+      // Camera 2 (Side View)
+      console.log('🎥 Initializing Camera 2 (Side View)...');
+      const stream2 = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          deviceId: { exact: cameraConfig.camera2.deviceId },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30 }
+        },
+        audio: true
+      });
         
         // Validate video tracks
         const videoTracks2 = stream2.getVideoTracks();
@@ -242,7 +237,6 @@ export default function RecordingDashboard() {
         
         setCamera2Recorder(recorder2);
         }
-      }
     } catch (error) {
       console.error("Camera access error:", error);
     }
