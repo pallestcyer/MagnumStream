@@ -464,6 +464,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Upload scene video from browser IndexedDB to server file system
   console.log('🔧 Registering upload-scene-video endpoint...');
   app.post("/api/recordings/:recordingId/upload-scene-video", upload.single('video'), async (req: any, res) => {
+    console.log(`🎬 UPLOAD ENDPOINT HIT: ${req.method} ${req.path}`);
+    console.log(`🎬 Recording ID: ${req.params.recordingId}`);
+    console.log(`🎬 Has file: ${!!req.file}`);
+    console.log(`🎬 Body:`, req.body);
+    
     try {
       const { recordingId } = req.params;
       const { sceneType, cameraAngle, duration, sessionId } = req.body;
