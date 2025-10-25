@@ -209,6 +209,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       });
 
+      // Video slots routes (delegated to local device)
+      app.get('/api/recordings/:recordingId/video-slots', async (req, res) => {
+        try {
+          const result = await videoOps.delegateToLocal(`/recordings/${req.params.recordingId}/video-slots`);
+          res.json(result);
+        } catch (error) {
+          res.status(500).json({ error: error.message });
+        }
+      });
+
+      app.post('/api/recordings/:recordingId/video-slots', async (req, res) => {
+        try {
+          const result = await videoOps.delegateToLocal(`/recordings/${req.params.recordingId}/video-slots`, req.body);
+          res.json(result);
+        } catch (error) {
+          res.status(500).json({ error: error.message });
+        }
+      });
+
+      app.patch('/api/recordings/:recordingId/video-slots/:slotNumber', async (req, res) => {
+        try {
+          const result = await videoOps.delegateToLocal(`/recordings/${req.params.recordingId}/video-slots/${req.params.slotNumber}`, req.body);
+          res.json(result);
+        } catch (error) {
+          res.status(500).json({ error: error.message });
+        }
+      });
+
       // Google Drive routes (delegated to local device)
       app.get('/api/google/auth-url', async (req, res) => {
         try {
