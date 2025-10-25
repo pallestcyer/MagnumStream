@@ -46,7 +46,7 @@ echo $SERVER_PID > "$LOG_DIR/server.pid"
 sleep 3
 
 # Check if server started successfully
-if ! curl -s http://localhost:5000/api/health > /dev/null; then
+if ! curl -s http://localhost:3001/api/health > /dev/null; then
     echo "❌ Server failed to start. Check logs at $SERVER_LOG"
     exit 1
 fi
@@ -66,7 +66,9 @@ else
 fi
 
 echo "🔍 Starting ngrok with verbose logging..."
-nohup ngrok http 5000 --log=stdout --log-level=info > "$NGROK_LOG" 2>&1 &
+# For now, remove auth token to use free version
+export NGROK_AUTHTOKEN=""
+nohup ngrok http 3001 --log=stdout --log-level=info > "$NGROK_LOG" 2>&1 &
 NGROK_PID=$!
 echo $NGROK_PID > "$LOG_DIR/ngrok.pid"
 
@@ -120,7 +122,7 @@ echo ""
 echo "🎉 MagnumStream Local Device Service is running!"
 echo ""
 echo "📊 Service Status:"
-echo "   Local Server:  http://localhost:5000"
+echo "   Local Server:  http://localhost:3001"
 echo "   Public URL:    $NGROK_URL"
 echo "   Server PID:    $SERVER_PID"
 echo "   ngrok PID:     $NGROK_PID"
