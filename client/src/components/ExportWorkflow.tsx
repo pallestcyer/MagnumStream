@@ -29,23 +29,93 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
   const [driveUrl, setDriveUrl] = useState("");
 
   const startExport = async () => {
-    // Stage 1: DaVinci Export (5 seconds)
+    // Stage 1: DaVinci Export - Upload videos and generate clips
     setStage("davinci");
     setProgress(0);
     
-    const davinciInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(davinciInterval);
-          // Move to Drive upload
-          setTimeout(() => {
-            uploadToDrive();
-          }, 500);
-          return 100;
-        }
-        return prev + 20;
+    try {
+      const recordingId = localStorage.getItem('currentRecordingId');
+      if (!recordingId) {
+        throw new Error('No recording ID found');
+      }
+
+      console.log('🎬 Starting export process for recording:', recordingId);
+      
+      // Step 1: Upload videos from IndexedDB to server (20% progress)
+      setProgress(20);
+      console.log('📤 Uploading videos to server...');
+      const uploadSuccess = await videoStorage.uploadSessionVideosToServer(recordingId);
+      
+      if (!uploadSuccess) {
+        throw new Error('Failed to upload videos to server');
+      }
+      
+      setProgress(40);
+      console.log('✅ Videos uploaded successfully');
+      
+      // Step 2: Generate clips from timeline slots (40% progress)
+      console.log('🎬 Generating clips from timeline slots...');
+      const slotsResponse = await fetch(`/api/recordings/${recordingId}/video-slots`);
+      if (!slotsResponse.ok) {
+        throw new Error('Failed to fetch video slots');
+      }
+      
+      const slots = await slotsResponse.json();
+      console.log('📊 Found video slots:', slots);
+      
+      if (slots.length === 0) {
+        console.warn('⚠️ No video slots found, generating clips without slots');
+      }
+      
+      const slotSelections = slots.map((slot: any) => ({
+        slotNumber: slot.slot_number,
+        windowStart: slot.window_start,
+        sceneType: slot.slot_number <= 3 ? 'cruising' : slot.slot_number <= 6 ? 'chase' : 'arrival',
+        cameraAngle: slot.camera_angle
+      }));
+      
+      const clipsResponse = await fetch(`/api/recordings/${recordingId}/generate-clips`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slotSelections })
       });
-    }, 1000);
+      
+      if (!clipsResponse.ok) {
+        throw new Error('Failed to generate clips');
+      }
+      
+      const clipsResult = await clipsResponse.json();
+      console.log('🎬 Clips generated:', clipsResult);
+      
+      setProgress(70);
+      
+      // Step 3: Create DaVinci job file (30% progress)
+      console.log('📄 Creating DaVinci job file...');
+      const davinciResponse = await fetch(`/api/recordings/${recordingId}/create-davinci-job`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (!davinciResponse.ok) {
+        throw new Error('Failed to create DaVinci job file');
+      }
+      
+      const davinciResult = await davinciResponse.json();
+      console.log('📄 DaVinci job file created:', davinciResult);
+      
+      setProgress(100);
+      
+      // Move to Drive upload after completion
+      setTimeout(() => {
+        uploadToDrive();
+      }, 500);
+      
+    } catch (error) {
+      console.error('❌ Export failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Export failed: ${errorMessage}`);
+      onOpenChange(false);
+    }
   };
 
   const uploadToDrive = async () => {

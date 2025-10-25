@@ -381,6 +381,128 @@ export async function registerRoutes(app: Express): Promise<Server> {
   */
 
   // ============================================================================
+  // VIDEO UPLOAD ENDPOINTS
+  // ============================================================================
+  
+  // Configure multer for video file uploads
+  const multer = require('multer');
+  const fs = require('fs').promises;
+  const path = require('path');
+  
+  const multerStorage = multer.memoryStorage();
+  const upload = multer({ 
+    storage: multerStorage,
+    limits: { fileSize: 500 * 1024 * 1024 } // 500MB limit
+  });
+
+  // Cleanup expired project folders
+  const cleanupExpiredFolders = async () => {
+    try {
+      const projectsDir = './projects';
+      const folders = await fs.readdir(projectsDir);
+      let cleanedCount = 0;
+      
+      for (const folder of folders) {
+        const metadataPath = path.join(projectsDir, folder, '.expiration');
+        try {
+          const metadataContent = await fs.readFile(metadataPath, 'utf8');
+          const metadata = JSON.parse(metadataContent);
+          
+          if (new Date(metadata.expiresAt) < new Date()) {
+            const folderPath = path.join(projectsDir, folder);
+            await fs.rm(folderPath, { recursive: true, force: true });
+            console.log(`🗑️ Cleaned up expired folder: ${folder}`);
+            cleanedCount++;
+          }
+        } catch {
+          // No metadata file or parsing error, skip this folder
+        }
+      }
+      
+      if (cleanedCount > 0) {
+        console.log(`🧹 Cleanup complete: ${cleanedCount} expired folders removed`);
+      }
+    } catch (error) {
+      console.error('❌ Cleanup error:', error);
+    }
+  };
+  
+  // Run cleanup every hour
+  setInterval(cleanupExpiredFolders, 60 * 60 * 1000);
+  
+  // Manual cleanup endpoint
+  app.post("/api/cleanup-expired", async (_req, res) => {
+    try {
+      await cleanupExpiredFolders();
+      res.json({ success: true, message: "Cleanup completed" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Upload scene video from browser IndexedDB to server file system
+  app.post("/api/recordings/:recordingId/upload-scene-video", upload.single('video'), async (req: any, res) => {
+    try {
+      const { recordingId } = req.params;
+      const { sceneType, cameraAngle, duration, sessionId } = req.body;
+      
+      if (!req.file) {
+        return res.status(400).json({ error: "No video file provided" });
+      }
+      
+      // Get recording info for directory naming
+      const recording = await storage.getFlightRecording(recordingId);
+      if (!recording) {
+        return res.status(404).json({ error: "Recording not found" });
+      }
+      
+      const { pilotName, createdAt } = recording;
+      const date = new Date(createdAt).toISOString().split('T')[0];
+      const sanitizedName = pilotName.replace(/[^a-zA-Z0-9]/g, '_');
+      
+      // Create project directory structure with expiration metadata
+      const projectDir = path.join('./projects', `${sanitizedName}_${date}`);
+      const sourceDir = path.join(projectDir, 'source');
+      
+      await fs.mkdir(sourceDir, { recursive: true });
+      
+      // Create expiration metadata file (24 hours from now)
+      const expirationTime = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const metadataPath = path.join(projectDir, '.expiration');
+      await fs.writeFile(metadataPath, JSON.stringify({
+        createdAt: new Date().toISOString(),
+        expiresAt: expirationTime,
+        recordingId,
+        sessionId,
+        pilotName
+      }, null, 2));
+      
+      // Save video file
+      const filename = `${sceneType}_camera${cameraAngle}.mp4`;
+      const filePath = path.join(sourceDir, filename);
+      
+      await fs.writeFile(filePath, req.file.buffer);
+      
+      console.log(`📁 Saved ${filename} for ${pilotName} (expires: ${expirationTime})`);
+      console.log(`📊 File size: ${(req.file.buffer.length / 1024 / 1024).toFixed(2)}MB`);
+      
+      res.json({
+        success: true,
+        message: `Video uploaded successfully`,
+        filePath,
+        sceneType,
+        cameraAngle,
+        duration: parseFloat(duration),
+        expiresAt: expirationTime
+      });
+      
+    } catch (error: any) {
+      console.error('Video upload error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
   // CLIP GENERATION ENDPOINTS
   // ============================================================================
   

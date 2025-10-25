@@ -316,6 +316,69 @@ class VideoStorage {
       request.onerror = () => reject(request.error);
     });
   }
+
+  // Upload all videos for current session to the server for FFmpeg processing
+  async uploadSessionVideosToServer(recordingId: string): Promise<boolean> {
+    if (!this.db) {
+      await this.init();
+    }
+
+    const currentSessionId = this.getCurrentSessionId();
+    console.log(`📤 Uploading videos for session ${currentSessionId} to server...`);
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([STORE_NAME], 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      
+      if (store.indexNames.contains('sessionId')) {
+        const index = store.index('sessionId');
+        const request = index.getAll(currentSessionId);
+
+        request.onsuccess = async () => {
+          const records: VideoRecord[] = request.result;
+          console.log(`📤 Found ${records.length} videos to upload for session ${currentSessionId}`);
+          
+          try {
+            // Upload each video to the server
+            const uploadPromises = records.map(async (record) => {
+              const formData = new FormData();
+              formData.append('video', record.blob, `${record.sceneType}_camera${record.cameraAngle}.mp4`);
+              formData.append('sceneType', record.sceneType);
+              formData.append('cameraAngle', record.cameraAngle.toString());
+              formData.append('duration', record.duration.toString());
+              formData.append('sessionId', currentSessionId);
+
+              const response = await fetch(`/api/recordings/${recordingId}/upload-scene-video`, {
+                method: 'POST',
+                body: formData
+              });
+
+              if (!response.ok) {
+                throw new Error(`Failed to upload ${record.sceneType} camera ${record.cameraAngle}: ${response.statusText}`);
+              }
+
+              const result = await response.json();
+              console.log(`✅ Uploaded ${record.sceneType} camera ${record.cameraAngle}:`, result);
+              return result;
+            });
+
+            await Promise.all(uploadPromises);
+            console.log(`🎉 Successfully uploaded all ${records.length} videos for session ${currentSessionId}`);
+            resolve(true);
+            
+          } catch (error) {
+            console.error('❌ Failed to upload videos:', error);
+            reject(error);
+          }
+        };
+
+        request.onerror = () => reject(request.error);
+      } else {
+        console.warn('📤 No sessionId index available, cannot upload videos');
+        resolve(false);
+      }
+    });
+  }
 }
 
 // Export singleton instance

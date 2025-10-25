@@ -186,28 +186,26 @@ export class ClipGenerator {
   private async extractSceneVideos(recordingId: string, sceneType: string, sourceDir: string): Promise<Record<string, string>> {
     const videos: Record<string, string> = {};
     
-    // TODO: This method would need to integrate with your video storage system
-    // For now, we'll create placeholder files or use existing files if they exist
-    console.log(`📹 Extracting ${sceneType} scene videos for recording ${recordingId}`);
+    console.log(`📹 Looking for uploaded ${sceneType} scene videos for recording ${recordingId} in ${sourceDir}`);
     
     const camera1Path = path.join(sourceDir, `${sceneType}_camera1.mp4`);
     const camera2Path = path.join(sourceDir, `${sceneType}_camera2.mp4`);
     
-    // Check if files already exist
+    // Check if uploaded files exist
     try {
       await fs.access(camera1Path);
       videos.camera1 = camera1Path;
-      console.log(`📹 Found existing camera 1 file: ${camera1Path}`);
+      console.log(`📹 Found uploaded camera 1 file: ${camera1Path}`);
     } catch {
-      console.log(`📹 Camera 1 file not found for ${sceneType}, will use placeholder`);
+      console.log(`📹 Camera 1 file not found for ${sceneType}, skipping`);
     }
     
     try {
       await fs.access(camera2Path);
       videos.camera2 = camera2Path;
-      console.log(`📹 Found existing camera 2 file: ${camera2Path}`);
+      console.log(`📹 Found uploaded camera 2 file: ${camera2Path}`);
     } catch {
-      console.log(`📹 Camera 2 file not found for ${sceneType}, will use placeholder`);
+      console.log(`📹 Camera 2 file not found for ${sceneType}, skipping`);
     }
     
     return videos;
