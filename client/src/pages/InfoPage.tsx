@@ -35,19 +35,42 @@ export default function InfoPage() {
   const video2Ref = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    // Clear any previous session when loading the info page
-    videoStorage.clearCurrentSession();
-    localStorage.removeItem('currentRecordingId');
-    localStorage.removeItem('pilotEmail');
-    localStorage.removeItem('staffMember');
+    const handleSessionTransition = async () => {
+      // Check if there's an active project before clearing
+      const existingRecordingId = localStorage.getItem('currentRecordingId');
+      
+      if (existingRecordingId) {
+        // Save the current active project as "in_progress" before clearing
+        try {
+          await fetch(`/api/recordings/${existingRecordingId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              exportStatus: 'in_progress'
+            })
+          });
+          console.log('📊 Saved existing project to history as in_progress:', existingRecordingId);
+        } catch (error) {
+          console.error('❌ Failed to save project to history:', error);
+        }
+      }
+      
+      // Always clear session data when returning to InfoPage - this is for starting new projects
+      videoStorage.clearCurrentSession();
+      localStorage.removeItem('currentRecordingId');
+      localStorage.removeItem('pilotEmail');
+      localStorage.removeItem('staffMember');
+      
+      // Clear pilot context 
+      setPilotInfo({ name: "", email: "", staffMember: "" });
+      
+      console.log('🔄 InfoPage: Cleared all session data for new project');
+      
+      // Initialize cameras
+      await initializeCameras();
+    };
     
-    // Clear pilot context 
-    setPilotInfo({ name: "", email: "", staffMember: "" });
-    
-    console.log('🔄 InfoPage: Cleared session data for new project');
-    
-    // Initialize cameras
-    initializeCameras();
+    handleSessionTransition();
     
     return () => {
       stopCameras();

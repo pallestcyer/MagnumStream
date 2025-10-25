@@ -113,7 +113,7 @@ export default function ClipEditor() {
             {/* Back button */}
             <Button
               variant="ghost"
-              onClick={() => setLocation("/")}
+              onClick={() => setLocation("/recording")}
               data-testid="button-back-to-dashboard"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
