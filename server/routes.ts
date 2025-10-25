@@ -478,8 +478,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get recording info for directory naming
+      console.log(`🎬 Looking up recording with ID: ${recordingId}`);
       const recording = await storage.getFlightRecording(recordingId);
+      console.log(`🎬 Recording found:`, recording ? 'YES' : 'NO');
+      if (recording) {
+        console.log(`🎬 Recording details:`, { id: recording.id, pilotName: recording.pilotName, createdAt: recording.createdAt });
+      }
       if (!recording) {
+        console.log(`🎬 ❌ Recording not found, returning 404`);
         return res.status(404).json({ error: "Recording not found" });
       }
       
