@@ -190,7 +190,16 @@ export default function RecordingDashboard() {
       };
       
       recorder1.onstart = () => console.log('🎬 Camera 1 recording started');
-      recorder1.onstop = () => console.log('🛑 Camera 1 recording stopped');
+      recorder1.onstop = () => {
+        console.log('🛑 Camera 1 recording stopped');
+        // Check if both recorders have stopped before saving
+        setTimeout(() => {
+          if (camera1Recorder?.state === 'inactive' && camera2Recorder?.state === 'inactive') {
+            console.log('📊 Both recorders stopped, saving videos...');
+            saveRecordedVideos();
+          }
+        }, 500);
+      };
       
       setCamera1Recorder(recorder1);
 
@@ -238,7 +247,16 @@ export default function RecordingDashboard() {
         };
         
         recorder2.onstart = () => console.log('🎬 Camera 2 recording started');
-        recorder2.onstop = () => console.log('🛑 Camera 2 recording stopped');
+        recorder2.onstop = () => {
+          console.log('🛑 Camera 2 recording stopped');
+          // Check if both recorders have stopped before saving
+          setTimeout(() => {
+            if (camera1Recorder?.state === 'inactive' && camera2Recorder?.state === 'inactive') {
+              console.log('📊 Both recorders stopped, saving videos...');
+              saveRecordedVideos();
+            }
+          }, 500);
+        };
         
         setCamera2Recorder(recorder2);
         }
@@ -351,10 +369,7 @@ export default function RecordingDashboard() {
         : rec
     ));
     
-    // Save recorded videos after a longer delay to ensure all chunks are received
-    setTimeout(() => {
-      saveRecordedVideos();
-    }, 3000);
+    // Videos will be saved automatically when both recorders stop (via onstop events)
   };
   
   const saveRecordedVideos = async () => {
