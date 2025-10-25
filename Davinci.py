@@ -89,7 +89,7 @@ RENDER_FORMAT = "mp4"  # Output format
 RENDER_CODEC = "H.264"  # Video codec
 
 # Timeline Configuration - Updated for 5-slot MagnumStream template
-TIMELINE_NAME = "Main Timeline"  # Name of timeline in your template
+TIMELINE_NAME = "MAG_FERRARI"  # Name of timeline in your template
 CLIP_TRACKS = {
     1: "V1",  # Track 1 for all clips (single track template)
 }
