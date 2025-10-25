@@ -162,6 +162,9 @@ export default function EditorCruising() {
   }, []);
 
   const handleWindowStartChange = async (slotNumber: number, newStart: number) => {
+    console.log(`🔄 EditorCruising: Changing slot ${slotNumber} to ${newStart}s`);
+    console.log(`🔄 Current recording ID: ${currentRecordingId}`);
+    
     // Update local state immediately for responsive UI
     setSlotSelections(prev =>
       prev.map(slot =>
@@ -179,6 +182,7 @@ export default function EditorCruising() {
     // Save to database
     if (currentRecordingId) {
       try {
+        console.log(`💾 Saving cruising slot ${slotNumber} position ${newStart}s to API...`);
         const response = await fetch(`/api/recordings/${currentRecordingId}/video-slots/${slotNumber}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -186,13 +190,18 @@ export default function EditorCruising() {
         });
         
         if (response.ok) {
-          console.log(`Saved timeline position for cruising slot ${slotNumber}: ${newStart}s`);
+          const result = await response.json();
+          console.log(`✅ Saved cruising timeline position for slot ${slotNumber}: ${newStart}s`, result);
         } else {
-          console.error('Failed to save timeline position:', response.statusText);
+          console.error('❌ Failed to save cruising timeline position:', response.status, response.statusText);
+          const errorText = await response.text();
+          console.error('❌ Error response:', errorText);
         }
       } catch (error) {
-        console.error('Error saving timeline position:', error);
+        console.error('❌ Error saving cruising timeline position:', error);
       }
+    } else {
+      console.warn('⚠️ No current recording ID - cannot save cruising timeline position');
     }
   };
 
