@@ -477,21 +477,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No video file provided" });
       }
       
-      // Get recording info for directory naming
-      console.log(`🎬 Looking up recording with ID: ${recordingId}`);
-      const recording = await storage.getFlightRecording(recordingId);
-      console.log(`🎬 Recording found:`, recording ? 'YES' : 'NO');
-      if (recording) {
-        console.log(`🎬 Recording details:`, { id: recording.id, pilotName: recording.pilotName, createdAt: recording.createdAt });
-      }
-      if (!recording) {
-        console.log(`🎬 ❌ Recording not found, returning 404`);
-        return res.status(404).json({ error: "Recording not found" });
-      }
+      // For Mac service (standalone device), use session info for directory naming
+      // Don't require recording to exist in local database since Mac service is file storage only
+      console.log(`🎬 Using sessionId for directory naming: ${sessionId}`);
       
-      const { pilotName, createdAt } = recording;
-      const date = new Date(createdAt).toISOString().split('T')[0];
-      const sanitizedName = pilotName.replace(/[^a-zA-Z0-9]/g, '_');
+      // Create directory structure using sessionId instead of database recording
+      const date = new Date().toISOString().split('T')[0];
+      const sanitizedName = sessionId.replace(/[^a-zA-Z0-9_]/g, '_');
       
       // Create project directory structure with expiration metadata
       const projectDir = path.join('./projects', `${sanitizedName}_${date}`);
@@ -507,7 +499,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresAt: expirationTime,
         recordingId,
         sessionId,
-        pilotName
+        projectName: sanitizedName
       }, null, 2));
       
       // Save video file
@@ -516,7 +508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await fs.writeFile(filePath, req.file.buffer);
       
-      console.log(`📁 Saved ${filename} for ${pilotName} (expires: ${expirationTime})`);
+      console.log(`📁 Saved ${filename} for session ${sessionId} (expires: ${expirationTime})`);
       console.log(`📊 File size: ${(req.file.buffer.length / 1024 / 1024).toFixed(2)}MB`);
       
       res.json({
