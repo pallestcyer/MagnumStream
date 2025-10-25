@@ -197,6 +197,12 @@ class DaVinciAutomation:
             logger.info(f"Recording ID: {recording_id}")
             logger.info(f"Processing {len(clips)} clips")
             
+            # Debug: Show which slots are in the job file
+            slot_numbers = list(clips.keys())
+            logger.info(f"📋 Clips in job file: slots {slot_numbers}")
+            for slot_num, clip_info in clips.items():
+                logger.info(f"   Slot {slot_num}: {clip_info.get('filename', 'No filename')} ({clip_info.get('duration', 'No duration')}s)")
+            
             # Load template project
             if not self._load_template_project():
                 return False
@@ -308,9 +314,13 @@ class DaVinciAutomation:
                     logger.info(f"Imported slot {slot_number}: {clip_info['filename']} ({clip_info.get('duration', 3.0)}s)")
             
             # Replace clips on timeline using direct replacement method
+            logger.info(f"🔄 Starting clip replacement for {len(media_items)} imported clips")
             for slot_number, clip_data in media_items.items():
+                logger.info(f"🎬 Processing slot {slot_number}: {clip_data['slot_info']['filename']}")
+                
                 if slot_number not in CLIP_POSITIONS:
-                    logger.warning(f"No position defined for slot {slot_number}")
+                    logger.warning(f"❌ No position defined for slot {slot_number} in CLIP_POSITIONS")
+                    logger.info(f"📍 Available positions: {list(CLIP_POSITIONS.keys())}")
                     continue
                 
                 position = CLIP_POSITIONS[slot_number]
