@@ -234,17 +234,36 @@ class DaVinciAutomation:
             
             self.media_pool = self.current_project.GetMediaPool()
             
-            # Get the timeline
+            # Get the timeline - with debugging
             timeline_count = self.current_project.GetTimelineCount()
+            logger.info(f"Found {timeline_count} timelines in project")
+            
+            # List all available timelines for debugging
+            available_timelines = []
             for i in range(1, timeline_count + 1):
                 timeline = self.current_project.GetTimelineByIndex(i)
-                if timeline.GetName() == TIMELINE_NAME:
+                timeline_name = timeline.GetName()
+                available_timelines.append(timeline_name)
+                logger.info(f"Timeline {i}: '{timeline_name}'")
+                
+                # Try to match the expected timeline name
+                if timeline_name == TIMELINE_NAME:
                     self.timeline = timeline
                     self.current_project.SetCurrentTimeline(timeline)
+                    logger.info(f"Using timeline: {timeline_name}")
                     break
             
+            # If no exact match, use the first timeline as fallback
+            if not self.timeline and timeline_count > 0:
+                logger.warning(f"Timeline '{TIMELINE_NAME}' not found. Available timelines: {available_timelines}")
+                logger.info("Using first timeline as fallback...")
+                self.timeline = self.current_project.GetTimelineByIndex(1)
+                self.current_project.SetCurrentTimeline(self.timeline)
+                actual_name = self.timeline.GetName()
+                logger.info(f"Using timeline: '{actual_name}'")
+            
             if not self.timeline:
-                raise Exception(f"Could not find timeline: {TIMELINE_NAME}")
+                raise Exception(f"No timelines found in project. Available: {available_timelines}")
             
             logger.info("Template project loaded successfully")
             return True
