@@ -135,7 +135,7 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
             try {
               const recordingId = localStorage.getItem('currentRecordingId');
               if (recordingId) {
-                // Update recording status to completed
+                // Update recording status to completed (but NOT sold)
                 await fetch(`/api/recordings/${recordingId}`, {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json' },
@@ -145,65 +145,7 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
                   })
                 });
 
-                // Automatically create a sales record when project is completed
-                try {
-                  // First check if a sales record already exists for this recording
-                  const existingSalesResponse = await fetch('/api/sales');
-                  let salesAlreadyExists = false;
-                  
-                  if (existingSalesResponse.ok) {
-                    const existingSales = await existingSalesResponse.json();
-                    salesAlreadyExists = existingSales.some((sale: any) => sale.recordingId === recordingId);
-                  }
-                  
-                  if (!salesAlreadyExists) {
-                    // Get the recording details to populate sales info
-                    const recordingResponse = await fetch(`/api/recordings`);
-                    if (recordingResponse.ok) {
-                      const recordings = await recordingResponse.json();
-                      const currentRecording = recordings.find((r: any) => r.id === recordingId);
-                      
-                      if (currentRecording && currentRecording.pilotName) {
-                        // Create sales record with default bundle (video_photos)
-                        const salesData = {
-                          recordingId: recordingId,
-                          customerName: currentRecording.pilotName,
-                          customerEmail: currentRecording.pilotEmail || currentRecording.pilotName.toLowerCase().replace(/\s+/g, '.') + '@example.com',
-                          staffMember: currentRecording.staffMember || 'Auto-Generated',
-                          bundle: 'video_photos', // Default bundle
-                          saleAmount: 49.99, // Default price for video_photos bundle
-                          driveShared: false
-                        };
-                        
-                        const salesResponse = await fetch('/api/sales', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify(salesData)
-                        });
-                        
-                        if (salesResponse.ok) {
-                          console.log('📊 Sales record automatically created for completed project');
-                          
-                          // Also mark the recording as sold
-                          await fetch(`/api/recordings/${recordingId}`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ sold: true })
-                          });
-                          console.log('📊 Recording marked as sold');
-                        } else {
-                          console.warn('⚠️ Failed to create automatic sales record:', await salesResponse.text());
-                        }
-                      } else {
-                        console.warn('⚠️ Cannot create sales record - missing pilot information');
-                      }
-                    }
-                  } else {
-                    console.log('📊 Sales record already exists for this recording, skipping creation');
-                  }
-                } catch (salesError) {
-                  console.error('❌ Failed to create automatic sales record:', salesError);
-                }
+                console.log('📊 Project marked as completed (ready for manual sale if desired)');
               }
               
               await videoStorage.updateProjectStatus('exported');
