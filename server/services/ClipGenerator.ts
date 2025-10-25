@@ -84,7 +84,9 @@ export class ClipGenerator {
           const metadataContent = await fs.readFile(metadataPath, 'utf8');
           const metadata = JSON.parse(metadataContent);
           
-          if (metadata.recordingId === recordingId) {
+          console.log(`🔍 Checking project ${dirName}: metadata recordingId = ${metadata.recordingId}, looking for = ${recordingId}`);
+          
+          if (metadata.recordingId === recordingId || metadata.sessionId === recordingId) {
             console.log(`🎬 Found project directory: ${projectPath}`);
             
             // Create subdirectories
@@ -102,6 +104,30 @@ export class ClipGenerator {
           // Skip directories without valid metadata
           continue;
         }
+      }
+      
+      // Fallback: use the most recent project directory if no exact match found
+      console.log(`⚠️ No exact match found for recording ${recordingId}, using most recent project`);
+      const sortedDirs = projectDirs.sort((a, b) => {
+        const statA = require('fs').statSync(path.join(this.baseDir, a));
+        const statB = require('fs').statSync(path.join(this.baseDir, b));
+        return statB.mtime.getTime() - statA.mtime.getTime();
+      });
+      
+      if (sortedDirs.length > 0) {
+        const fallbackPath = path.join(this.baseDir, sortedDirs[0]);
+        console.log(`🎬 Using fallback project directory: ${fallbackPath}`);
+        
+        // Create subdirectories
+        const clipsDir = path.join(fallbackPath, 'clips');
+        const davinciDir = path.join(fallbackPath, 'davinci');
+        const sourceDir = path.join(fallbackPath, 'source');
+        
+        await fs.mkdir(clipsDir, { recursive: true });
+        await fs.mkdir(davinciDir, { recursive: true });
+        await fs.mkdir(sourceDir, { recursive: true });
+        
+        return fallbackPath;
       }
       
       throw new Error(`No project directory found for recording ${recordingId}`);
@@ -251,7 +277,7 @@ export class ClipGenerator {
     console.log(`🔧 FFmpeg command: ${ffmpegCommand}`);
     
     try {
-      const { stdout, stderr } = await execAsync(ffmpegCommand);
+      const { stderr } = await execAsync(ffmpegCommand);
       if (stderr && !stderr.includes('frame=')) {
         console.warn(`FFmpeg stderr: ${stderr}`);
       }
