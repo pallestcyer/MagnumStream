@@ -408,7 +408,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const fs = (await import('fs')).promises;
     console.log('🔧 Importing path...');
     const path = await import('path');
-    console.log('✅ All imports successful');
+    console.log('✅ All imports successful for video upload endpoints');
   
   const multerStorage = multer.memoryStorage();
   const upload = multer({ 
@@ -462,6 +462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Upload scene video from browser IndexedDB to server file system
+  console.log('🔧 Registering upload-scene-video endpoint...');
   app.post("/api/recordings/:recordingId/upload-scene-video", upload.single('video'), async (req: any, res) => {
     try {
       const { recordingId } = req.params;
@@ -738,8 +739,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  console.log('✅ Video upload endpoints registered successfully');
+  
   } catch (error) {
     console.error('❌ Error setting up video upload endpoints:', error);
+    console.error('❌ Full error details:', error);
     throw error;
   }
 
