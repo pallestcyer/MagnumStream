@@ -351,10 +351,10 @@ export default function RecordingDashboard() {
         : rec
     ));
     
-    // Save recorded videos after a short delay to ensure recording stopped
+    // Save recorded videos after a longer delay to ensure all chunks are received
     setTimeout(() => {
       saveRecordedVideos();
-    }, 1000);
+    }, 3000);
   };
   
   const saveRecordedVideos = async () => {
