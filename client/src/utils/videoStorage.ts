@@ -71,8 +71,14 @@ class VideoStorage {
         const recording = await response.json();
         console.log(`📊 Updated project ${sessionId} status to: ${status}`, recording);
         
-        // Store the recording ID for future use
-        localStorage.setItem('currentRecordingId', recording.id);
+        // Only store the recording ID if we don't already have one
+        const existingRecordingId = localStorage.getItem('currentRecordingId');
+        if (!existingRecordingId) {
+          console.log(`📊 Setting initial recording ID: ${recording.id}`);
+          localStorage.setItem('currentRecordingId', recording.id);
+        } else {
+          console.log(`📊 Keeping existing recording ID: ${existingRecordingId} (not overwriting with ${recording.id})`);
+        }
       } else {
         console.error('❌ Failed to update project status:', response.statusText);
       }
