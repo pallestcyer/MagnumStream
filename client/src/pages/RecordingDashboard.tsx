@@ -263,8 +263,11 @@ export default function RecordingDashboard() {
           console.log(`📊 Recorders stopped: ${newCount}/2`);
           if (newCount >= 2) {
             console.log('📊 Both recorders stopped, saving videos...');
+            // Capture the current elapsed time before it gets reset
+            const capturedElapsedTime = elapsedTime;
+            console.log(`🔍 DEBUG: Captured elapsed time for saving: ${capturedElapsedTime}s`);
             // Save with a longer delay to ensure state is updated
-            setTimeout(() => saveRecordedVideos(), 1000);
+            setTimeout(() => saveRecordedVideos(capturedElapsedTime), 1000);
             return 0; // Reset for next recording
           }
           return newCount;
@@ -326,8 +329,11 @@ export default function RecordingDashboard() {
             console.log(`📊 Recorders stopped: ${newCount}/2`);
             if (newCount >= 2) {
               console.log('📊 Both recorders stopped, saving videos...');
+              // Capture the current elapsed time before it gets reset
+              const capturedElapsedTime = elapsedTime;
+              console.log(`🔍 DEBUG: Captured elapsed time for saving: ${capturedElapsedTime}s`);
               // Save with a longer delay to ensure state is updated
-              setTimeout(() => saveRecordedVideos(), 1000);
+              setTimeout(() => saveRecordedVideos(capturedElapsedTime), 1000);
               return 0; // Reset for next recording
             }
             return newCount;
@@ -447,7 +453,7 @@ export default function RecordingDashboard() {
     // Scene completion status will be set ONLY after successful video saving
   };
   
-  const saveRecordedVideos = async () => {
+  const saveRecordedVideos = async (recordingDuration?: number) => {
     // Use existing recording ID or create one if needed
     let recordingId = currentRecordingId;
     if (!recordingId) {
@@ -458,6 +464,10 @@ export default function RecordingDashboard() {
     
     try {
       const currentSceneType = currentScene.type;
+      // Use the passed duration or fall back to current elapsedTime
+      const actualDuration = recordingDuration ?? elapsedTime;
+      
+      console.log(`🔍 DEBUG: saveRecordedVideos called with duration: ${recordingDuration}, elapsedTime: ${elapsedTime}, using: ${actualDuration}`);
       
       // Use refs for immediate access to chunks
       const chunks1 = chunksRef1.current;
@@ -468,7 +478,7 @@ export default function RecordingDashboard() {
         camera2Chunks: chunks2.length,
         camera1Size: chunks1.reduce((total, chunk) => total + chunk.size, 0),
         camera2Size: chunks2.reduce((total, chunk) => total + chunk.size, 0),
-        elapsedTime,
+        actualDuration,
         recordingId,
         sessionId: videoStorage.getCurrentSessionId(),
         currentSceneIndex,
@@ -507,7 +517,7 @@ export default function RecordingDashboard() {
       // Store blobs in IndexedDB with error handling
       if (camera1Blob) {
         try {
-          await videoStorage.storeVideo(currentSceneType, 1, camera1Blob, elapsedTime);
+          await videoStorage.storeVideo(currentSceneType, 1, camera1Blob, actualDuration);
           console.log(`✅ Successfully stored ${currentSceneType} camera 1 in IndexedDB (${camera1Blob.size} bytes)`);
         } catch (error) {
           console.error(`❌ Failed to store ${currentSceneType} camera 1:`, error);
@@ -517,7 +527,7 @@ export default function RecordingDashboard() {
       
       if (camera2Blob) {
         try {
-          await videoStorage.storeVideo(currentSceneType, 2, camera2Blob, elapsedTime);
+          await videoStorage.storeVideo(currentSceneType, 2, camera2Blob, actualDuration);
           console.log(`✅ Successfully stored ${currentSceneType} camera 2 in IndexedDB (${camera2Blob.size} bytes)`);
         } catch (error) {
           console.error(`❌ Failed to store ${currentSceneType} camera 2:`, error);
@@ -544,14 +554,14 @@ export default function RecordingDashboard() {
       }
       
       // Store metadata in localStorage (small data)
-      localStorage.setItem(`scene_${currentSceneType}_duration`, elapsedTime.toString());
+      localStorage.setItem(`scene_${currentSceneType}_duration`, actualDuration.toString());
       localStorage.setItem('currentRecordingId', recordingId);
       
       // Only mark scene as completed AFTER successful video saving
       setSceneRecordings(prev => {
         const updated = prev.map((rec, idx) => {
           if (idx === currentSceneIndex) {
-            const updatedRec = { ...rec, camera1Duration: elapsedTime, camera2Duration: elapsedTime, completed: true };
+            const updatedRec = { ...rec, camera1Duration: actualDuration, camera2Duration: actualDuration, completed: true };
             
             // Persist completion status to localStorage
             const sessionId = localStorage.getItem('currentSessionId') || 'default';
@@ -559,7 +569,7 @@ export default function RecordingDashboard() {
             localStorage.setItem(completionKey, 'true');
             console.log(`✅ Scene ${currentSceneType} (index ${currentSceneIndex}) marked as completed AFTER successful video saving`);
             console.log(`🔍 Completion key: ${completionKey}`);
-            console.log(`🔍 Duration being saved: ${elapsedTime}s`);
+            console.log(`🔍 Duration being saved: ${actualDuration}s`);
             console.log(`🔍 Updated record:`, updatedRec);
             
             return updatedRec;
@@ -580,7 +590,7 @@ export default function RecordingDashboard() {
       console.log(`📹 Saved ${currentSceneType} scene videos:`, {
         camera1: camera1Blob ? 'Stored in IndexedDB' : 'No data',
         camera2: camera2Blob ? 'Stored in IndexedDB' : 'No data',
-        duration: elapsedTime
+        duration: actualDuration
       });
       
       toast({
