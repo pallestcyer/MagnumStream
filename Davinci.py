@@ -94,17 +94,16 @@ CLIP_TRACKS = {
     1: "V1",  # Track 1 for all clips (single track template)
 }
 
-# Clip Mapping - Maps slot numbers to timeline positions (matches SLOT_TEMPLATE from schema.ts)
-# Updated for 5 slots with exact frame positions at 23.976fps to match schema durations
+# Clip Mapping - Maps slot numbers to timeline positions (matches actual timeline structure)
+# Based on observed timeline item positions in MAG_FERRARI-BACKUP template:
 # All clips are on video track V3 (track index 3)
-# Timeline starts at 1:00:00:00 timecode (86400 frames at 23.976fps)
-TIMELINE_START_FRAME = 86400  # 1 hour = 3600 seconds * 24 fps = 86400 frames at 24fps
+# These are the EXACT frame positions from the template timeline
 CLIP_POSITIONS = {
-    1: {"track": 3, "start_frame": TIMELINE_START_FRAME + 0},      # Slot 1: 1:00:00:00, duration 1.627s (39 frames)
-    2: {"track": 3, "start_frame": TIMELINE_START_FRAME + 39},     # Slot 2: 1:00:01:15, duration 1.502s (36 frames) 
-    3: {"track": 3, "start_frame": TIMELINE_START_FRAME + 75},     # Slot 3: 1:00:03:03, duration 1.543s (37 frames)
-    4: {"track": 3, "start_frame": TIMELINE_START_FRAME + 112},    # Slot 4: 1:00:04:16, duration 2.503s (60 frames)
-    5: {"track": 3, "start_frame": TIMELINE_START_FRAME + 172},    # Slot 5: 1:00:07:04, duration 2.002s (48 frames)
+    1: {"track": 3, "start_frame": 86570},    # Slot 1: Timeline item 1 (86570-86609)
+    2: {"track": 3, "start_frame": 86633},    # Slot 2: Timeline item 2 (86633-86669) 
+    3: {"track": 3, "start_frame": 87135},    # Slot 3: Timeline item 3 (87135-87172)
+    4: {"track": 3, "start_frame": 87328},    # Slot 4: Timeline item 4 (87328-87388)
+    5: {"track": 3, "start_frame": 87565},    # Slot 5: Timeline item 5 (87565-87613)
 }
 
 # Logging Configuration
@@ -320,18 +319,30 @@ class DaVinciAutomation:
                 
                 # Get all timeline items on the video track
                 timeline_items = self.timeline.GetItemListInTrack('video', track_index)
-                logger.info(f"Found {len(timeline_items)} items on video track {track_index}")
+                logger.info(f"🔍 Found {len(timeline_items)} items on video track {track_index}")
+                
+                # Log all timeline item positions for debugging
+                logger.info(f"📍 Timeline items on track V{track_index}:")
+                for i, item in enumerate(timeline_items):
+                    item_start = item.GetStart()
+                    item_end = item.GetEnd()
+                    logger.info(f"   Item {i+1}: frames {item_start}-{item_end}")
                 
                 # Find the item at our target position and replace it
                 replaced = False
+                logger.info(f"🎯 Looking for slot {slot_number} at frame {start_frame}")
+                
                 for i, item in enumerate(timeline_items):
                     item_start = item.GetStart()
                     item_end = item.GetEnd()
                     
-                    logger.info(f"Item {i+1}: start={item_start}, end={item_end}, target={start_frame}")
-                    
                     # Check if this item overlaps with our target position
                     if item_start <= start_frame < item_end:
+                        logger.info(f"✅ MATCH FOUND: Item {i+1} (frames {item_start}-{item_end}) contains target frame {start_frame}")
+                    elif item_start == start_frame:
+                        logger.info(f"✅ EXACT MATCH: Item {i+1} starts exactly at target frame {start_frame}")
+                    
+                    if item_start <= start_frame < item_end or item_start == start_frame:
                         media_item = clip_data['media']
                         
                         # Try multiple replacement methods
