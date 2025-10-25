@@ -198,7 +198,8 @@ export default function RecordingDashboard() {
           console.log(`📊 Recorders stopped: ${newCount}/2`);
           if (newCount >= 2) {
             console.log('📊 Both recorders stopped, saving videos...');
-            setTimeout(() => saveRecordedVideos(), 500);
+            // Save with a longer delay to ensure state is updated
+            setTimeout(() => saveRecordedVideos(), 1000);
             return 0; // Reset for next recording
           }
           return newCount;
@@ -258,7 +259,8 @@ export default function RecordingDashboard() {
             console.log(`📊 Recorders stopped: ${newCount}/2`);
             if (newCount >= 2) {
               console.log('📊 Both recorders stopped, saving videos...');
-              setTimeout(() => saveRecordedVideos(), 500);
+              // Save with a longer delay to ensure state is updated
+              setTimeout(() => saveRecordedVideos(), 1000);
               return 0; // Reset for next recording
             }
             return newCount;
@@ -399,7 +401,14 @@ export default function RecordingDashboard() {
         camera2Chunks: recordedChunks2.length,
         camera1Size: recordedChunks1.reduce((total, chunk) => total + chunk.size, 0),
         camera2Size: recordedChunks2.reduce((total, chunk) => total + chunk.size, 0),
-        elapsedTime
+        elapsedTime,
+        recordingId
+      });
+      
+      // Debug: Log the actual chunks
+      console.log('🔍 Debug chunks:', {
+        chunks1: recordedChunks1.map(c => ({ size: c.size, type: c.type })),
+        chunks2: recordedChunks2.map(c => ({ size: c.size, type: c.type }))
       });
       
       // Only create blobs if we have recorded data
