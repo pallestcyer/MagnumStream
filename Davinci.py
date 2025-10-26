@@ -615,8 +615,24 @@ class DaVinciAutomation:
             except:
                 logger.warning(f"Could not load render preset {RENDER_PRESET}, using default settings")
             
-            # Render job will be added in the StartRendering section below
-            
+            # Clear any existing render jobs from the queue before starting
+            try:
+                if hasattr(self.current_project, 'DeleteAllRenderJobs'):
+                    self.current_project.DeleteAllRenderJobs()
+                    logger.info("🗑️ Cleared existing render queue")
+            except Exception as e:
+                logger.warning(f"Could not clear render queue: {e}")
+
+            # Delete any existing output file to avoid detecting old renders
+            for ext in ['.mp4', '.mov', '.avi']:
+                old_file = organized_output_folder / f"{render_filename}{ext}"
+                if old_file.exists():
+                    try:
+                        old_file.unlink()
+                        logger.info(f"🗑️ Deleted old render file: {old_file}")
+                    except Exception as e:
+                        logger.warning(f"Could not delete old file {old_file}: {e}")
+
             # Start rendering - we know these methods work from the diagnostic
             job_id = None
             try:
@@ -626,14 +642,14 @@ class DaVinciAutomation:
                     logger.info(f"✅ Render job added: {job_id}")
                 else:
                     raise Exception("AddRenderJob returned None")
-                
+
                 # Start the rendering process
                 render_started = self.current_project.StartRendering()
                 if render_started:
                     logger.info(f"✅ Rendering started successfully")
                 else:
                     logger.warning("⚠️ StartRendering returned False but job was added")
-                    
+
             except Exception as e:
                 logger.error(f"❌ Failed to start rendering: {e}")
                 raise Exception(f"Could not start rendering: {e}")
@@ -682,19 +698,37 @@ class DaVinciAutomation:
                             render_timeout += 5
                             continue
                     else:
-                        # No render status methods available, just wait and check for file
-                        logger.info(f"No render status methods available, checking for output file... ({render_timeout}s elapsed)")
-                        output_path = organized_output_folder / f"{render_filename}.mp4"
-                        if output_path.exists():
-                            logger.info(f"Rendering completed successfully: {output_path}")
-                            return str(output_path)
-                        
-                        # Check with different extensions
-                        for ext in ['.mp4', '.mov', '.avi']:
-                            alt_path = organized_output_folder / f"{render_filename}{ext}"
-                            if alt_path.exists():
-                                logger.info(f"Rendering completed successfully: {alt_path}")
-                                return str(alt_path)
+                        # No render status methods available, wait longer before checking for file
+                        # Only check every 10 seconds to avoid false positives from old files
+                        if render_timeout % 10 == 0:
+                            logger.info(f"No render status methods available, checking for output file... ({render_timeout}s elapsed)")
+
+                            # Check with different extensions
+                            for ext in ['.mp4', '.mov', '.avi']:
+                                alt_path = organized_output_folder / f"{render_filename}{ext}"
+                                if alt_path.exists():
+                                    # Verify file was created recently (within last 30 seconds)
+                                    import os
+                                    file_age = time.time() - os.path.getmtime(str(alt_path))
+                                    if file_age < 30:
+                                        logger.info(f"Rendering completed successfully: {alt_path} (file age: {file_age:.1f}s)")
+
+                                        # Clear render queue after successful completion
+                                        try:
+                                            if hasattr(self.current_project, 'DeleteAllRenderJobs'):
+                                                self.current_project.DeleteAllRenderJobs()
+                                                logger.info("🗑️ Cleared render queue after completion")
+                                        except Exception as cleanup_error:
+                                            logger.warning(f"Could not clear render queue after completion: {cleanup_error}")
+
+                                        return str(alt_path)
+                                    else:
+                                        logger.warning(f"Found file but it's too old ({file_age:.1f}s), waiting for new render...")
+
+                        # Wait before next check
+                        time.sleep(5)
+                        render_timeout += 5
+                        continue
                     
                 except Exception as status_error:
                     logger.warning(f"Error getting render status: {status_error}")
@@ -714,6 +748,15 @@ class DaVinciAutomation:
                     if job_status == 'Complete':
                         output_path = organized_output_folder / f"{render_filename}.mp4"
                         logger.info(f"Rendering completed successfully: {output_path}")
+
+                        # Clear render queue after successful completion
+                        try:
+                            if hasattr(self.current_project, 'DeleteAllRenderJobs'):
+                                self.current_project.DeleteAllRenderJobs()
+                                logger.info("🗑️ Cleared render queue after completion")
+                        except Exception as cleanup_error:
+                            logger.warning(f"Could not clear render queue after completion: {cleanup_error}")
+
                         return str(output_path)
                     elif job_status == 'Failed':
                         raise Exception(f"Render failed: {status.get('Error', 'Unknown error')}")
