@@ -116,30 +116,66 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
       console.log('🎬 Clips generated:', clipsResult);
       
       setProgress(70);
-      
-      // Step 3: Create DaVinci job file and render final video (30% progress)
+
+      // Step 3: Start DaVinci render (this is a long-running operation)
       console.log('📄 Creating DaVinci job file and starting render...');
+      setStage("davinci");
+      setProgress(75);
+
+      // This request will take 30 seconds to 2+ minutes - server waits for actual render completion
       const davinciResponse = await fetch(`${localDeviceUrl}/api/recordings/${recordingId}/render-davinci`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          projectName: `${flightDate}_${flightTime.replace(':', '')}_Final` 
+        body: JSON.stringify({
+          projectName: `${flightDate}_${flightTime.replace(':', '')}_Final`
         })
       });
-      
+
       if (!davinciResponse.ok) {
         throw new Error('Failed to render with DaVinci Resolve');
       }
-      
+
       const renderResult = await davinciResponse.json();
       console.log('🎬 DaVinci render completed:', renderResult);
-      
+
+      // DaVinci is done, now show Drive upload stage
+      setStage("drive");
+      setProgress(85);
+
+      // Server has already uploaded to Drive (or skipped if not connected)
+      // Use the real Drive info from the response
+      if (renderResult.driveInfo) {
+        // Real Drive upload succeeded
+        setDriveUrl(renderResult.driveInfo.fileUrl || renderResult.driveInfo.webViewLink);
+        console.log('✅ Video uploaded to Drive:', renderResult.driveInfo.fileUrl);
+      } else if (renderResult.warning) {
+        // Drive not connected, but video rendered locally
+        console.warn('⚠️ ' + renderResult.warning);
+        setDriveUrl(null); // No Drive link available
+      }
+
+      // Update recording with real data from server (server already did this, but UI updates it too for consistency)
+      if (recordingId && renderResult.driveInfo) {
+        try {
+          await fetch(`/api/recordings/${recordingId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              exportStatus: 'completed',
+              driveFileUrl: renderResult.driveInfo.fileUrl,
+              driveFileId: renderResult.driveInfo.fileId
+            })
+          });
+          console.log('📊 Recording updated with real Drive info');
+        } catch (error) {
+          console.error('❌ Failed to update recording:', error);
+        }
+      }
+
+      await videoStorage.updateProjectStatus('exported');
+
       setProgress(100);
-      
-      // Move to Drive upload after completion
-      setTimeout(() => {
-        uploadToDrive();
-      }, 500);
+      setStage("sms");
       
     } catch (error) {
       console.error('❌ Export failed:', error);
