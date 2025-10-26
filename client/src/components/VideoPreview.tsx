@@ -13,8 +13,8 @@ import {
 } from "lucide-react";
 
 interface VideoPreviewProps {
-  driveFileId: string;
-  driveFileUrl: string;
+  driveFileId?: string | null;
+  driveFileUrl?: string | null;
   customerName: string;
   flightDate: string;
   flightTime: string;
@@ -42,13 +42,16 @@ export default function VideoPreview({
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [thumbnailError, setThumbnailError] = useState(false);
 
-  // Generate Google Drive embed URL for preview
-  const embedUrl = `https://drive.google.com/file/d/${driveFileId}/preview`;
-  const downloadUrl = `https://drive.google.com/uc?export=download&id=${driveFileId}`;
+  // Check if Drive file is available
+  const hasDriveFile = !!driveFileId && !!driveFileUrl;
 
-  // Generate thumbnail URL from Drive file ID
-  const thumbnailUrl = videoInfo?.thumbnailUrl || 
-    `https://drive.google.com/thumbnail?id=${driveFileId}&sz=w1920-h1080`;
+  // Generate Google Drive embed URL for preview (only if Drive file exists)
+  const embedUrl = driveFileId ? `https://drive.google.com/file/d/${driveFileId}/preview` : null;
+  const downloadUrl = driveFileId ? `https://drive.google.com/uc?export=download&id=${driveFileId}` : null;
+
+  // Generate thumbnail URL from Drive file ID (or use placeholder)
+  const thumbnailUrl = videoInfo?.thumbnailUrl ||
+    (driveFileId ? `https://drive.google.com/thumbnail?id=${driveFileId}&sz=w1920-h1080` : null);
 
   const formatFileSize = (bytes?: number): string => {
     if (!bytes) return 'Unknown size';
@@ -74,8 +77,8 @@ export default function VideoPreview({
           {/* Video Thumbnail/Preview */}
           <div className="relative group">
             <div className="aspect-video bg-muted rounded-lg overflow-hidden relative">
-              {!thumbnailError ? (
-                <img 
+              {thumbnailUrl && !thumbnailError ? (
+                <img
                   src={thumbnailUrl}
                   alt={`${customerName} Flight Video Preview`}
                   className="w-full h-full object-cover"
@@ -84,19 +87,28 @@ export default function VideoPreview({
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-muted">
                   <FileVideo className="w-16 h-16 text-muted-foreground" />
+                  {!hasDriveFile && (
+                    <div className="absolute bottom-2 left-2 right-2">
+                      <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-500 border-yellow-500/50">
+                        Local Storage Only
+                      </Badge>
+                    </div>
+                  )}
                 </div>
               )}
-              
-              {/* Play Overlay */}
-              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <Button
-                  size="lg"
-                  className="bg-white/20 hover:bg-white/30 backdrop-blur-sm border-white/30"
-                  onClick={() => setIsPreviewOpen(true)}
-                >
-                  <Play className="w-6 h-6 text-white" />
-                </Button>
-              </div>
+
+              {/* Play Overlay - only show if we have a Drive file to preview */}
+              {hasDriveFile && (
+                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Button
+                    size="lg"
+                    className="bg-white/20 hover:bg-white/30 backdrop-blur-sm border-white/30"
+                    onClick={() => setIsPreviewOpen(true)}
+                  >
+                    <Play className="w-6 h-6 text-white" />
+                  </Button>
+                </div>
+              )}
 
               {/* Video Info Overlay */}
               <div className="absolute bottom-2 left-2 right-2 flex justify-between items-end">
@@ -125,25 +137,34 @@ export default function VideoPreview({
 
             {/* Action Buttons */}
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsPreviewOpen(true)}
-                className="flex-1"
-              >
-                <Eye className="w-3 h-3 mr-2" />
-                Preview
-              </Button>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.open(driveFileUrl, '_blank')}
-                className="flex-1"
-              >
-                <ExternalLink className="w-3 h-3 mr-2" />
-                View in Drive
-              </Button>
+              {hasDriveFile ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsPreviewOpen(true)}
+                    className="flex-1"
+                  >
+                    <Eye className="w-3 h-3 mr-2" />
+                    Preview
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(driveFileUrl!, '_blank')}
+                    className="flex-1"
+                  >
+                    <ExternalLink className="w-3 h-3 mr-2" />
+                    View in Drive
+                  </Button>
+                </>
+              ) : (
+                <Badge variant="outline" className="flex-1 py-2 justify-center bg-yellow-500/10 text-yellow-500 border-yellow-500/50">
+                  <FileVideo className="w-3 h-3 mr-2" />
+                  Video rendered locally
+                </Badge>
+              )}
 
               {showSaleButton && onSale && (
                 <Button
@@ -159,8 +180,8 @@ export default function VideoPreview({
         </div>
       </Card>
 
-      {/* Video Preview Modal */}
-      {isPreviewOpen && (
+      {/* Video Preview Modal - only if Drive file exists */}
+      {isPreviewOpen && hasDriveFile && embedUrl && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-background rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
             <div className="p-4 border-b border-border flex items-center justify-between">
@@ -178,7 +199,7 @@ export default function VideoPreview({
                 ✕
               </Button>
             </div>
-            
+
             <div className="aspect-video bg-black">
               <iframe
                 src={embedUrl}
@@ -199,15 +220,17 @@ export default function VideoPreview({
               </div>
               
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(downloadUrl, '_blank')}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download
-                </Button>
-                
+                {downloadUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(downloadUrl, '_blank')}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download
+                  </Button>
+                )}
+
                 {showSaleButton && onSale && (
                   <Button
                     size="sm"

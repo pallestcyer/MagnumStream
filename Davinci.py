@@ -234,18 +234,21 @@ class DaVinciAutomation:
             current = self.project_manager.GetCurrentProject()
             if current:
                 self.project_manager.CloseProject(current)
-            
+
             # Load template
             self.current_project = self.project_manager.LoadProject(TEMPLATE_PROJECT_NAME)
             if not self.current_project:
                 raise Exception(f"Could not load template project: {TEMPLATE_PROJECT_NAME}")
-            
+
             self.media_pool = self.current_project.GetMediaPool()
-            
+
+            # Apply project settings to match working configuration
+            self._configure_project_settings()
+
             # Get the timeline - with debugging
             timeline_count = self.current_project.GetTimelineCount()
             logger.info(f"Found {timeline_count} timelines in project")
-            
+
             # List all available timelines for debugging
             available_timelines = []
             for i in range(1, timeline_count + 1):
@@ -253,14 +256,14 @@ class DaVinciAutomation:
                 timeline_name = timeline.GetName()
                 available_timelines.append(timeline_name)
                 logger.info(f"Timeline {i}: '{timeline_name}'")
-                
+
                 # Try to match the expected timeline name
                 if timeline_name == TIMELINE_NAME:
                     self.timeline = timeline
                     self.current_project.SetCurrentTimeline(timeline)
                     logger.info(f"Using timeline: {timeline_name}")
                     break
-            
+
             # If no exact match, use the first timeline as fallback
             if not self.timeline and timeline_count > 0:
                 logger.warning(f"Timeline '{TIMELINE_NAME}' not found. Available timelines: {available_timelines}")
@@ -269,16 +272,81 @@ class DaVinciAutomation:
                 self.current_project.SetCurrentTimeline(self.timeline)
                 actual_name = self.timeline.GetName()
                 logger.info(f"Using timeline: '{actual_name}'")
-            
+
             if not self.timeline:
                 raise Exception(f"No timelines found in project. Available: {available_timelines}")
-            
+
             logger.info("Template project loaded successfully")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to load template project: {e}")
             return False
+
+    def _configure_project_settings(self):
+        """Configure project settings to match working configuration"""
+        try:
+            logger.info("Configuring project settings...")
+
+            # Critical settings from working project configuration
+            project_settings = {
+                # Timeline settings - must match template
+                "timelineFrameRate": "23.976",
+                "timelinePlaybackFrameRate": "23.976",
+                "timelineResolutionWidth": "1920",
+                "timelineResolutionHeight": "1080",
+                "timelineOutputResolutionWidth": "1920",
+                "timelineOutputResolutionHeight": "1080",
+
+                # Color science settings
+                "colorScienceMode": "davinciYRGB",
+                "colorSpaceInput": "Rec.709 Gamma 2.4",
+                "colorSpaceOutput": "Rec.709 (Scene)",
+                "colorSpaceTimeline": "Rec.709 (Scene)",
+
+                # Render cache settings
+                "perfRenderCacheCodec": "apch",  # Apple ProRes 422 HQ
+                "perfOptimisedCodec": "apch",
+                "perfRenderCacheMode": "none",
+
+                # Frame rate mismatch behavior
+                "timelineFrameRateMismatchBehavior": "resolve",
+                "timelineInputResMismatchBehavior": "scaleToFit",
+                "timelineOutputResMismatchBehavior": "scaleToFit",
+
+                # Super Scale settings
+                "superScale": "1",
+                "superScaleNoiseReduction": "Medium",
+                "superScaleSharpness": "Medium",
+
+                # Video data levels
+                "videoDataLevels": "Video",
+            }
+
+            # Apply settings one by one with error handling
+            settings_applied = 0
+            settings_failed = 0
+
+            for key, value in project_settings.items():
+                try:
+                    if hasattr(self.current_project, 'SetSetting'):
+                        result = self.current_project.SetSetting(key, value)
+                        if result:
+                            settings_applied += 1
+                            logger.debug(f"✅ Set {key} = {value}")
+                        else:
+                            settings_failed += 1
+                            logger.debug(f"⚠️ Could not set {key} = {value}")
+                except Exception as e:
+                    settings_failed += 1
+                    logger.debug(f"❌ Error setting {key}: {e}")
+
+            logger.info(f"Project settings: {settings_applied} applied, {settings_failed} failed/skipped")
+            logger.info("Note: Some settings may be template-locked or require different API calls")
+
+        except Exception as e:
+            logger.warning(f"Could not configure all project settings: {e}")
+            logger.info("Continuing with template default settings")
     
     def _replace_clips_from_project(self, clips, recording_id):
         """Replace placeholder clips with new recordings from ClipGenerator output"""

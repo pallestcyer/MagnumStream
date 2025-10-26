@@ -647,18 +647,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (stdout.includes('SUCCESS:')) {
         const outputPath = stdout.split('SUCCESS: ')[1]?.trim();
         console.log(`✅ DaVinci render completed: ${outputPath}`);
-        
-        res.json({
-          success: true,
-          message: "DaVinci render completed successfully",
-          outputPath,
-          renderInfo: {
-            recordingId,
-            projectName: projectName || `Project_${recordingId}`,
-            clipCount: clips.length,
-            completedAt: new Date().toISOString()
+
+        // Upload the rendered video to Google Drive
+        try {
+          const fs = await import('fs');
+          const path = await import('path');
+
+          // Check if the rendered file exists
+          if (!fs.existsSync(outputPath)) {
+            console.error(`❌ Rendered file not found at: ${outputPath}`);
+            throw new Error(`Rendered file not found: ${outputPath}`);
           }
-        });
+
+          console.log(`📤 Uploading rendered video to Google Drive...`);
+
+          // Get the recording to extract customer info
+          const recording = await storage.getFlightRecording(recordingId);
+          if (!recording) {
+            throw new Error(`Recording not found: ${recordingId}`);
+          }
+
+          const customerName = recording.pilotName || 'Customer';
+          const fileName = path.basename(outputPath);
+
+          // Check if Google Drive OAuth is configured
+          if (!req.session.googleTokens) {
+            console.warn('⚠️ Google Drive not connected - skipping upload but marking as completed');
+            console.warn('⚠️ Video file saved at: ' + outputPath);
+
+            // Update recording status without Drive info
+            await storage.updateFlightRecording(recordingId, {
+              exportStatus: "completed" as any,
+              completedAt: new Date()
+            });
+
+            res.json({
+              success: true,
+              message: "DaVinci render completed successfully (Drive upload skipped - not connected)",
+              outputPath,
+              renderInfo: {
+                recordingId,
+                projectName: projectName || `Project_${recordingId}`,
+                clipCount: clips.length,
+                completedAt: new Date().toISOString()
+              },
+              warning: "Google Drive not connected - video saved locally only"
+            });
+            return;
+          }
+
+          // Upload to Google Drive
+          const { googleDriveOAuth } = await import('./services/GoogleDriveOAuth');
+          googleDriveOAuth.setCredentials(req.session.googleTokens);
+
+          const driveInfo = await googleDriveOAuth.uploadVideoToUserDrive(
+            outputPath,
+            fileName,
+            customerName
+          );
+
+          console.log(`✅ Video uploaded to Google Drive: ${driveInfo.fileUrl}`);
+
+          // Update the recording in the database with Drive info and completed status
+          await storage.updateFlightRecording(recordingId, {
+            exportStatus: "completed" as any,
+            driveFileUrl: driveInfo.fileUrl,
+            driveFileId: driveInfo.fileId,
+            completedAt: new Date()
+          });
+
+          console.log(`✅ Recording ${recordingId} marked as completed and ready for sale`);
+
+          res.json({
+            success: true,
+            message: "DaVinci render completed and uploaded to Google Drive",
+            outputPath,
+            driveInfo,
+            renderInfo: {
+              recordingId,
+              projectName: projectName || `Project_${recordingId}`,
+              clipCount: clips.length,
+              completedAt: new Date().toISOString()
+            }
+          });
+
+        } catch (uploadError: any) {
+          console.error('❌ Failed to upload to Google Drive:', uploadError);
+
+          // Still mark as completed even if upload fails - video is rendered locally
+          await storage.updateFlightRecording(recordingId, {
+            exportStatus: "completed" as any,
+            completedAt: new Date()
+          });
+
+          res.json({
+            success: true,
+            message: "DaVinci render completed but Google Drive upload failed",
+            outputPath,
+            error: uploadError.message,
+            renderInfo: {
+              recordingId,
+              projectName: projectName || `Project_${recordingId}`,
+              clipCount: clips.length,
+              completedAt: new Date().toISOString()
+            }
+          });
+        }
       } else {
         throw new Error("DaVinci render failed: " + stdout);
       }
