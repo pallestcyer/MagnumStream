@@ -590,7 +590,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/recordings/:recordingId/render-davinci", async (req, res) => {
     try {
       const { recordingId } = req.params;
-      const { projectName } = req.body;
+      const { projectName, googleTokens } = req.body;
       
       console.log(`🎬 Starting DaVinci render for recording ${recordingId}`);
       
@@ -670,8 +670,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const customerName = recording.pilotName || 'Customer';
           const fileName = path.basename(outputPath);
 
-          // Check if Google Drive OAuth is configured
-          if (!req.session.googleTokens) {
+          // Check if Google Drive OAuth tokens were provided
+          if (!googleTokens) {
             console.warn('⚠️ Google Drive not connected - skipping upload but marking as completed');
             console.warn('⚠️ Video file saved at: ' + outputPath);
 
@@ -695,9 +695,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return;
           }
 
-          // Upload to Google Drive
+          // Upload to Google Drive using provided tokens
           const { googleDriveOAuth } = await import('./services/GoogleDriveOAuth');
-          googleDriveOAuth.setCredentials(req.session.googleTokens);
+          googleDriveOAuth.setCredentials(googleTokens);
 
           const driveInfo = await googleDriveOAuth.uploadVideoToUserDrive(
             outputPath,
@@ -851,7 +851,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { googleDriveOAuth } = await import('./services/GoogleDriveOAuth');
       googleDriveOAuth.setCredentials(req.session.googleTokens);
-      
+
       const isValid = await googleDriveOAuth.validateTokens();
       if (!isValid) {
         req.session.googleTokens = null;
@@ -859,14 +859,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ authenticated: false });
       }
 
-      res.json({ 
-        authenticated: true, 
-        userInfo: req.session.googleUserInfo 
+      res.json({
+        authenticated: true,
+        userInfo: req.session.googleUserInfo
       });
 
     } catch (error: any) {
       console.error('Auth status check error:', error);
       res.json({ authenticated: false });
+    }
+  });
+
+  // Get OAuth tokens for passing to Mac service
+  app.get("/api/google/tokens", async (req, res) => {
+    try {
+      if (!req.session.googleTokens) {
+        return res.status(401).json({ error: "Not authenticated with Google" });
+      }
+
+      // Return tokens so frontend can pass them to Mac service
+      res.json({
+        tokens: req.session.googleTokens
+      });
+
+    } catch (error: any) {
+      console.error('Get tokens error:', error);
+      res.status(500).json({ error: error.message });
     }
   });
 

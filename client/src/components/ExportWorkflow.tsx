@@ -117,7 +117,23 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
       
       setProgress(70);
 
-      // Step 3: Start DaVinci render (this is a long-running operation)
+      // Step 3: Get Google OAuth tokens from Vercel session
+      console.log('🔑 Getting Google Drive credentials...');
+      let googleTokens = null;
+      try {
+        const tokensResponse = await fetch('/api/google/tokens');
+        if (tokensResponse.ok) {
+          const tokensData = await tokensResponse.json();
+          googleTokens = tokensData.tokens;
+          console.log('✅ Google Drive credentials obtained');
+        } else {
+          console.warn('⚠️ Google Drive not connected - video will be saved locally only');
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not get Google Drive credentials:', error);
+      }
+
+      // Step 4: Start DaVinci render (this is a long-running operation)
       console.log('📄 Creating DaVinci job file and starting render...');
       setStage("davinci");
       setProgress(75);
@@ -127,7 +143,8 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          projectName: `${flightDate}_${flightTime.replace(':', '')}_Final`
+          projectName: `${flightDate}_${flightTime.replace(':', '')}_Final`,
+          googleTokens: googleTokens
         })
       });
 
