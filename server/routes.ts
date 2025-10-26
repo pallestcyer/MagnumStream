@@ -677,8 +677,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             // Update recording status without Drive info
             await storage.updateFlightRecording(recordingId, {
-              exportStatus: "completed" as any,
-              completedAt: new Date()
+              exportStatus: "completed" as any
             });
 
             res.json({
@@ -712,8 +711,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updateFlightRecording(recordingId, {
             exportStatus: "completed" as any,
             driveFileUrl: driveInfo.fileUrl,
-            driveFileId: driveInfo.fileId,
-            completedAt: new Date()
+            driveFileId: driveInfo.fileId
           });
 
           console.log(`✅ Recording ${recordingId} marked as completed and ready for sale`);
@@ -736,8 +734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Still mark as completed even if upload fails - video is rendered locally
           await storage.updateFlightRecording(recordingId, {
-            exportStatus: "completed" as any,
-            completedAt: new Date()
+            exportStatus: "completed" as any
           });
 
           res.json({
