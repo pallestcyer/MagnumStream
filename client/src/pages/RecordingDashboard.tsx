@@ -196,16 +196,34 @@ export default function RecordingDashboard() {
   const initializeCameras = async () => {
     try {
       // Get camera configuration from server
-      const cameraConfigResponse = await fetch('/api/camera-config');
-      const cameraConfig = await cameraConfigResponse.json();
-      
-      console.log('🎥 Using camera configuration:', cameraConfig);
+      let cameraConfig: any = {
+        camera1: { deviceId: 'default', label: 'Camera 1 (Straight View)' },
+        camera2: { deviceId: 'default', label: 'Camera 2 (Side View)' }
+      };
+
+      try {
+        const cameraConfigResponse = await fetch('/api/camera-config');
+        if (cameraConfigResponse.ok) {
+          const config = await cameraConfigResponse.json();
+          // Check if we got a valid config (not an error)
+          if (config.camera1 && config.camera2) {
+            cameraConfig = config;
+            console.log('🎥 Using camera configuration from server:', cameraConfig);
+          } else {
+            console.warn('⚠️ Invalid camera config response, using defaults:', config);
+          }
+        } else {
+          console.warn('⚠️ Camera config API failed, using default cameras');
+        }
+      } catch (configError) {
+        console.warn('⚠️ Camera config API unavailable, using default cameras:', configError);
+      }
 
       // Camera 1 (Straight View)
       console.log('🎥 Initializing Camera 1 (Straight View)...');
       const stream1 = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          deviceId: { exact: cameraConfig.camera1.deviceId },
+        video: {
+          deviceId: cameraConfig.camera1.deviceId === 'default' ? undefined : { exact: cameraConfig.camera1.deviceId },
           width: { ideal: 1920 },
           height: { ideal: 1080 },
           frameRate: { ideal: 30 }
@@ -284,10 +302,10 @@ export default function RecordingDashboard() {
       // Camera 2 (Side View)
       console.log('🎥 Initializing Camera 2 (Side View)...');
       console.log('🎥 Camera 2 Device ID:', cameraConfig.camera2.deviceId);
-      
+
       const stream2 = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          deviceId: { exact: cameraConfig.camera2.deviceId },
+        video: {
+          deviceId: cameraConfig.camera2.deviceId === 'default' ? undefined : { exact: cameraConfig.camera2.deviceId },
           width: { ideal: 1920 },
           height: { ideal: 1080 },
           frameRate: { ideal: 30 }
