@@ -710,8 +710,27 @@ class DaVinciAutomation:
                                     # Verify file was created recently (within last 30 seconds)
                                     import os
                                     file_age = time.time() - os.path.getmtime(str(alt_path))
+
+                                    # Also check file size is growing (render in progress) or stable (render complete)
+                                    file_size = os.path.getsize(str(alt_path))
+
+                                    # If file is less than 1MB, it's probably still being created
+                                    if file_size < 1_000_000:
+                                        logger.debug(f"File exists but too small ({file_size:,} bytes), render likely in progress...")
+                                        continue
+
+                                    # Wait a bit and check if file size is still changing
+                                    time.sleep(2)
+                                    new_file_size = os.path.getsize(str(alt_path))
+
+                                    if new_file_size > file_size:
+                                        # File is still growing, render in progress
+                                        logger.debug(f"File still growing ({file_size:,} → {new_file_size:,} bytes), render in progress...")
+                                        continue
+
+                                    # File exists, is large enough, and not growing - render complete!
                                     if file_age < 30:
-                                        logger.info(f"Rendering completed successfully: {alt_path} (file age: {file_age:.1f}s)")
+                                        logger.info(f"Rendering completed successfully: {alt_path} (file age: {file_age:.1f}s, size: {file_size:,} bytes)")
 
                                         # Clear render queue after successful completion
                                         try:
