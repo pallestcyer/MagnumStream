@@ -447,6 +447,13 @@ export default function RecordingDashboard() {
   };
 
   const handleStopRecording = async () => {
+    console.log('🛑 handleStopRecording called', {
+      elapsedTime,
+      camera1State: camera1Recorder?.state,
+      camera2State: camera2Recorder?.state,
+      currentRecordersStoppedCount: recordersStoppedCount
+    });
+
     // Check minimum duration
     if (elapsedTime < 5) {
       toast({
@@ -456,15 +463,23 @@ export default function RecordingDashboard() {
       });
       return;
     }
-    
+
     // Stop recording
     if (camera1Recorder && camera1Recorder.state === 'recording') {
+      console.log('🛑 Stopping Camera 1 recorder');
       camera1Recorder.stop();
+    } else {
+      console.warn('⚠️ Camera 1 recorder not in recording state:', camera1Recorder?.state);
     }
+
     if (camera2Recorder && camera2Recorder.state === 'recording') {
+      console.log('🛑 Stopping Camera 2 recorder');
       camera2Recorder.stop();
+    } else {
+      console.warn('⚠️ Camera 2 recorder not in recording state:', camera2Recorder?.state);
     }
-    
+
+    console.log('🛑 Setting recordingState to completed');
     setRecordingState("completed");
   };
   
