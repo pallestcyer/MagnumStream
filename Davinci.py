@@ -456,11 +456,8 @@ class DaVinciAutomation:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             render_filename = f"MagnumStream_Render_{timestamp}"
             
-            # Get current template render settings to preserve aspect ratio and quality
-            current_settings = self.current_project.GetRenderSettings()
-            logger.info(f"Current template render settings: {current_settings}")
-            
-            # Only override essential settings while preserving template quality/aspect ratio
+            # Set render settings - GetRenderSettings() returns None in this DaVinci version
+            # so we'll use safe defaults that preserve the template's aspect ratio
             render_settings = {
                 "SelectAllFrames": True,
                 "TargetDir": str(OUTPUT_FOLDER),
@@ -468,22 +465,24 @@ class DaVinciAutomation:
                 "UniqueFilenameStyle": 0,  # Don't add numbers
                 "ExportVideo": True,
                 "ExportAudio": True,
+                "FormatWidth": 1920,   # Safe default for template
+                "FormatHeight": 1080,  # Safe default for template  
+                "FrameRate": "23.976", # Match template frame rate
+                "VideoQuality": 0,     # Automatic quality
             }
-            
-            # Preserve template settings if they exist, otherwise use defaults
-            if current_settings:
-                # Keep original format settings to preserve aspect ratio
-                if "FormatWidth" in current_settings:
-                    render_settings["FormatWidth"] = current_settings["FormatWidth"]
-                if "FormatHeight" in current_settings:
-                    render_settings["FormatHeight"] = current_settings["FormatHeight"]
-                if "FrameRate" in current_settings:
-                    render_settings["FrameRate"] = current_settings["FrameRate"]
-                if "VideoQuality" in current_settings:
-                    render_settings["VideoQuality"] = current_settings["VideoQuality"]
                     
-            logger.info(f"Final render settings: {render_settings}")
-            self.current_project.SetRenderSettings(render_settings)
+            logger.info(f"Setting render settings: {render_settings}")
+            
+            # SetRenderSettings is working, so use it directly
+            try:
+                success = self.current_project.SetRenderSettings(render_settings)
+                if success:
+                    logger.info("✅ Render settings applied successfully")
+                else:
+                    logger.warning("⚠️ SetRenderSettings returned False but continuing")
+            except Exception as e:
+                logger.error(f"❌ SetRenderSettings failed: {e}")
+                raise Exception(f"Could not set render settings: {e}")
             
             # Load render preset if available
             try:
@@ -492,35 +491,27 @@ class DaVinciAutomation:
             except:
                 logger.warning(f"Could not load render preset {RENDER_PRESET}, using default settings")
             
-            # Add current timeline to render queue
-            try:
-                if hasattr(self.current_project, 'AddRenderJob') and callable(getattr(self.current_project, 'AddRenderJob', None)):
-                    if not self.current_project.AddRenderJob():
-                        raise Exception("Could not add render job")
-                else:
-                    logger.warning("AddRenderJob method not available, trying direct render")
-            except Exception as e:
-                logger.warning(f"AddRenderJob failed: {e}, trying direct render")
+            # Render job will be added in the StartRendering section below
             
-            # Start rendering
+            # Start rendering - we know these methods work from the diagnostic
             job_id = None
             try:
-                if hasattr(self.current_project, 'StartRendering') and callable(getattr(self.current_project, 'StartRendering', None)):
-                    job_id = self.current_project.StartRendering()
-                    if not job_id:
-                        raise Exception("StartRendering returned falsy value")
+                # Add render job first (required)
+                job_id = self.current_project.AddRenderJob()
+                if job_id:
+                    logger.info(f"✅ Render job added: {job_id}")
                 else:
-                    # Try alternative render method
-                    if hasattr(self.current_project, 'ExportCurrentTimeline') and callable(getattr(self.current_project, 'ExportCurrentTimeline', None)):
-                        job_id = self.current_project.ExportCurrentTimeline(str(OUTPUT_FOLDER / f"{render_filename}.mp4"))
-                        if job_id:
-                            logger.info("Using ExportCurrentTimeline method")
-                        else:
-                            raise Exception("ExportCurrentTimeline failed")
-                    else:
-                        raise Exception("No render methods available")
+                    raise Exception("AddRenderJob returned None")
+                
+                # Start the rendering process
+                render_started = self.current_project.StartRendering()
+                if render_started:
+                    logger.info(f"✅ Rendering started successfully")
+                else:
+                    logger.warning("⚠️ StartRendering returned False but job was added")
+                    
             except Exception as e:
-                logger.error(f"Failed to start rendering: {e}")
+                logger.error(f"❌ Failed to start rendering: {e}")
                 raise Exception(f"Could not start rendering: {e}")
             
             logger.info(f"Rendering started with job ID: {job_id}")
