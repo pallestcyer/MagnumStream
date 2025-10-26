@@ -27,8 +27,8 @@ async function detectCameras() {
     console.log('5. Copy the device IDs and add them to your .env file');
     console.log('');
     console.log('📝 Add these lines to your .env file:');
-    console.log('CAMERA_1_DEVICE_ID=your-straight-view-camera-device-id');
-    console.log('CAMERA_2_DEVICE_ID=your-side-view-camera-device-id');
+    console.log('CAMERA_1_DEVICE_ID=your-side-view-camera-device-id');
+    console.log('CAMERA_2_DEVICE_ID=your-straight-view-camera-device-id');
     
   } catch (error) {
     console.error('❌ Error:', error.message);
