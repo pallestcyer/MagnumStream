@@ -158,7 +158,10 @@ export default function SalesPage() {
     r.projectName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const exportedRecordings = filteredRecordings.filter(r => r.exportStatus === "completed");
+  // Only show recordings that are completed AND have a Drive file (video ready for sale)
+  const exportedRecordings = filteredRecordings.filter(r =>
+    r.exportStatus === "completed" && r.driveFileUrl && r.driveFileId
+  );
   const unsoldRecordings = exportedRecordings.filter(r => !r.sold);
   const soldRecordings = exportedRecordings.filter(r => r.sold);
 
@@ -253,69 +256,18 @@ export default function SalesPage() {
                 </div>
               ) : (
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {unsoldRecordings.map((recording) => {
-                    // If recording has a Google Drive file, use VideoPreview component
-                    if (recording.driveFileUrl && recording.driveFileId) {
-                      return (
-                        <VideoPreview
-                          key={recording.id}
-                          driveFileId={recording.driveFileId}
-                          driveFileUrl={recording.driveFileUrl}
-                          customerName={recording.pilotName}
-                          flightDate={recording.flightDate || 'Unknown date'}
-                          flightTime={recording.flightTime || 'Unknown time'}
-                          onSale={() => handleMarkAsSold(recording)}
-                          showSaleButton={true}
-                        />
-                      );
-                    }
-                    
-                    // Fallback to legacy card for recordings without Drive files
-                    return (
-                      <Card
-                        key={recording.id}
-                        className="p-4 bg-card/50 border-card-border hover-elevate"
-                        data-testid={`video-card-unsold-${recording.id}`}
-                      >
-                        <div className="space-y-3">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-foreground text-lg">{recording.pilotName}</h3>
-                              <p className="text-sm text-muted-foreground mt-1">{recording.projectName}</p>
-                            </div>
-                            <Badge variant="outline" className="bg-orange-500/20 text-orange-500 border-orange-500/50">
-                              Processing
-                            </Badge>
-                          </div>
-
-                          <div className="text-sm text-muted-foreground space-y-1 bg-muted/20 p-3 rounded-md">
-                            <p className="flex items-center gap-2">
-                              <Calendar className="w-3 h-3" />
-                              {recording.flightDate} at {recording.flightTime}
-                            </p>
-                            <p className="flex items-center gap-2">
-                              <Users className="w-3 h-3" />
-                              Staff: {recording.staffMember || "Unknown"}
-                            </p>
-                            {recording.pilotEmail && (
-                              <p className="flex items-center gap-2 text-xs truncate">
-                                📧 {recording.pilotEmail}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="text-center py-4">
-                            <p className="text-sm text-muted-foreground">
-                              Video still processing...
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Check back soon for preview and sale options
-                            </p>
-                          </div>
-                        </div>
-                      </Card>
-                    );
-                  })}
+                  {unsoldRecordings.map((recording) => (
+                    <VideoPreview
+                      key={recording.id}
+                      driveFileId={recording.driveFileId}
+                      driveFileUrl={recording.driveFileUrl}
+                      customerName={recording.pilotName}
+                      flightDate={recording.flightDate || 'Unknown date'}
+                      flightTime={recording.flightTime || 'Unknown time'}
+                      onSale={() => handleMarkAsSold(recording)}
+                      showSaleButton={true}
+                    />
+                  ))}
                 </div>
               )}
             </Card>
