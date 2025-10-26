@@ -126,8 +126,9 @@ export default function RecordingDashboard() {
           shouldMarkCompleted: ((camera1Blob || camera2Blob) && duration !== null) || isCompleted
         });
         
-        // Consider it a valid existing recording if we have duration OR persisted completion status
-        if (((camera1Blob || camera2Blob) && duration !== null) || isCompleted) {
+        // Only consider it a valid existing recording if completion status is explicitly true
+        // This prevents re-marking scenes as completed after they've been cleared for re-recording
+        if (isCompleted && ((camera1Blob || camera2Blob) && duration !== null)) {
           console.log(`✅ Found existing recording for ${scene.type} in current session:`, {
             camera1: camera1Blob ? `${camera1Blob.size} bytes` : 'None',
             camera2: camera2Blob ? `${camera2Blob.size} bytes` : 'None',
@@ -534,12 +535,18 @@ export default function RecordingDashboard() {
             const completionKey = `scene_completed_${sessionId}_${currentSceneType}`;
             localStorage.setItem(completionKey, 'true');
             console.log(`✅ Scene ${currentSceneType} completed (${actualDuration}s)`);
+            console.log(`💾 Persisted completion with key: ${completionKey}`);
             
             return updatedRec;
           }
           return rec;
         });
         
+        console.log(`📊 Updated scene recordings after completion:`, updated.map(r => ({
+          sceneType: r.sceneType,
+          completed: r.completed,
+          duration: r.camera1Duration
+        })));
         
         // Auto-advance to next unrecorded scene after recording completion
         setTimeout(() => {
@@ -551,6 +558,7 @@ export default function RecordingDashboard() {
             setElapsedTime(0);
           } else {
             console.log(`🎉 All scenes completed!`);
+            setRecordingState("idle");
           }
         }, 100);
         
@@ -598,13 +606,31 @@ export default function RecordingDashboard() {
     localStorage.removeItem(completionKey);
     console.log(`🗑️ Cleared completion status for ${currentSceneType} re-recording`);
     
+    // Clear any stored duration metadata
+    localStorage.removeItem(`scene_${currentSceneType}_duration`);
+    
+    // Force update the scene recording state immediately
+    setSceneRecordings(prev => {
+      const updated = prev.map((rec, idx) => 
+        idx === currentSceneIndex 
+          ? { ...rec, camera1Duration: 0, camera2Duration: 0, completed: false }
+          : rec
+      );
+      console.log(`🔄 Force updated scene recordings after retake:`, updated.map(r => ({
+        sceneType: r.sceneType,
+        completed: r.completed,
+        duration: r.camera1Duration
+      })));
+      return updated;
+    });
+    
     setRecordingState("idle");
     setElapsedTime(0);
-    setSceneRecordings(prev => prev.map((rec, idx) => 
-      idx === currentSceneIndex 
-        ? { ...rec, camera1Duration: 0, camera2Duration: 0, completed: false }
-        : rec
-    ));
+    
+    toast({
+      title: "Scene Cleared",
+      description: `${currentSceneType} scene cleared for re-recording`,
+    });
   };
 
   const handleNextScene = () => {
