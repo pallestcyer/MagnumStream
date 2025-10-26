@@ -548,7 +548,7 @@ export default function RecordingDashboard() {
           videosStored = true;
         } catch (error) {
           console.error(`❌ Failed to store ${currentSceneType} camera 1:`, error);
-          throw error;
+          // Don't throw - continue with completion even if storage fails
         }
       } else {
         console.warn(`⚠️ No camera 1 blob to store for ${currentSceneType}`);
@@ -556,12 +556,20 @@ export default function RecordingDashboard() {
       
       if (camera2Blob) {
         try {
+          console.log(`💾 About to store camera 2 video: ${camera2Blob.size} bytes`);
           await videoStorage.storeVideo(currentSceneType, 2, camera2Blob, actualDuration);
           console.log(`✅ Stored ${currentSceneType} camera 2 (${camera2Blob.size} bytes, ${actualDuration}s)`);
           videosStored = true;
         } catch (error) {
           console.error(`❌ Failed to store ${currentSceneType} camera 2:`, error);
-          throw error;
+          console.error(`❌ Camera 2 storage error details:`, {
+            blobSize: camera2Blob.size,
+            blobType: camera2Blob.type,
+            duration: actualDuration,
+            sceneType: currentSceneType
+          });
+          // Don't throw - continue with completion even if storage fails
+          console.warn(`⚠️ Continuing with completion despite camera 2 storage failure`);
         }
       } else {
         console.warn(`⚠️ No camera 2 blob to store for ${currentSceneType}`);
