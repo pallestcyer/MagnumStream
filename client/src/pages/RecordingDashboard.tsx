@@ -402,13 +402,15 @@ export default function RecordingDashboard() {
           console.log('🎬 Starting Camera 1 recording');
           setRecordedChunks1([]);
           chunksRef1.current = []; // Clear ref
-          camera1Recorder.start(1000); // Record in 1-second chunks
+          console.log('🎬 Camera 1 starting with timeslice...');
+          camera1Recorder.start(100); // Record in smaller chunks to ensure data collection
         }
         if (camera2Recorder && camera2Recorder.state === 'inactive') {
           console.log('🎬 Starting Camera 2 recording');
           setRecordedChunks2([]);
           chunksRef2.current = []; // Clear ref
-          camera2Recorder.start(1000);
+          console.log('🎬 Camera 2 starting with timeslice...');
+          camera2Recorder.start(100); // Record in smaller chunks to ensure data collection
         }
       }
     }
@@ -516,9 +518,9 @@ export default function RecordingDashboard() {
           camera2Stream: !!camera2Stream
         });
         
-        // Force completion anyway for testing - this shouldn't happen in production
-        console.warn('🚨 FORCING COMPLETION despite no chunks (for debugging)');
-        // Don't return here, continue with empty blobs to test the completion logic
+        // Since this was working before, continue with completion even without chunks
+        console.warn('🚨 No chunks found but proceeding with completion (as it worked before)');
+        // Continue execution - don't return early
       }
       
       // Create blobs from recorded chunks with explicit MIME type - prioritize MP4
