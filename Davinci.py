@@ -215,8 +215,8 @@ class DaVinciAutomation:
             if not self._save_project(project_name):
                 return False
             
-            # Render the project
-            output_path = self._render_project(project_name)
+            # Render the project with customer-based naming
+            output_path = self._render_project(job_data)
             if not output_path:
                 return False
             
@@ -431,6 +431,46 @@ class DaVinciAutomation:
         """Convert seconds to frames at project frame rate"""
         return int(seconds * fps)
     
+    def _extract_customer_names(self, job_data):
+        """Extract customer names from job metadata and format them properly"""
+        try:
+            metadata = job_data.get('metadata', {})
+            project_name = metadata.get('projectName', '')
+            
+            # The projectName in metadata should contain the customer names
+            # Format: "Joe & Sam" or "Emily" from the InfoPage input
+            if project_name:
+                # Remove common suffixes and clean up
+                clean_name = project_name.replace('_Flight', '').replace(' Flight', '')
+                clean_name = clean_name.replace('___', ' & ').replace('_', ' ')
+                
+                # Convert back to proper format for filename
+                # "Joe & Sam" -> "Joe&Sam"
+                # "Emily" -> "Emily"
+                if ' & ' in clean_name:
+                    parts = [part.strip() for part in clean_name.split(' & ')]
+                    return '&'.join(parts)
+                else:
+                    return clean_name.strip()
+            
+            # Fallback: try to extract from sessionId
+            session_id = metadata.get('sessionId', '')
+            if session_id:
+                # sessionId format might be "joe_&_sam" or similar
+                clean_session = session_id.replace('_&_', '&').replace('_', ' ')
+                if '&' in clean_session:
+                    parts = [part.strip().title() for part in clean_session.split('&')]
+                    return '&'.join(parts)
+                else:
+                    return clean_session.title()
+            
+            # Final fallback
+            return "Customer"
+            
+        except Exception as e:
+            logger.warning(f"Could not extract customer names: {e}")
+            return "Customer"
+    
     def _save_project(self, project_name):
         """Save the current project state without renaming"""
         try:
@@ -445,22 +485,38 @@ class DaVinciAutomation:
             logger.error(f"Failed to save project: {e}")
             return False
     
-    def _render_project(self, original_project_name):
-        """Set up and start rendering, returns output file path on success"""
+    def _render_project(self, job_data):
+        """Set up and start rendering with customer-based naming, returns output file path on success"""
         try:
-            # Ensure output directory exists
-            OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
-            
-            # Use timestamp for unique render filename while keeping project name consistent
+            # Ensure output directory exists with organized structure
             from datetime import datetime
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            render_filename = f"MagnumStream_Render_{timestamp}"
+            render_date = datetime.now()
             
-            # Set render settings - GetRenderSettings() returns None in this DaVinci version
-            # so we'll use safe defaults that preserve the template's aspect ratio
+            # Create organized folder structure: Year/Month/Day
+            year_folder = OUTPUT_FOLDER / str(render_date.year)
+            month_folder = year_folder / f"{render_date.month:02d}-{render_date.strftime('%B')}"
+            day_folder = month_folder / f"{render_date.day:02d}"
+            
+            # Create all directories
+            day_folder.mkdir(parents=True, exist_ok=True)
+            
+            # Extract customer names from job data
+            customer_names = self._extract_customer_names(job_data)
+            timestamp = render_date.strftime("%Y%m%d_%H%M%S")
+            
+            # Create filename: "Joe&Sam_20251025_143941" or "Emily_20251025_143941"
+            render_filename = f"{customer_names}_{timestamp}"
+            
+            logger.info(f"📁 Organized output structure: {day_folder}")
+            logger.info(f"🎬 Customer-based filename: {render_filename}")
+            
+            # Update output folder to use organized structure
+            organized_output_folder = day_folder
+            
+            # Set render settings with organized output folder and customer-based naming
             render_settings = {
                 "SelectAllFrames": True,
-                "TargetDir": str(OUTPUT_FOLDER),
+                "TargetDir": str(organized_output_folder),
                 "CustomName": render_filename,
                 "UniqueFilenameStyle": 0,  # Don't add numbers
                 "ExportVideo": True,
@@ -537,15 +593,15 @@ class DaVinciAutomation:
                     if not status and hasattr(self.current_project, 'IsRenderingInProgress') and callable(getattr(self.current_project, 'IsRenderingInProgress', None)):
                         is_rendering = self.current_project.IsRenderingInProgress()
                         if not is_rendering:
-                            # Rendering completed, check for output file
-                            output_path = OUTPUT_FOLDER / f"{render_filename}.mp4"
+                            # Rendering completed, check for output file in organized folder
+                            output_path = organized_output_folder / f"{render_filename}.mp4"
                             if output_path.exists():
                                 logger.info(f"Rendering completed successfully: {output_path}")
                                 return str(output_path)
                             else:
                                 # Check with different extensions
                                 for ext in ['.mp4', '.mov', '.avi']:
-                                    alt_path = OUTPUT_FOLDER / f"{render_filename}{ext}"
+                                    alt_path = organized_output_folder / f"{render_filename}{ext}"
                                     if alt_path.exists():
                                         logger.info(f"Rendering completed successfully: {alt_path}")
                                         return str(alt_path)
@@ -560,14 +616,14 @@ class DaVinciAutomation:
                     else:
                         # No render status methods available, just wait and check for file
                         logger.info(f"No render status methods available, checking for output file... ({render_timeout}s elapsed)")
-                        output_path = OUTPUT_FOLDER / f"{render_filename}.mp4"
+                        output_path = organized_output_folder / f"{render_filename}.mp4"
                         if output_path.exists():
                             logger.info(f"Rendering completed successfully: {output_path}")
                             return str(output_path)
                         
                         # Check with different extensions
                         for ext in ['.mp4', '.mov', '.avi']:
-                            alt_path = OUTPUT_FOLDER / f"{render_filename}{ext}"
+                            alt_path = organized_output_folder / f"{render_filename}{ext}"
                             if alt_path.exists():
                                 logger.info(f"Rendering completed successfully: {alt_path}")
                                 return str(alt_path)
@@ -575,7 +631,7 @@ class DaVinciAutomation:
                 except Exception as status_error:
                     logger.warning(f"Error getting render status: {status_error}")
                     # Still check for output file even if status check fails
-                    output_path = OUTPUT_FOLDER / f"{render_filename}.mp4"
+                    output_path = organized_output_folder / f"{render_filename}.mp4"
                     if output_path.exists():
                         logger.info(f"Rendering completed successfully (status check failed): {output_path}")
                         return str(output_path)
@@ -588,7 +644,7 @@ class DaVinciAutomation:
                 if status and isinstance(status, dict):
                     job_status = status.get('JobStatus', 'Unknown')
                     if job_status == 'Complete':
-                        output_path = OUTPUT_FOLDER / f"{render_filename}.mp4"
+                        output_path = organized_output_folder / f"{render_filename}.mp4"
                         logger.info(f"Rendering completed successfully: {output_path}")
                         return str(output_path)
                     elif job_status == 'Failed':

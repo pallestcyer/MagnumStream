@@ -67,8 +67,9 @@ export class GoogleDriveService {
       // Create or find customer folder
       const customerFolder = await this.createCustomerFolder(customerName, recordingId);
       
-      // Upload video file
-      const videoFileName = `${customerName}_Flight_Video_${new Date().toISOString().split('T')[0]}.mp4`;
+      // Upload video file with customer-based naming (matches DaVinci output)
+      const timestamp = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const videoFileName = `${customerName}_${timestamp}.mp4`;
       
       const fileMetadata = {
         name: videoFileName,
@@ -115,48 +116,82 @@ export class GoogleDriveService {
   }
 
   /**
-   * Create dedicated folder for customer with organized structure
+   * Create organized folder structure: MagnumStream/Year/Month/Day/CustomerName
    */
   private async createCustomerFolder(customerName: string, recordingId: string): Promise<{id: string, name: string}> {
-    const sanitizedName = customerName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
-    const folderName = `${sanitizedName}_Flight_${new Date().toISOString().split('T')[0]}`;
+    const sanitizedName = customerName.replace(/[^a-zA-Z0-9\s&]/g, '').replace(/\s+/g, '_');
+    const currentDate = new Date();
+    
+    // Create organized folder structure
+    const year = currentDate.getFullYear().toString();
+    const monthNum = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+    const monthName = currentDate.toLocaleDateString('en', { month: 'long' });
+    const month = `${monthNum}-${monthName}`;
+    const day = currentDate.getDate().toString().padStart(2, '0');
+    
+    // Customer folder name with date
+    const folderName = `${sanitizedName}_${currentDate.toISOString().split('T')[0]}`;
 
     try {
-      // Check if folder already exists
+      // Get or create the organized folder hierarchy: MagnumStream/Year/Month/Day/Customer
+      const magnumStreamFolder = await this.getOrCreateFolder('MagnumStream', null);
+      const yearFolder = await this.getOrCreateFolder(year, magnumStreamFolder.id);
+      const monthFolder = await this.getOrCreateFolder(month, yearFolder.id);
+      const dayFolder = await this.getOrCreateFolder(day, monthFolder.id);
+      const customerFolder = await this.getOrCreateFolder(folderName, dayFolder.id);
+
+      console.log(`📁 Created organized folder structure: MagnumStream/${year}/${month}/${day}/${folderName}`);
+      
+      return customerFolder;
+
+    } catch (error) {
+      console.error('❌ Failed to create customer folder:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Helper method to get or create a folder with the specified name and parent
+   */
+  private async getOrCreateFolder(name: string, parentId: string | null): Promise<{id: string, name: string}> {
+    try {
+      // Search for existing folder
+      const query = parentId 
+        ? `name='${name}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`
+        : `name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+
       const existingFolders = await this.drive.files.list({
-        q: `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+        q: query,
         fields: 'files(id,name)'
       });
 
-      if (existingFolders.data.files.length > 0) {
-        console.log(`📁 Using existing folder: ${folderName}`);
-        return {
-          id: existingFolders.data.files[0].id,
-          name: existingFolders.data.files[0].name
-        };
+      if (existingFolders.data.files && existingFolders.data.files.length > 0) {
+        const folder = existingFolders.data.files[0];
+        return { id: folder.id!, name: folder.name! };
       }
 
       // Create new folder
-      const folderMetadata = {
-        name: folderName,
-        mimeType: 'application/vnd.google-apps.folder',
-        description: `Flight recording folder for ${customerName}`
+      const folderMetadata: any = {
+        name: name,
+        mimeType: 'application/vnd.google-apps.folder'
       };
+
+      if (parentId) {
+        folderMetadata.parents = [parentId];
+      }
 
       const folder = await this.drive.files.create({
         resource: folderMetadata,
         fields: 'id,name'
       });
 
-      console.log(`📁 Created customer folder: ${folderName} (${folder.data.id})`);
-      
       return {
-        id: folder.data.id,
-        name: folder.data.name
+        id: folder.data.id!,
+        name: folder.data.name!
       };
 
     } catch (error) {
-      console.error('❌ Failed to create customer folder:', error);
+      console.error(`❌ Failed to get/create folder ${name}:`, error);
       throw error;
     }
   }
