@@ -541,11 +541,15 @@ export default function RecordingDashboard() {
       
       let videosStored = false;
       
+      // Store videos sequentially to avoid IndexedDB transaction conflicts
       if (camera1Blob) {
         try {
           await videoStorage.storeVideo(currentSceneType, 1, camera1Blob, actualDuration);
           console.log(`✅ Stored ${currentSceneType} camera 1 (${camera1Blob.size} bytes, ${actualDuration}s)`);
           videosStored = true;
+          
+          // Small delay to ensure transaction completes before next one
+          await new Promise(resolve => setTimeout(resolve, 50));
         } catch (error) {
           console.error(`❌ Failed to store ${currentSceneType} camera 1:`, error);
           // Don't throw - continue with completion even if storage fails
@@ -566,7 +570,8 @@ export default function RecordingDashboard() {
             blobSize: camera2Blob.size,
             blobType: camera2Blob.type,
             duration: actualDuration,
-            sceneType: currentSceneType
+            sceneType: currentSceneType,
+            errorMessage: error?.message || 'Unknown error'
           });
           // Don't throw - continue with completion even if storage fails
           console.warn(`⚠️ Continuing with completion despite camera 2 storage failure`);
@@ -574,6 +579,10 @@ export default function RecordingDashboard() {
       } else {
         console.warn(`⚠️ No camera 2 blob to store for ${currentSceneType}`);
       }
+      
+      // FORCE PROCEED TO COMPLETION LOGIC REGARDLESS
+      console.log(`🎯 FORCING CONTINUATION TO COMPLETION LOGIC`);
+      console.log(`🎯 About to proceed to scene completion regardless of storage status`);
       
       // For debugging: proceed with completion even if no videos stored
       if (!videosStored && chunks1.length === 0 && chunks2.length === 0) {
