@@ -396,11 +396,12 @@ export class SupabaseStorage implements IStorage {
   async findRecordingBySessionId(sessionId: string): Promise<FlightRecording | undefined> {
     // Convert sessionId back to pilot name format for lookup
     const pilotName = sessionId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-    
+
+    // Use ilike for case-insensitive matching to handle different capitalizations
     const { data, error } = await db
       .from('flight_recordings')
       .select('*')
-      .eq('pilot_name', pilotName)
+      .ilike('pilot_name', pilotName)
       .order('created_at', { ascending: false })
       .limit(1)
       .single();

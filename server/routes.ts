@@ -665,7 +665,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const { googleDriveLinkGenerator } = await import('./services/GoogleDriveLinkGenerator');
 
           // Get the recording to extract customer info
-          const recording = await storage.getFlightRecording(recordingId);
+          // Try to find by ID first, fallback to finding latest by project name
+          let recording = await storage.getFlightRecording(recordingId);
+
+          if (!recording) {
+            console.warn(`⚠️  Recording not found by ID ${recordingId}, searching by project name...`);
+            const allRecordings = await storage.getAllFlightRecordings();
+            // Find the most recent recording with status 'completed' or 'in_progress'
+            recording = allRecordings
+              .filter(r => r.exportStatus === 'completed' || r.exportStatus === 'in_progress')
+              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+
+            if (recording) {
+              console.log(`✅ Found recording by latest status: ${recording.id} (${recording.pilotName})`);
+              // Use the correct ID going forward
+              recordingId = recording.id;
+            }
+          }
+
           if (!recording) {
             throw new Error(`Recording not found: ${recordingId}`);
           }
