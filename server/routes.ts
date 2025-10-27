@@ -648,7 +648,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const outputPath = stdout.split('SUCCESS: ')[1]?.trim();
         console.log(`✅ DaVinci render completed: ${outputPath}`);
 
-        // Upload the rendered video to Google Drive
+        // Copy the rendered video to Google Drive (local sync)
         try {
           const fs = await import('fs');
           const path = await import('path');
@@ -659,7 +659,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             throw new Error(`Rendered file not found: ${outputPath}`);
           }
 
-          console.log(`📤 Uploading rendered video to Google Drive...`);
+          console.log(`📤 Syncing rendered video to Google Drive...`);
+
+          // Use local Google Drive sync instead of API
+          const { googleDriveLinkGenerator } = await import('./services/GoogleDriveLinkGenerator');
 
           // Get the recording to extract customer info
           const recording = await storage.getFlightRecording(recordingId);
@@ -670,10 +673,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const customerName = recording.pilotName || 'Customer';
           const fileName = path.basename(outputPath);
 
-          // Check if Google Drive OAuth tokens were provided
-          if (!googleTokens) {
-            console.warn('⚠️ Google Drive not connected - skipping upload but marking as completed');
-            console.warn('⚠️ Video file saved at: ' + outputPath);
+          // Check if Google Drive for Desktop is available
+          if (!googleDriveLinkGenerator.isAvailable()) {
+            console.warn('⚠️ Google Drive for Desktop not found - skipping sync');
+            console.warn('⚠️ Video file saved locally at: ' + outputPath);
 
             // Update recording status without Drive info
             await storage.updateFlightRecording(recordingId, {
@@ -682,7 +685,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             res.json({
               success: true,
-              message: "DaVinci render completed successfully (Drive upload skipped - not connected)",
+              message: "DaVinci render completed successfully (Drive sync skipped - not available)",
               outputPath,
               renderInfo: {
                 recordingId,
@@ -690,37 +693,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 clipCount: clips.length,
                 completedAt: new Date().toISOString()
               },
-              warning: "Google Drive not connected - video saved locally only"
+              warning: "Google Drive for Desktop not installed - video saved locally only"
             });
             return;
           }
 
-          // Upload to Google Drive using provided tokens
-          const { googleDriveOAuth } = await import('./services/GoogleDriveOAuth');
-          googleDriveOAuth.setCredentials(googleTokens);
+          // Copy file to Google Drive local folder (will auto-sync to cloud)
+          console.log(`📂 Copying to Google Drive folder...`);
+          const driveFilePath = await googleDriveLinkGenerator.copyToGoogleDrive(outputPath, recordingId);
 
-          const driveInfo = await googleDriveOAuth.uploadVideoToUserDrive(
-            outputPath,
-            fileName,
-            customerName
-          );
+          // Generate link info
+          const linkInfo = await googleDriveLinkGenerator.generateShareableLink(driveFilePath);
 
-          console.log(`✅ Video uploaded to Google Drive: ${driveInfo.fileUrl}`);
+          console.log(`✅ Video synced to Google Drive:`);
+          console.log(`   Path: ${linkInfo.relativePath}`);
+          console.log(`   ${linkInfo.instructions}`);
 
-          // Update the recording in the database with Drive info and completed status
+          // Update the recording in the database with Drive path info and completed status
           await storage.updateFlightRecording(recordingId, {
             exportStatus: "completed" as any,
-            driveFileUrl: driveInfo.fileUrl,
-            driveFileId: driveInfo.fileId
+            driveFileUrl: `googledrive:///${linkInfo.relativePath}`,
+            driveFileId: linkInfo.relativePath
           });
 
           console.log(`✅ Recording ${recordingId} marked as completed and ready for sale`);
 
           res.json({
             success: true,
-            message: "DaVinci render completed and uploaded to Google Drive",
+            message: "DaVinci render completed and synced to Google Drive",
             outputPath,
-            driveInfo,
+            driveInfo: {
+              filePath: driveFilePath,
+              relativePath: linkInfo.relativePath,
+              displayPath: googleDriveLinkGenerator.getDisplayPath(driveFilePath),
+              instructions: linkInfo.instructions
+            },
             renderInfo: {
               recordingId,
               projectName: projectName || `Project_${recordingId}`,
@@ -760,6 +767,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
         error: error.message,
         details: "Make sure DaVinci Resolve Studio is running and scripting is enabled"
       });
+    }
+  });
+
+  // Open local video file on Mac (for sales page preview)
+  app.post("/api/recordings/open-local-video", async (req, res) => {
+    try {
+      const { drivePath } = req.body;
+
+      if (!drivePath) {
+        return res.status(400).json({ error: "drivePath is required" });
+      }
+
+      const { exec } = await import('child_process');
+      const { promisify } = await import('util');
+      const execAsync = promisify(exec);
+      const os = await import('os');
+      const path = await import('path');
+
+      // Construct full path to Google Drive file
+      const homeDir = os.homedir();
+      const googleDriveBase = path.join(homeDir, 'Library', 'CloudStorage');
+
+      // Find the Google Drive folder
+      const fs = await import('fs');
+      const cloudStorageContents = fs.readdirSync(googleDriveBase);
+      const googleDriveFolder = cloudStorageContents.find(folder => folder.startsWith('GoogleDrive-'));
+
+      if (!googleDriveFolder) {
+        return res.status(404).json({ error: "Google Drive folder not found" });
+      }
+
+      const fullPath = path.join(googleDriveBase, googleDriveFolder, 'My Drive', drivePath);
+
+      // Check if file exists
+      if (!fs.existsSync(fullPath)) {
+        return res.status(404).json({ error: `Video file not found: ${fullPath}` });
+      }
+
+      // Open the video file with default application (usually QuickTime on Mac)
+      await execAsync(`open "${fullPath}"`);
+
+      console.log(`📹 Opened video file: ${fullPath}`);
+
+      res.json({
+        success: true,
+        message: "Video file opened successfully",
+        path: fullPath
+      });
+
+    } catch (error: any) {
+      console.error('Error opening video file:', error);
+      res.status(500).json({ error: error.message });
     }
   });
 

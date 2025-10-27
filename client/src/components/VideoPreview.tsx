@@ -2,14 +2,16 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Play, 
-  Download, 
-  ExternalLink, 
-  Eye, 
+import {
+  Play,
+  Download,
+  ExternalLink,
+  Eye,
   Clock,
   FileVideo,
-  Users
+  Users,
+  Link2,
+  FolderOpen
 } from "lucide-react";
 
 interface VideoPreviewProps {
@@ -44,14 +46,56 @@ export default function VideoPreview({
 
   // Check if Drive file is available
   const hasDriveFile = !!driveFileId && !!driveFileUrl;
+  const isLocalGoogleDrive = driveFileUrl?.startsWith('googledrive:///');
 
-  // Generate Google Drive embed URL for preview (only if Drive file exists)
-  const embedUrl = driveFileId ? `https://drive.google.com/file/d/${driveFileId}/preview` : null;
-  const downloadUrl = driveFileId ? `https://drive.google.com/uc?export=download&id=${driveFileId}` : null;
+  // For local Google Drive sync, we show different actions
+  const drivePath = isLocalGoogleDrive ? driveFileId : null;
+
+  // Generate Google Drive embed URL for preview (only if Drive file exists and is cloud-based)
+  const embedUrl = driveFileId && !isLocalGoogleDrive ? `https://drive.google.com/file/d/${driveFileId}/preview` : null;
+  const downloadUrl = driveFileId && !isLocalGoogleDrive ? `https://drive.google.com/uc?export=download&id=${driveFileId}` : null;
 
   // Generate thumbnail URL from Drive file ID (or use placeholder)
   const thumbnailUrl = videoInfo?.thumbnailUrl ||
-    (driveFileId ? `https://drive.google.com/thumbnail?id=${driveFileId}&sz=w1920-h1080` : null);
+    (driveFileId && !isLocalGoogleDrive ? `https://drive.google.com/thumbnail?id=${driveFileId}&sz=w1920-h1080` : null);
+
+  const handleOpenInGoogleDrive = () => {
+    if (drivePath) {
+      // Open the Google Drive folder (not just search for the file)
+      // Extract the folder path from the file path
+      const pathParts = drivePath.split('/');
+      const folderPath = pathParts.slice(0, -1).join('/'); // Remove filename, keep folder path
+
+      // Search for the folder in Google Drive
+      const fileName = pathParts[pathParts.length - 1]; // Get filename for search
+      const searchUrl = `https://drive.google.com/drive/search?q=${encodeURIComponent(fileName || '')}`;
+      window.open(searchUrl, '_blank');
+    }
+  };
+
+  const handlePreviewVideo = async () => {
+    // For local Google Drive files, open the local file on Mac
+    if (isLocalGoogleDrive && drivePath) {
+      try {
+        // Call backend to open the local file
+        const response = await fetch(`/api/recordings/open-local-video`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ drivePath })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to open video');
+        }
+      } catch (error) {
+        console.error('Error opening video:', error);
+        alert('Failed to open video file. Please check the file exists in Google Drive folder.');
+      }
+    } else if (embedUrl) {
+      // For cloud-based Drive files, open preview modal
+      setIsPreviewOpen(true);
+    }
+  };
 
   const formatFileSize = (bytes?: number): string => {
     if (!bytes) return 'Unknown size';
@@ -97,13 +141,13 @@ export default function VideoPreview({
                 </div>
               )}
 
-              {/* Play Overlay - only show if we have a Drive file to preview */}
+              {/* Play Overlay - show if we have a Drive file (local or cloud) */}
               {hasDriveFile && (
                 <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <Button
                     size="lg"
                     className="bg-white/20 hover:bg-white/30 backdrop-blur-sm border-white/30"
-                    onClick={() => setIsPreviewOpen(true)}
+                    onClick={handlePreviewVideo}
                   >
                     <Play className="w-6 h-6 text-white" />
                   </Button>
@@ -137,7 +181,24 @@ export default function VideoPreview({
 
             {/* Action Buttons */}
             <div className="flex gap-2">
-              {hasDriveFile ? (
+              {isLocalGoogleDrive ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleOpenInGoogleDrive}
+                    className="flex-1"
+                    title="Open in Google Drive to get shareable link"
+                  >
+                    <ExternalLink className="w-3 h-3 mr-2" />
+                    Open in Drive
+                  </Button>
+                  <Badge variant="outline" className="flex-1 py-2 justify-center bg-green-500/10 text-green-500 border-green-500/50">
+                    <FileVideo className="w-3 h-3 mr-2" />
+                    Synced to Drive
+                  </Badge>
+                </>
+              ) : hasDriveFile ? (
                 <>
                   <Button
                     variant="outline"

@@ -37,6 +37,42 @@ fi
 echo "🔨 Building project..."
 npm run build
 
+# Check Google Drive
+echo "☁️  Checking Google Drive..."
+GOOGLE_DRIVE_PATH="$HOME/Library/CloudStorage"
+GOOGLE_DRIVE_FOUND=false
+
+if [ -d "$GOOGLE_DRIVE_PATH" ]; then
+    # Look for GoogleDrive folder
+    DRIVE_FOLDER=$(find "$GOOGLE_DRIVE_PATH" -maxdepth 1 -type d -name "GoogleDrive-*" 2>/dev/null | head -1)
+
+    if [ -n "$DRIVE_FOLDER" ]; then
+        echo "✅ Google Drive found: $DRIVE_FOLDER"
+        GOOGLE_DRIVE_FOUND=true
+
+        # Extract email from folder name
+        DRIVE_EMAIL=$(basename "$DRIVE_FOLDER" | sed 's/GoogleDrive-//')
+        echo "   Account: $DRIVE_EMAIL"
+        echo "   Videos will sync to: My Drive/MagnumStream_Videos"
+    fi
+fi
+
+if [ "$GOOGLE_DRIVE_FOUND" = false ]; then
+    echo "⚠️  Google Drive not found or not running"
+    echo "   Rendered videos will be saved locally only"
+    echo "   To enable auto-sync to Drive:"
+    echo "   1. Install Google Drive for Desktop"
+    echo "   2. Sign in with your account"
+    echo "   3. Restart this service"
+fi
+
+# Make sync script executable if it exists
+SYNC_SCRIPT="$PROJECT_DIR/sync-to-drive.sh"
+if [ -f "$SYNC_SCRIPT" ]; then
+    chmod +x "$SYNC_SCRIPT"
+    echo "✅ Google Drive sync script ready"
+fi
+
 # Check Python and DaVinci Resolve setup
 echo "🐍 Checking Python and DaVinci Resolve setup..."
 

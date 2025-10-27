@@ -221,8 +221,12 @@ class DaVinciAutomation:
                 return False
             
             logger.info(f"Successfully completed DaVinci render: {output_path}")
+
+            # Note: Google Drive sync is handled by the Node.js server after receiving the output path
+            # This allows the server to update the database with the Drive path atomically
+
             return output_path
-            
+
         except Exception as e:
             logger.error(f"Error processing DaVinci job: {e}")
             return False
@@ -553,6 +557,13 @@ class DaVinciAutomation:
             logger.error(f"Failed to save project: {e}")
             return False
     
+    # Note: _sync_to_google_drive method removed
+    # Google Drive sync is now handled by the Node.js server (routes.ts)
+    # after receiving the render completion response. This ensures:
+    # 1. Database is updated atomically with Drive path
+    # 2. No double-syncing
+    # 3. Better error handling and logging in one place
+
     def _render_project(self, job_data):
         """Set up and start rendering with customer-based naming, returns output file path on success"""
         try:
