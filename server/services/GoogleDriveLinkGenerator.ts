@@ -158,20 +158,17 @@ export class GoogleDriveLinkGenerator {
   }
 
   /**
-   * Generate a shareable Google Drive link from a file path in Google Drive
-   * This uses the Google Drive file path structure to create a link
+   * Generate a Google Drive web link from a file path in Google Drive
+   * This creates a link that opens the file in drive.google.com when logged in
+   * (Not a public shareable link - requires being logged into the Google account)
    *
-   * Note: For actual shareable links, you need to:
-   * 1. Right-click the file in Finder → Share → Copy Link, OR
-   * 2. Use Google Drive API to programmatically get the file ID and create a share link
-   *
-   * This method returns the path and instructions for getting the link
+   * This method returns the path and web URL for accessing the file
    */
   public async generateShareableLink(driveFilePath: string): Promise<{
     filePath: string;
     relativePath: string;
     instructions: string;
-    webUrl?: string;
+    webUrl: string;
   }> {
     if (!this.isAvailable()) {
       throw new Error('Google Drive not available');
@@ -180,27 +177,29 @@ export class GoogleDriveLinkGenerator {
     // Get relative path from My Drive
     const relativePath = driveFilePath.replace(this.googleDriveBasePath! + '/', '');
 
-    // For local Google Drive for Desktop, we can't programmatically get the shareable link
-    // without using the Google Drive API. However, the file will appear in drive.google.com
-    // once it syncs, and users can get the link from there.
+    const filename = path.basename(driveFilePath);
 
-    const instructions = [
-      'To get shareable link:',
-      '1. Right-click the file in Finder → Share → Copy Link, OR',
-      '2. Visit drive.google.com → My Drive → ' + relativePath,
-      '3. Right-click → Share → Copy link'
-    ].join('\n');
+    // Generate a Google Drive search URL that will find and open the file
+    // When logged in, this will show the file in Drive and allow opening it
+    const webUrl = `https://drive.google.com/drive/search?q=${encodeURIComponent(filename)}`;
 
-    // Construct the web URL format (this will work once the file is synced)
-    // Note: This is not the actual share link, just a guide
-    const webPathGuess = `https://drive.google.com/drive/search?q=${encodeURIComponent(path.basename(driveFilePath))}`;
+    const instructions = `File synced to Google Drive: ${relativePath}`;
 
     return {
       filePath: driveFilePath,
       relativePath,
       instructions,
-      webUrl: webPathGuess
+      webUrl
     };
+  }
+
+  /**
+   * Generate Google Drive web URL from relative path
+   * This creates a search URL that finds the file in drive.google.com
+   */
+  public getWebUrlFromPath(relativePath: string): string {
+    const filename = path.basename(relativePath);
+    return `https://drive.google.com/drive/search?q=${encodeURIComponent(filename)}`;
   }
 
   /**

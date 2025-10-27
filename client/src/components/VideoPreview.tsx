@@ -46,28 +46,29 @@ export default function VideoPreview({
 
   // Check if Drive file is available
   const hasDriveFile = !!driveFileId && !!driveFileUrl;
+
+  // Check if this is a Google Drive web URL (search link) or an old local path
+  const isGoogleDriveWebUrl = driveFileUrl?.startsWith('https://drive.google.com/');
   const isLocalGoogleDrive = driveFileUrl?.startsWith('googledrive:///');
 
-  // For local Google Drive sync, we show different actions
+  // For local Google Drive sync (old format), we show different actions
   const drivePath = isLocalGoogleDrive ? driveFileId : null;
 
-  // Generate Google Drive embed URL for preview (only if Drive file exists and is cloud-based)
-  const embedUrl = driveFileId && !isLocalGoogleDrive ? `https://drive.google.com/file/d/${driveFileId}/preview` : null;
-  const downloadUrl = driveFileId && !isLocalGoogleDrive ? `https://drive.google.com/uc?export=download&id=${driveFileId}` : null;
+  // Generate Google Drive embed URL for preview (only for actual Drive file IDs, not search URLs)
+  const embedUrl = null; // We don't support embed preview for search URLs
+  const downloadUrl = null; // We don't support direct download for search URLs
 
   // Generate thumbnail URL from Drive file ID (or use placeholder)
-  const thumbnailUrl = videoInfo?.thumbnailUrl ||
-    (driveFileId && !isLocalGoogleDrive ? `https://drive.google.com/thumbnail?id=${driveFileId}&sz=w1920-h1080` : null);
+  const thumbnailUrl = videoInfo?.thumbnailUrl || null;
 
   const handleOpenInGoogleDrive = () => {
-    if (drivePath) {
-      // Open the Google Drive folder (not just search for the file)
-      // Extract the folder path from the file path
+    if (isGoogleDriveWebUrl && driveFileUrl) {
+      // Open the Google Drive web URL directly
+      window.open(driveFileUrl, '_blank');
+    } else if (drivePath) {
+      // Fallback for old local path format
       const pathParts = drivePath.split('/');
-      const folderPath = pathParts.slice(0, -1).join('/'); // Remove filename, keep folder path
-
-      // Search for the folder in Google Drive
-      const fileName = pathParts[pathParts.length - 1]; // Get filename for search
+      const fileName = pathParts[pathParts.length - 1];
       const searchUrl = `https://drive.google.com/drive/search?q=${encodeURIComponent(fileName || '')}`;
       window.open(searchUrl, '_blank');
     }
@@ -181,14 +182,14 @@ export default function VideoPreview({
 
             {/* Action Buttons */}
             <div className="flex gap-2">
-              {isLocalGoogleDrive ? (
+              {isGoogleDriveWebUrl || isLocalGoogleDrive ? (
                 <>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleOpenInGoogleDrive}
                     className="flex-1"
-                    title="Open in Google Drive to get shareable link"
+                    title="Open video in Google Drive"
                   >
                     <ExternalLink className="w-3 h-3 mr-2" />
                     Open in Drive

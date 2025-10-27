@@ -707,13 +707,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           console.log(`✅ Video synced to Google Drive:`);
           console.log(`   Path: ${linkInfo.relativePath}`);
+          console.log(`   Web URL: ${linkInfo.webUrl}`);
           console.log(`   ${linkInfo.instructions}`);
 
           // Update the recording in the database with Drive path info and completed status
           await storage.updateFlightRecording(recordingId, {
             exportStatus: "completed" as any,
-            driveFileUrl: `googledrive:///${linkInfo.relativePath}`,
-            driveFileId: linkInfo.relativePath
+            driveFileUrl: linkInfo.webUrl, // Store the web URL for opening in browser
+            driveFileId: linkInfo.relativePath // Store relative path for reference
           });
 
           console.log(`✅ Recording ${recordingId} marked as completed and ready for sale`);
