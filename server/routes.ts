@@ -667,6 +667,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Get the recording to extract customer info
           // Try to find by ID first, fallback to finding latest by project name
           let recording = await storage.getFlightRecording(recordingId);
+          let actualRecordingId = recordingId;
 
           if (!recording) {
             console.warn(`⚠️  Recording not found by ID ${recordingId}, searching by project name...`);
@@ -679,7 +680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (recording) {
               console.log(`✅ Found recording by latest status: ${recording.id} (${recording.pilotName})`);
               // Use the correct ID going forward
-              recordingId = recording.id;
+              actualRecordingId = recording.id;
             }
           }
 
@@ -696,7 +697,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.warn('⚠️ Video file saved locally at: ' + outputPath);
 
             // Update recording status without Drive info
-            await storage.updateFlightRecording(recordingId, {
+            await storage.updateFlightRecording(actualRecordingId, {
               exportStatus: "completed" as any
             });
 
@@ -717,7 +718,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Copy file to Google Drive local folder (will auto-sync to cloud)
           console.log(`📂 Copying to Google Drive folder...`);
-          const driveFilePath = await googleDriveLinkGenerator.copyToGoogleDrive(outputPath, recordingId);
+          const driveFilePath = await googleDriveLinkGenerator.copyToGoogleDrive(outputPath, actualRecordingId);
 
           // Generate link info
           const linkInfo = await googleDriveLinkGenerator.generateShareableLink(driveFilePath);
@@ -728,13 +729,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`   ${linkInfo.instructions}`);
 
           // Update the recording in the database with Drive path info and completed status
-          await storage.updateFlightRecording(recordingId, {
+          await storage.updateFlightRecording(actualRecordingId, {
             exportStatus: "completed" as any,
             driveFileUrl: linkInfo.webUrl, // Store the web URL for opening in browser
             driveFileId: linkInfo.relativePath // Store relative path for reference
           });
 
-          console.log(`✅ Recording ${recordingId} marked as completed and ready for sale`);
+          console.log(`✅ Recording ${actualRecordingId} marked as completed and ready for sale`);
 
           res.json({
             success: true,
@@ -758,7 +759,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error('❌ Failed to upload to Google Drive:', uploadError);
 
           // Still mark as completed even if upload fails - video is rendered locally
-          await storage.updateFlightRecording(recordingId, {
+          await storage.updateFlightRecording(actualRecordingId, {
             exportStatus: "completed" as any
           });
 
