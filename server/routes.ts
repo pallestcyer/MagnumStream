@@ -73,9 +73,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { projectName, pilotName, pilotEmail, staffMember, flightDate, flightTime, exportStatus, sessionId } = req.body;
       
-      // Check if recording already exists for this pilot
-      let recording = await storage.findRecordingBySessionId?.(sessionId) || 
-                     (await storage.getAllFlightRecordings()).find(r => r.pilotName === pilotName);
+      // Check if recording already exists for this session/pilot
+      let recording;
+
+      if (sessionId && storage.findRecordingBySessionId) {
+        recording = await storage.findRecordingBySessionId(sessionId);
+      }
+
+      // If not found by session ID, look for recent recording with matching name (case-insensitive)
+      // Only match recordings from last 24 hours to avoid matching old customers with same name
+      if (!recording) {
+        const allRecordings = await storage.getAllFlightRecordings();
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+        recording = allRecordings.find(r =>
+          r.pilotName.toLowerCase() === pilotName.toLowerCase() &&
+          new Date(r.createdAt) > oneDayAgo
+        );
+      }
       
       if (recording) {
         // Update existing recording

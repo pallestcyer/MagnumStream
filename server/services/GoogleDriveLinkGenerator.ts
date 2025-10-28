@@ -179,11 +179,13 @@ export class GoogleDriveLinkGenerator {
 
     const filename = path.basename(driveFilePath);
 
-    // Generate a Google Drive search URL that will find and open the file
-    // When logged in, this will show the file in Drive and allow opening it
-    const webUrl = `https://drive.google.com/drive/search?q=${encodeURIComponent(filename)}`;
+    // Generate a Google Drive search URL filtered to MagnumStream_Videos folder
+    // This will find the file when logged in to the account
+    // Format: search in "MagnumStream_Videos" folder for the filename
+    const searchQuery = `${filename} in:MagnumStream_Videos`;
+    const webUrl = `https://drive.google.com/drive/search?q=${encodeURIComponent(searchQuery)}`;
 
-    const instructions = `File synced to Google Drive: ${relativePath}`;
+    const instructions = `File synced to Google Drive: ${relativePath}\nClick "Open in Drive" to view the video in your browser.`;
 
     return {
       filePath: driveFilePath,
