@@ -440,12 +440,9 @@ export default function RecordingDashboard() {
     
     // Create a recording session
     if (!currentRecordingId) {
-      const recordingId = crypto.randomUUID();
-      setCurrentRecordingId(recordingId);
-      
-      // Create flight recording in database
+      // Create flight recording in database and get the ID from the response
       try {
-        await fetch('/api/recordings', {
+        const response = await fetch('/api/recordings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -455,9 +452,20 @@ export default function RecordingDashboard() {
             staffMember: pilotInfo.staffMember || 'Unknown',
             flightDate: new Date().toISOString().split('T')[0],
             flightTime: new Date().toTimeString().split(' ')[0],
-            exportStatus: 'recording'
+            exportStatus: 'recording',
+            sessionId: pilotInfo.name || 'Unknown'
           })
         });
+
+        if (response.ok) {
+          const recording = await response.json();
+          const recordingId = recording.id;
+          setCurrentRecordingId(recordingId);
+          localStorage.setItem('currentRecordingId', recordingId);
+          console.log('✅ Created recording in Supabase:', recordingId);
+        } else {
+          console.error('Failed to create recording:', await response.text());
+        }
       } catch (error) {
         console.error('Failed to create recording session:', error);
       }
@@ -504,12 +512,16 @@ export default function RecordingDashboard() {
   const saveRecordedVideos = async (recordingDuration?: number) => {
     console.log(`🔄 saveRecordedVideos called with duration: ${recordingDuration}`);
     
-    // Use existing recording ID or create one if needed
+    // Use existing recording ID - it should have been created in handleStartRecording
     let recordingId = currentRecordingId;
     if (!recordingId) {
-      recordingId = crypto.randomUUID();
-      setCurrentRecordingId(recordingId);
-      console.log(`📊 Created recording ID for saving: ${recordingId}`);
+      console.error('❌ No recording ID found - this should not happen!');
+      toast({
+        title: "Recording Error",
+        description: "Failed to save recording - no recording ID found.",
+        variant: "destructive",
+      });
+      return;
     }
     
     try {
