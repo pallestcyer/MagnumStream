@@ -68,12 +68,9 @@ export class ClipGenerator {
   private async getProjectDirectory(recordingId: string): Promise<string> {
     // For Mac service: Find project directory by looking for existing uploads
     // Since recording may not exist in local SQLite database
-    console.log(`🎬 Looking for project directory for recording: ${recordingId}`);
-    
     try {
       // Search for project directories that contain files for this recording
       const projectDirs = await fs.readdir(this.baseDir);
-      console.log(`🎬 Found ${projectDirs.length} project directories to search`);
       
       for (const dirName of projectDirs) {
         const projectPath = path.join(this.baseDir, dirName);
@@ -83,9 +80,7 @@ export class ClipGenerator {
           // Check if this project contains our recording
           const metadataContent = await fs.readFile(metadataPath, 'utf8');
           const metadata = JSON.parse(metadataContent);
-          
-          console.log(`🔍 Checking project ${dirName}: metadata recordingId = ${metadata.recordingId}, looking for = ${recordingId}`);
-          
+
           if (metadata.recordingId === recordingId || metadata.sessionId === recordingId) {
             console.log(`🎬 Found project directory: ${projectPath}`);
             

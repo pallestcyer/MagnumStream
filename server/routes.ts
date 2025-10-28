@@ -111,14 +111,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/recordings/:recordingId/video-slots", async (req, res) => {
     try {
       const { recordingId } = req.params;
-      console.log(`📊 API: Getting video slots for recording ${recordingId}`);
-      
+
       if (storage.getVideoSlotsByRecordingId) {
-        console.log('📊 API: Calling storage.getVideoSlotsByRecordingId...');
-        
         try {
           const slots = await storage.getVideoSlotsByRecordingId(recordingId);
-          console.log(`📊 API: Found ${slots?.length || 0} video slots:`, slots);
           
           // Ensure we return a valid JSON array
           const validSlots = Array.isArray(slots) ? slots : [];
@@ -131,7 +127,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           res.json([]);
         }
       } else {
-        console.log('📊 API: getVideoSlotsByRecordingId method not available, returning empty array');
         res.setHeader('Content-Type', 'application/json');
         res.json([]);
       }
@@ -463,24 +458,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Upload scene video from browser IndexedDB to server file system
-  console.log('🔧 Registering upload-scene-video endpoint...');
   app.post("/api/recordings/:recordingId/upload-scene-video", upload.single('video'), async (req: any, res) => {
-    console.log(`🎬 UPLOAD ENDPOINT HIT: ${req.method} ${req.path}`);
-    console.log(`🎬 Recording ID: ${req.params.recordingId}`);
-    console.log(`🎬 Has file: ${!!req.file}`);
-    console.log(`🎬 Body:`, req.body);
-    
     try {
       const { recordingId } = req.params;
       const { sceneType, cameraAngle, duration, sessionId } = req.body;
-      
+
       if (!req.file) {
         return res.status(400).json({ error: "No video file provided" });
       }
-      
-      // For Mac service (standalone device), use session info for directory naming
-      // Don't require recording to exist in local database since Mac service is file storage only
-      console.log(`🎬 Using sessionId for directory naming: ${sessionId}`);
       
       // Create directory structure using sessionId instead of database recording
       const date = new Date().toISOString().split('T')[0];
@@ -508,10 +493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const filePath = path.join(sourceDir, filename);
       
       await fs.writeFile(filePath, req.file.buffer);
-      
-      console.log(`📁 Saved ${filename} for session ${sessionId} (expires: ${expirationTime})`);
-      console.log(`📊 File size: ${(req.file.buffer.length / 1024 / 1024).toFixed(2)}MB`);
-      
+
       res.json({
         success: true,
         message: `Video uploaded successfully`,
