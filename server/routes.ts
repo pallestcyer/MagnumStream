@@ -221,6 +221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(501).json({ error: "Video slot update not implemented" });
       }
     } catch (error: any) {
+      console.error('❌ Error updating video slot:', error);
       res.status(500).json({ error: error.message });
     }
   });
