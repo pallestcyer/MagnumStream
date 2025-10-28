@@ -672,15 +672,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let recording = await storage.getFlightRecording(recordingId);
 
           if (!recording) {
-            console.warn(`⚠️  Recording not found by ID ${recordingId}, searching by project name...`);
+            console.warn(`⚠️  Recording not found by ID ${recordingId}, searching by latest recording...`);
             const allRecordings = await storage.getAllFlightRecordings();
-            // Find the most recent recording with status 'completed' or 'in_progress'
+            console.log(`📊 Found ${allRecordings.length} total recordings`);
+
+            // Find the most recent recording (regardless of status)
+            // This handles cases where the recording ID from frontend is stale
             recording = allRecordings
-              .filter(r => r.exportStatus === 'completed' || r.exportStatus === 'in_progress')
               .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
 
             if (recording) {
-              console.log(`✅ Found recording by latest status: ${recording.id} (${recording.pilotName})`);
+              console.log(`✅ Found latest recording: ${recording.id} (${recording.pilotName}, status: ${recording.exportStatus})`);
               // Use the correct ID going forward
               actualRecordingId = recording.id;
             }
