@@ -4,7 +4,7 @@ import session from 'express-session';
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeDatabase } from "./db";
-import { initializeStorage } from "./storage";
+import { initializeStorage, storage } from "./storage";
 
 const app = express();
 
@@ -67,9 +67,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Initialize storage first
-  await initializeStorage();
-  
+  // Initialize storage first and assign it to the storage variable
+  Object.assign(storage, await initializeStorage());
+
   // Initialize database (SQLite only if not using Supabase)
   if (process.env.USE_SUPABASE !== 'true') {
     await initializeDatabase();
