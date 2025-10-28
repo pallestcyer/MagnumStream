@@ -649,6 +649,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`✅ DaVinci render completed: ${outputPath}`);
 
         // Copy the rendered video to Google Drive (local sync)
+        // Declare actualRecordingId at outer scope so it's available in catch block
+        let actualRecordingId = recordingId;
+
         try {
           const fs = await import('fs');
           const path = await import('path');
@@ -667,7 +670,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Get the recording to extract customer info
           // Try to find by ID first, fallback to finding latest by project name
           let recording = await storage.getFlightRecording(recordingId);
-          let actualRecordingId = recordingId;
 
           if (!recording) {
             console.warn(`⚠️  Recording not found by ID ${recordingId}, searching by project name...`);
