@@ -204,14 +204,27 @@ async function initializeStorage(): Promise<IStorage> {
 }
 
 // Create a storage instance - this will be initialized async
-let storage: IStorage = new MemStorage(); // Temporary default
+let _storage: IStorage = new MemStorage(); // Temporary default
+
+// Export a proxy object that always points to the current storage
+export const storage: IStorage = new Proxy({} as IStorage, {
+  get(target, prop) {
+    return (_storage as any)[prop];
+  },
+  set(target, prop, value) {
+    (_storage as any)[prop] = value;
+    return true;
+  }
+});
+
+// Function to set the storage instance (called during initialization)
+export function setStorage(newStorage: IStorage) {
+  _storage = newStorage;
+}
 
 // Function to get the initialized storage
 async function getStorage(): Promise<IStorage> {
-  if (!storage || storage instanceof MemStorage) {
-    storage = await initializeStorage();
-  }
-  return storage;
+  return _storage;
 }
 
-export { storage, initializeStorage, getStorage };
+export { initializeStorage, getStorage };
