@@ -511,11 +511,11 @@ export default function RecordingDashboard() {
   
   const saveRecordedVideos = async (recordingDuration?: number) => {
     console.log(`🔄 saveRecordedVideos called with duration: ${recordingDuration}`);
-    
-    // Use existing recording ID - it should have been created in handleStartRecording
-    let recordingId = currentRecordingId;
+
+    // Use existing recording ID - check state first, then localStorage fallback
+    let recordingId = currentRecordingId || localStorage.getItem('currentRecordingId');
     if (!recordingId) {
-      console.error('❌ No recording ID found - this should not happen!');
+      console.error('❌ No recording ID found in state or localStorage!');
       toast({
         title: "Recording Error",
         description: "Failed to save recording - no recording ID found.",
@@ -523,6 +523,13 @@ export default function RecordingDashboard() {
       });
       return;
     }
+
+    // Update state if we got it from localStorage
+    if (!currentRecordingId && recordingId) {
+      setCurrentRecordingId(recordingId);
+    }
+
+    console.log(`✅ Using recording ID: ${recordingId}`);
     
     try {
       // Use the captured scene type from when recording started
