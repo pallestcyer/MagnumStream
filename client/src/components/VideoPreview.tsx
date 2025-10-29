@@ -183,22 +183,16 @@ export default function VideoPreview({
             {/* Action Buttons */}
             <div className="flex gap-2">
               {isGoogleDriveWebUrl || isLocalGoogleDrive ? (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleOpenInGoogleDrive}
-                    className="flex-1"
-                    title="Open video in Google Drive"
-                  >
-                    <ExternalLink className="w-3 h-3 mr-2" />
-                    Open in Drive
-                  </Button>
-                  <Badge variant="outline" className="flex-1 py-2 justify-center bg-green-500/10 text-green-500 border-green-500/50">
-                    <FileVideo className="w-3 h-3 mr-2" />
-                    Synced to Drive
-                  </Badge>
-                </>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleOpenInGoogleDrive}
+                  className="flex-1"
+                  title="Open video in Google Drive"
+                >
+                  <ExternalLink className="w-3 h-3 mr-2" />
+                  Open in Drive
+                </Button>
               ) : hasDriveFile ? (
                 <>
                   <Button
