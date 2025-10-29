@@ -158,10 +158,10 @@ export default function SalesPage() {
     r.projectName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Show recordings that are completed (video is rendered and ready)
-  // Drive file is optional - video might be stored locally only
+  // Show recordings that are completed AND have been uploaded to Google Drive
+  // This ensures only Drive versions appear on sales page (no local-only renders)
   const exportedRecordings = filteredRecordings.filter(r =>
-    r.exportStatus === "completed"
+    r.exportStatus === "completed" && r.driveFileUrl
   );
   const unsoldRecordings = exportedRecordings.filter(r => !r.sold);
   const soldRecordings = exportedRecordings.filter(r => r.sold);

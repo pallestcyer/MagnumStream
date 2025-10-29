@@ -64,21 +64,29 @@ export class GoogleDriveLinkGenerator {
       throw new Error(`Source video file not found: ${localVideoPath}`);
     }
 
-    // Parse the local path to get date structure and filename
-    // Expected format: ~/MagnumStream/rendered/YYYY/MM-Month/DD/Filename.mp4
+    // Parse the local path to get date structure, customer folder, and filename
+    // Expected format: ~/MagnumStream/rendered/YYYY/MM-Month/DD/CustomerName/Filename.mp4
     const pathParts = localVideoPath.split('/');
     const filename = path.basename(localVideoPath);
 
-    // Find year/month/day from path
+    // Find year/month/day/customer from path
     let year = '';
     let month = '';
     let day = '';
+    let customerFolder = '';
 
     for (let i = pathParts.length - 1; i >= 0; i--) {
       const part = pathParts[i];
 
+      // Skip the filename itself
+      if (i === pathParts.length - 1) continue;
+
+      // Customer folder is right before the filename (not a date pattern)
+      if (!customerFolder && i === pathParts.length - 2 && !/^\d{2}$/.test(part) && !/^\d{2}-/.test(part) && !/^\d{4}$/.test(part)) {
+        customerFolder = part;
+      }
       // Day is a 2-digit number (01-31)
-      if (!day && /^\d{2}$/.test(part)) {
+      else if (!day && /^\d{2}$/.test(part)) {
         day = part;
       }
       // Month is like "10-October"
@@ -90,16 +98,17 @@ export class GoogleDriveLinkGenerator {
         year = part;
       }
 
-      if (year && month && day) break;
+      if (year && month && day && customerFolder) break;
     }
 
-    // Create destination path with organized structure
+    // Create destination path with organized structure including customer folder
     const destinationDir = path.join(
       this.googleDriveBasePath!,
       this.googleDriveFolderName,
       year || new Date().getFullYear().toString(),
       month || `${String(new Date().getMonth() + 1).padStart(2, '0')}-${new Date().toLocaleDateString('en', { month: 'long' })}`,
-      day || String(new Date().getDate()).padStart(2, '0')
+      day || String(new Date().getDate()).padStart(2, '0'),
+      customerFolder // Add customer folder to the path
     );
 
     // Ensure destination directory exists

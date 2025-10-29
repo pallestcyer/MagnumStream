@@ -571,26 +571,30 @@ class DaVinciAutomation:
             from datetime import datetime
             render_date = datetime.now()
             
-            # Create organized folder structure: Year/Month/Day
+            # Create organized folder structure: Year/Month/Day/CustomerName
             year_folder = OUTPUT_FOLDER / str(render_date.year)
             month_folder = year_folder / f"{render_date.month:02d}-{render_date.strftime('%B')}"
             day_folder = month_folder / f"{render_date.day:02d}"
-            
-            # Create all directories
-            day_folder.mkdir(parents=True, exist_ok=True)
-            
+
             # Extract customer names from job data
             customer_names = self._extract_customer_names(job_data)
+
+            # Add customer name subfolder within the day folder
+            customer_folder = day_folder / customer_names
+
+            # Create all directories including customer subfolder
+            customer_folder.mkdir(parents=True, exist_ok=True)
+
             timestamp = render_date.strftime("%Y%m%d_%H%M%S")
-            
+
             # Create filename: "Joe&Sam_20251025_143941" or "Emily_20251025_143941"
             render_filename = f"{customer_names}_{timestamp}"
-            
-            logger.info(f"📁 Organized output structure: {day_folder}")
+
+            logger.info(f"📁 Organized output structure: {customer_folder}")
             logger.info(f"🎬 Customer-based filename: {render_filename}")
-            
-            # Update output folder to use organized structure
-            organized_output_folder = day_folder
+
+            # Update output folder to use organized structure with customer subfolder
+            organized_output_folder = customer_folder
             
             # Set render settings with organized output folder and customer-based naming
             render_settings = {
