@@ -730,11 +730,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`   Web URL: ${linkInfo.webUrl}`);
           console.log(`   ${linkInfo.instructions}`);
 
+          // Try to get folder URL using OAuth (optional, gracefully fails if not set up)
+          let driveFolderUrl = null;
+          try {
+            const { googleDriveOAuth } = await import('./services/GoogleDriveOAuth');
+            if (googleDriveOAuth.isReady()) {
+              // Get the folder path (everything except the filename)
+              const path = await import('path');
+              const folderPath = path.dirname(linkInfo.relativePath);
+
+              const folderInfo = await googleDriveOAuth.getFolderInfoByPath(folderPath);
+              if (folderInfo) {
+                driveFolderUrl = folderInfo.webUrl;
+                console.log(`✅ Got Drive folder URL: ${driveFolderUrl}`);
+              }
+            }
+          } catch (error) {
+            console.log('⚠️  Could not get folder URL (OAuth not set up or failed):', error);
+          }
+
           // Update the recording in the database with Drive path info and completed status
           await storage.updateFlightRecording(actualRecordingId, {
             exportStatus: "completed" as any,
             driveFileUrl: linkInfo.webUrl, // Store the web URL for opening in browser
-            driveFileId: linkInfo.relativePath // Store relative path for reference
+            driveFileId: linkInfo.relativePath, // Store relative path for reference
+            driveFolderUrl: driveFolderUrl // Store folder URL if available
           });
 
           console.log(`✅ Recording ${actualRecordingId} marked as completed and ready for sale`);
@@ -1027,6 +1047,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   console.log('🔧 Setting up error handling middleware...');
   
+  // Google Drive OAuth endpoints
+  app.get("/api/drive/auth/url", async (req, res) => {
+    try {
+      const { googleDriveOAuth } = await import('./services/GoogleDriveOAuth');
+      const authUrl = googleDriveOAuth.generateAuthUrl();
+      res.json({ authUrl });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/drive/auth/callback", async (req, res) => {
+    try {
+      const { code } = req.query;
+      if (!code || typeof code !== 'string') {
+        return res.status(400).json({ error: 'Authorization code is required' });
+      }
+
+      const { googleDriveOAuth } = await import('./services/GoogleDriveOAuth');
+      await googleDriveOAuth.getTokensFromCode(code);
+
+      res.send(`
+        <html>
+          <body style="font-family: system-ui; padding: 40px; text-align: center;">
+            <h1 style="color: #10b981;">✓ Google Drive Connected!</h1>
+            <p>You can close this window and return to MagnumStream.</p>
+            <script>setTimeout(() => window.close(), 2000);</script>
+          </body>
+        </html>
+      `);
+    } catch (error: any) {
+      res.status(500).send(`
+        <html>
+          <body style="font-family: system-ui; padding: 40px; text-align: center;">
+            <h1 style="color: #ef4444;">✗ Authentication Failed</h1>
+            <p>${error.message}</p>
+          </body>
+        </html>
+      `);
+    }
+  });
+
+  app.get("/api/drive/auth/status", async (req, res) => {
+    try {
+      const { googleDriveOAuth } = await import('./services/GoogleDriveOAuth');
+      const isReady = googleDriveOAuth.isReady();
+      res.json({ authenticated: isReady });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Share Drive folder with customer email
+  app.post("/api/drive/share-folder", async (req, res) => {
+    try {
+      const { recordingId, customerEmail } = req.body;
+
+      if (!recordingId || !customerEmail) {
+        return res.status(400).json({ error: 'recordingId and customerEmail are required' });
+      }
+
+      const { googleDriveOAuth } = await import('./services/GoogleDriveOAuth');
+
+      if (!googleDriveOAuth.isReady()) {
+        return res.status(503).json({ error: 'Google Drive not authenticated. Please authenticate first.' });
+      }
+
+      // Get recording to find folder path
+      const recording = await storage.getFlightRecording(recordingId);
+      if (!recording || !recording.driveFileId) {
+        return res.status(404).json({ error: 'Recording or Drive path not found' });
+      }
+
+      // Get folder path (directory of the file)
+      const path = await import('path');
+      const folderPath = path.dirname(recording.driveFileId);
+
+      // Find folder ID
+      const folderInfo = await googleDriveOAuth.getFolderInfoByPath(folderPath);
+      if (!folderInfo) {
+        return res.status(404).json({ error: 'Drive folder not found' });
+      }
+
+      // Share folder with customer
+      const shared = await googleDriveOAuth.shareFolderWithEmail(folderInfo.id, customerEmail);
+
+      if (shared) {
+        res.json({ success: true, message: `Folder shared with ${customerEmail}` });
+      } else {
+        res.status(500).json({ error: 'Failed to share folder' });
+      }
+    } catch (error: any) {
+      console.error('Failed to share folder:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Add error handling middleware
   app.use(notFoundHandler);
   app.use(errorHandler);

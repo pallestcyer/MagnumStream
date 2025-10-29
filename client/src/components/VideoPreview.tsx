@@ -17,6 +17,7 @@ import {
 interface VideoPreviewProps {
   driveFileId?: string | null;
   driveFileUrl?: string | null;
+  driveFolderUrl?: string | null;
   customerName: string;
   flightDate: string;
   flightTime: string;
@@ -33,6 +34,7 @@ interface VideoPreviewProps {
 export default function VideoPreview({
   driveFileId,
   driveFileUrl,
+  driveFolderUrl,
   customerName,
   flightDate,
   flightTime,
@@ -47,8 +49,11 @@ export default function VideoPreview({
   // Check if Drive file is available
   const hasDriveFile = !!driveFileId && !!driveFileUrl;
 
+  // Prefer folder URL over file search URL for better user experience
+  const driveOpenUrl = driveFolderUrl || driveFileUrl;
+
   // Check if this is a Google Drive web URL (search link) or an old local path
-  const isGoogleDriveWebUrl = driveFileUrl?.startsWith('https://drive.google.com/');
+  const isGoogleDriveWebUrl = driveOpenUrl?.startsWith('https://drive.google.com/');
   const isLocalGoogleDrive = driveFileUrl?.startsWith('googledrive:///');
 
   // For local Google Drive sync (old format), we show different actions
@@ -62,9 +67,9 @@ export default function VideoPreview({
   const thumbnailUrl = videoInfo?.thumbnailUrl || null;
 
   const handleOpenInGoogleDrive = () => {
-    if (isGoogleDriveWebUrl && driveFileUrl) {
-      // Open the Google Drive web URL directly
-      window.open(driveFileUrl, '_blank');
+    if (isGoogleDriveWebUrl && driveOpenUrl) {
+      // Open the Google Drive web URL directly (folder or search)
+      window.open(driveOpenUrl, '_blank');
     } else if (drivePath) {
       // Fallback for old local path format
       const pathParts = drivePath.split('/');

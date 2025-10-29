@@ -51,6 +51,48 @@ export default function SalesPage() {
 
   const ANALYTICS_PASSWORD = "admin123";
 
+  // Check Google Drive authentication status
+  const { data: driveAuthStatus } = useQuery({
+    queryKey: ["/api/drive/auth/status"],
+    queryFn: async () => {
+      try {
+        return await apiRequest("GET", "/api/drive/auth/status");
+      } catch (error) {
+        return { authenticated: false };
+      }
+    },
+    refetchInterval: 30000, // Check every 30 seconds
+  });
+
+  const handleAuthenticateDrive = async () => {
+    try {
+      const response = await apiRequest("GET", "/api/drive/auth/url");
+      window.open(response.authUrl, '_blank', 'width=600,height=700');
+
+      // Poll for auth status
+      const checkInterval = setInterval(async () => {
+        const status = await apiRequest("GET", "/api/drive/auth/status");
+        if (status.authenticated) {
+          clearInterval(checkInterval);
+          queryClient.invalidateQueries({ queryKey: ["/api/drive/auth/status"] });
+          toast({
+            title: "Google Drive Connected",
+            description: "You can now share videos with customers automatically",
+          });
+        }
+      }, 2000);
+
+      // Stop checking after 5 minutes
+      setTimeout(() => clearInterval(checkInterval), 300000);
+    } catch (error) {
+      toast({
+        title: "Authentication Failed",
+        description: "Could not initiate Google Drive authentication",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Fetch recordings with optional date filter
   const queryKey = selectedDate ? ["/api/recordings", { date: selectedDate }] : ["/api/recordings"];
   const { data: recordings = [], isLoading: recordingsLoading } = useQuery<FlightRecording[]>({
@@ -82,7 +124,19 @@ export default function SalesPage() {
     mutationFn: async (saleData: any) => {
       return await apiRequest("POST", "/api/sales", saleData);
     },
-    onSuccess: () => {
+    onSuccess: async (_, variables) => {
+      // Try to share the Drive folder with customer email
+      try {
+        await apiRequest("POST", "/api/drive/share-folder", {
+          recordingId: variables.recordingId,
+          customerEmail: variables.customerEmail
+        });
+        console.log(`✅ Shared Drive folder with ${variables.customerEmail}`);
+      } catch (error) {
+        console.warn('Could not share Drive folder (OAuth may not be set up):', error);
+        // Don't fail the sale if sharing fails - it's optional
+      }
+
       queryClient.invalidateQueries({ queryKey: ["/api/recordings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sales/analytics"] });
       toast({
@@ -188,6 +242,40 @@ export default function SalesPage() {
           </div>
         </div>
 
+        {/* Google Drive Status Banner */}
+        {driveAuthStatus && !driveAuthStatus.authenticated && (
+          <Card className="p-4 bg-yellow-500/10 border-yellow-500/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <ExternalLink className="w-5 h-5 text-yellow-500" />
+                <div>
+                  <p className="font-medium text-foreground">Google Drive Not Connected</p>
+                  <p className="text-sm text-muted-foreground">
+                    Connect to automatically share folders with customers on purchase
+                  </p>
+                </div>
+              </div>
+              <Button onClick={handleAuthenticateDrive} variant="outline" size="sm">
+                Connect Google Drive
+              </Button>
+            </div>
+          </Card>
+        )}
+
+        {driveAuthStatus?.authenticated && (
+          <Card className="p-4 bg-green-500/10 border-green-500/50">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-5 h-5 text-green-500" />
+              <div>
+                <p className="font-medium text-foreground">Google Drive Connected</p>
+                <p className="text-sm text-muted-foreground">
+                  Customer folders will be shared automatically on purchase
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-2 max-w-md">
             <TabsTrigger value="front-desk" data-testid="tab-front-desk">
@@ -262,6 +350,7 @@ export default function SalesPage() {
                       key={recording.id}
                       driveFileId={recording.driveFileId}
                       driveFileUrl={recording.driveFileUrl}
+                      driveFolderUrl={recording.driveFolderUrl}
                       customerName={recording.pilotName}
                       flightDate={recording.flightDate || 'Unknown date'}
                       flightTime={recording.flightTime || 'Unknown time'}

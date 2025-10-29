@@ -1,8 +1,13 @@
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
+import * as fs from 'fs';
+import * as path from 'path';
+
+const TOKEN_PATH = path.join(process.cwd(), 'google-drive-tokens.json');
 
 export class GoogleDriveOAuth {
   private oauth2Client: OAuth2Client;
+  private isAuthenticated: boolean = false;
 
   constructor() {
     this.oauth2Client = new OAuth2Client(
@@ -10,6 +15,46 @@ export class GoogleDriveOAuth {
       process.env.GOOGLE_CLIENT_SECRET,
       process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5000/auth/google/callback'
     );
+
+    // Try to load existing tokens on startup
+    this.loadTokens();
+  }
+
+  /**
+   * Load tokens from disk if they exist
+   */
+  private loadTokens(): void {
+    try {
+      if (fs.existsSync(TOKEN_PATH)) {
+        const tokens = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf-8'));
+        this.oauth2Client.setCredentials(tokens);
+        this.isAuthenticated = true;
+        console.log('✅ Google Drive OAuth tokens loaded from disk');
+      } else {
+        console.log('⚠️  No Google Drive OAuth tokens found. Authentication required.');
+      }
+    } catch (error) {
+      console.error('Failed to load Google Drive tokens:', error);
+    }
+  }
+
+  /**
+   * Save tokens to disk for persistence across restarts
+   */
+  private saveTokens(tokens: any): void {
+    try {
+      fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens, null, 2));
+      console.log('✅ Google Drive OAuth tokens saved to disk');
+    } catch (error) {
+      console.error('Failed to save Google Drive tokens:', error);
+    }
+  }
+
+  /**
+   * Check if service is authenticated
+   */
+  public isReady(): boolean {
+    return this.isAuthenticated;
   }
 
   /**
@@ -17,7 +62,7 @@ export class GoogleDriveOAuth {
    */
   generateAuthUrl(): string {
     const scopes = [
-      'https://www.googleapis.com/auth/drive.file',
+      'https://www.googleapis.com/auth/drive',
       'https://www.googleapis.com/auth/userinfo.email'
     ];
 
@@ -29,11 +74,13 @@ export class GoogleDriveOAuth {
   }
 
   /**
-   * Exchange authorization code for tokens
+   * Exchange authorization code for tokens and save them
    */
   async getTokensFromCode(code: string) {
     const { tokens } = await this.oauth2Client.getToken(code);
     this.oauth2Client.setCredentials(tokens);
+    this.saveTokens(tokens);
+    this.isAuthenticated = true;
     return tokens;
   }
 
@@ -42,6 +89,8 @@ export class GoogleDriveOAuth {
    */
   setCredentials(tokens: any) {
     this.oauth2Client.setCredentials(tokens);
+    this.saveTokens(tokens);
+    this.isAuthenticated = true;
   }
 
   /**
@@ -137,6 +186,100 @@ export class GoogleDriveOAuth {
     } catch (error) {
       return false;
     }
+  }
+
+  /**
+   * Find folder ID by relative path from My Drive
+   * Example: MagnumStream_Videos/2025/10-October/29/CustomerName
+   */
+  async findFolderByPath(relativePath: string): Promise<string | null> {
+    if (!this.isAuthenticated) {
+      console.warn('Google Drive OAuth not authenticated');
+      return null;
+    }
+
+    try {
+      const drive = google.drive({ version: 'v3', auth: this.oauth2Client });
+      const pathParts = relativePath.split('/').filter(p => p);
+
+      let parentId = 'root';
+
+      // Navigate through each folder in the path
+      for (const folderName of pathParts) {
+        const query = `name='${folderName}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+
+        const result = await drive.files.list({
+          q: query,
+          fields: 'files(id, name)',
+          spaces: 'drive'
+        });
+
+        if (!result.data.files || result.data.files.length === 0) {
+          console.warn(`Folder not found: ${folderName} in path ${relativePath}`);
+          return null;
+        }
+
+        parentId = result.data.files[0].id!;
+      }
+
+      return parentId;
+    } catch (error) {
+      console.error('Error finding folder by path:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get folder web URL from folder ID
+   */
+  getFolderWebUrl(folderId: string): string {
+    return `https://drive.google.com/drive/folders/${folderId}`;
+  }
+
+  /**
+   * Share folder with customer email
+   */
+  async shareFolderWithEmail(folderId: string, customerEmail: string): Promise<boolean> {
+    if (!this.isAuthenticated) {
+      console.warn('Google Drive OAuth not authenticated');
+      return false;
+    }
+
+    try {
+      const drive = google.drive({ version: 'v3', auth: this.oauth2Client });
+
+      await drive.permissions.create({
+        fileId: folderId,
+        requestBody: {
+          role: 'reader',
+          type: 'user',
+          emailAddress: customerEmail
+        },
+        sendNotificationEmail: true,
+        emailMessage: `Your MagnumStream flight video is ready! You now have access to view and download your personalized flight experience.`
+      });
+
+      console.log(`✅ Shared folder ${folderId} with ${customerEmail}`);
+      return true;
+    } catch (error) {
+      console.error(`Failed to share folder with ${customerEmail}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Get folder metadata including web URL by searching for it
+   */
+  async getFolderInfoByPath(relativePath: string): Promise<{ id: string; webUrl: string } | null> {
+    const folderId = await this.findFolderByPath(relativePath);
+    if (!folderId) {
+      return null;
+    }
+
+    return {
+      id: folderId,
+      webUrl: this.getFolderWebUrl(folderId)
+    };
   }
 }
 
