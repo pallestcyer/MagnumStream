@@ -307,7 +307,59 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
 
 
-      // Google Drive routes (delegated to local device)
+      // Google Drive OAuth endpoints (handled by Vercel using env vars)
+      app.get('/api/drive/auth/url', async (req, res) => {
+        try {
+          const { googleDriveOAuth } = await import('../server/services/GoogleDriveOAuth');
+          const authUrl = googleDriveOAuth.generateAuthUrl();
+          res.json({ authUrl });
+        } catch (error: any) {
+          res.status(500).json({ error: error.message });
+        }
+      });
+
+      app.get('/api/drive/auth/status', async (req, res) => {
+        try {
+          const { googleDriveOAuth } = await import('../server/services/GoogleDriveOAuth');
+          const isReady = googleDriveOAuth.isReady();
+          res.json({ authenticated: isReady });
+        } catch (error: any) {
+          res.status(500).json({ error: error.message });
+        }
+      });
+
+      app.post('/api/drive/share-folder', async (req, res) => {
+        try {
+          const { recordingId, customerEmail } = req.body;
+
+          if (!recordingId || !customerEmail) {
+            return res.status(400).json({ error: 'recordingId and customerEmail are required' });
+          }
+
+          const { googleDriveOAuth } = await import('../server/services/GoogleDriveOAuth');
+
+          if (!googleDriveOAuth.isReady()) {
+            return res.status(503).json({ error: 'Google Drive not authenticated' });
+          }
+
+          // Get recording to find folder path
+          const recording = await storage.getAllFlightRecordings();
+          const targetRecording = recording.find((r: any) => r.id === recordingId);
+
+          if (!targetRecording || !targetRecording.driveFolderUrl) {
+            return res.status(404).json({ error: 'Recording not found or no Drive folder' });
+          }
+
+          // Extract folder path from the recording's Drive folder URL
+          // For now, we'll delegate this to the local device as it has the file structure
+          const result = await videoOps.delegateToLocal(`/drive/share-folder`, { recordingId, customerEmail }, 'POST');
+          res.json(result);
+        } catch (error: any) {
+          res.status(500).json({ error: error.message });
+        }
+      });
+
+      // Old Google Drive routes (delegated to local device) - kept for backward compatibility
       app.get('/api/google/auth-url', async (req, res) => {
         try {
           const result = await videoOps.delegateToLocal('/google/auth-url');
