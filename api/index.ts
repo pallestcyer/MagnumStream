@@ -310,7 +310,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Google Drive OAuth endpoints (handled by Vercel using env vars)
       app.get('/api/drive/auth/url', async (req, res) => {
         try {
-          const { googleDriveOAuth } = await import('../server/services/GoogleDriveOAuth');
+          const { googleDriveOAuth } = await import('./GoogleDriveOAuth');
           const authUrl = googleDriveOAuth.generateAuthUrl();
           res.json({ authUrl });
         } catch (error: any) {
@@ -320,7 +320,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       app.get('/api/drive/auth/status', async (req, res) => {
         try {
-          const { googleDriveOAuth } = await import('../server/services/GoogleDriveOAuth');
+          const { googleDriveOAuth } = await import('./GoogleDriveOAuth');
           const isReady = googleDriveOAuth.isReady();
           res.json({ authenticated: isReady });
         } catch (error: any) {
@@ -336,7 +336,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ error: 'recordingId and customerEmail are required' });
           }
 
-          const { googleDriveOAuth } = await import('../server/services/GoogleDriveOAuth');
+          const { googleDriveOAuth } = await import('./GoogleDriveOAuth');
 
           if (!googleDriveOAuth.isReady()) {
             return res.status(503).json({ error: 'Google Drive not authenticated' });
