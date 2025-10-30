@@ -3,6 +3,8 @@ import 'dotenv/config';
 import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
+import { google } from 'googleapis';
+import { OAuth2Client } from 'google-auth-library';
 
 // Inline Supabase setup
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -185,9 +187,62 @@ class VideoOperations {
   }
 }
 
+// Simple OAuth helper for Vercel
+class SimpleGoogleDriveOAuth {
+  private oauth2Client: OAuth2Client;
+  private isAuthenticated: boolean = false;
+
+  constructor() {
+    this.oauth2Client = new OAuth2Client(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5000/auth/google/callback'
+    );
+
+    if (process.env.GOOGLE_REFRESH_TOKEN) {
+      this.oauth2Client.setCredentials({
+        refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+      });
+      this.isAuthenticated = true;
+    }
+  }
+
+  isReady(): boolean {
+    return this.isAuthenticated;
+  }
+
+  generateAuthUrl(): string {
+    return this.oauth2Client.generateAuthUrl({
+      access_type: 'offline',
+      scope: ['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/userinfo.email'],
+      prompt: 'consent'
+    });
+  }
+
+  async shareFolderWithEmail(folderId: string, customerEmail: string): Promise<boolean> {
+    try {
+      const drive = google.drive({ version: 'v3', auth: this.oauth2Client });
+      await drive.permissions.create({
+        fileId: folderId,
+        requestBody: {
+          role: 'reader',
+          type: 'user',
+          emailAddress: customerEmail
+        },
+        sendNotificationEmail: true,
+      });
+      return true;
+    } catch (error) {
+      console.error('Error sharing folder:', error);
+      return false;
+    }
+  }
+}
+
 let app: express.Application | null = null;
 const storage = new DatabaseStorage();
 const videoOps = new VideoOperations();
+const driveOAuth = new SimpleGoogleDriveOAuth();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
@@ -310,8 +365,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Google Drive OAuth endpoints (handled by Vercel using env vars)
       app.get('/api/drive/auth/url', async (req, res) => {
         try {
-          const { googleDriveOAuth } = await import('./GoogleDriveOAuth');
-          const authUrl = googleDriveOAuth.generateAuthUrl();
+          const authUrl = driveOAuth.generateAuthUrl();
           res.json({ authUrl });
         } catch (error: any) {
           res.status(500).json({ error: error.message });
@@ -320,8 +374,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       app.get('/api/drive/auth/status', async (req, res) => {
         try {
-          const { googleDriveOAuth } = await import('./GoogleDriveOAuth');
-          const isReady = googleDriveOAuth.isReady();
+          const isReady = driveOAuth.isReady();
           res.json({ authenticated: isReady });
         } catch (error: any) {
           res.status(500).json({ error: error.message });
@@ -336,22 +389,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ error: 'recordingId and customerEmail are required' });
           }
 
-          const { googleDriveOAuth } = await import('./GoogleDriveOAuth');
-
-          if (!googleDriveOAuth.isReady()) {
+          if (!driveOAuth.isReady()) {
             return res.status(503).json({ error: 'Google Drive not authenticated' });
           }
 
-          // Get recording to find folder path
-          const recording = await storage.getAllFlightRecordings();
-          const targetRecording = recording.find((r: any) => r.id === recordingId);
-
-          if (!targetRecording || !targetRecording.driveFolderUrl) {
-            return res.status(404).json({ error: 'Recording not found or no Drive folder' });
-          }
-
-          // Extract folder path from the recording's Drive folder URL
-          // For now, we'll delegate this to the local device as it has the file structure
+          // Delegate to local device which has the file structure and folder mapping
           const result = await videoOps.delegateToLocal(`/drive/share-folder`, { recordingId, customerEmail }, 'POST');
           res.json(result);
         } catch (error: any) {
