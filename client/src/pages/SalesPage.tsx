@@ -242,40 +242,6 @@ export default function SalesPage() {
           </div>
         </div>
 
-        {/* Google Drive Status Banner */}
-        {driveAuthStatus && !driveAuthStatus.authenticated && (
-          <Card className="p-4 bg-yellow-500/10 border-yellow-500/50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <ExternalLink className="w-5 h-5 text-yellow-500" />
-                <div>
-                  <p className="font-medium text-foreground">Google Drive Not Connected</p>
-                  <p className="text-sm text-muted-foreground">
-                    Connect to automatically share folders with customers on purchase
-                  </p>
-                </div>
-              </div>
-              <Button onClick={handleAuthenticateDrive} variant="outline" size="sm">
-                Connect Google Drive
-              </Button>
-            </div>
-          </Card>
-        )}
-
-        {driveAuthStatus?.authenticated && (
-          <Card className="p-4 bg-green-500/10 border-green-500/50">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
-              <div>
-                <p className="font-medium text-foreground">Google Drive Connected</p>
-                <p className="text-sm text-muted-foreground">
-                  Customer folders will be shared automatically on purchase
-                </p>
-              </div>
-            </div>
-          </Card>
-        )}
-
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-2 max-w-md">
             <TabsTrigger value="front-desk" data-testid="tab-front-desk">
