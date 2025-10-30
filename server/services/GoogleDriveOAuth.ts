@@ -207,7 +207,7 @@ export class GoogleDriveOAuth {
    */
   async findFolderByPath(relativePath: string): Promise<string | null> {
     if (!this.isAuthenticated) {
-      console.warn('Google Drive OAuth not authenticated');
+      console.warn('❌ Google Drive OAuth not authenticated - cannot find folder');
       return null;
     }
 
@@ -215,11 +215,17 @@ export class GoogleDriveOAuth {
       const drive = google.drive({ version: 'v3', auth: this.oauth2Client });
       const pathParts = relativePath.split('/').filter(p => p);
 
+      console.log(`🔍 Searching for folder path in Drive: ${relativePath}`);
+      console.log(`   Path parts: ${pathParts.join(' > ')}`);
+
       let parentId = 'root';
 
       // Navigate through each folder in the path
-      for (const folderName of pathParts) {
+      for (let i = 0; i < pathParts.length; i++) {
+        const folderName = pathParts[i];
         const query = `name='${folderName}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+
+        console.log(`   [${i + 1}/${pathParts.length}] Looking for: "${folderName}" under parent ${parentId}`);
 
         const result = await drive.files.list({
           q: query,
@@ -228,13 +234,17 @@ export class GoogleDriveOAuth {
         });
 
         if (!result.data.files || result.data.files.length === 0) {
-          console.warn(`Folder not found: ${folderName} in path ${relativePath}`);
+          console.warn(`❌ Folder not found: "${folderName}" (part ${i + 1} of ${pathParts.length})`);
+          console.warn(`   Full path attempted: ${relativePath}`);
+          console.warn(`   This means the folder structure in Google Drive doesn't match the local structure`);
           return null;
         }
 
         parentId = result.data.files[0].id!;
+        console.log(`   ✅ Found: ${result.data.files[0].name} (ID: ${parentId})`);
       }
 
+      console.log(`✅ Successfully found folder! Final ID: ${parentId}`);
       return parentId;
     } catch (error) {
       console.error('Error finding folder by path:', error);

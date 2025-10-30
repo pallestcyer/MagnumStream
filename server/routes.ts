@@ -730,23 +730,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`   Web URL: ${linkInfo.webUrl}`);
           console.log(`   ${linkInfo.instructions}`);
 
-          // Try to get folder URL using OAuth (optional, gracefully fails if not set up)
+          // Get folder URL using OAuth - this provides direct link to folder
           let driveFolderUrl = null;
           try {
             const { googleDriveOAuth } = await import('./services/GoogleDriveOAuth');
+            console.log(`🔍 OAuth ready status: ${googleDriveOAuth.isReady()}`);
+
             if (googleDriveOAuth.isReady()) {
               // Get the folder path (everything except the filename)
               const path = await import('path');
               const folderPath = path.dirname(linkInfo.relativePath);
+              console.log(`🔍 Looking up folder path in Drive: ${folderPath}`);
 
               const folderInfo = await googleDriveOAuth.getFolderInfoByPath(folderPath);
               if (folderInfo) {
                 driveFolderUrl = folderInfo.webUrl;
                 console.log(`✅ Got Drive folder URL: ${driveFolderUrl}`);
+              } else {
+                console.warn(`⚠️  Folder not found in Google Drive: ${folderPath}`);
               }
+            } else {
+              console.warn('⚠️  Google Drive OAuth not ready - folder URL will not be available');
+              console.warn('   To fix: Ensure google-drive-tokens.json exists or GOOGLE_REFRESH_TOKEN env var is set');
             }
           } catch (error) {
-            console.log('⚠️  Could not get folder URL (OAuth not set up or failed):', error);
+            console.error('❌ Error getting folder URL:', error);
           }
 
           // Update the recording in the database with Drive path info and completed status
