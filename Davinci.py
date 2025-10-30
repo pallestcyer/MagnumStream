@@ -74,7 +74,7 @@ dvr = load_davinci_api()
 # ============================================================================
 
 # Template Configuration
-TEMPLATE_PROJECT_NAME = "MAG_FERRARI-BACKUP"  # Your template project name in Resolve
+TEMPLATE_PROJECT_NAME = "MAG_FERRARI-NEW"  # Your template project name in Resolve
 
 # Mac-compatible paths (works with existing ClipGenerator structure)
 BASE_DIR = Path.home() / "MagnumStream"  # User's home directory
