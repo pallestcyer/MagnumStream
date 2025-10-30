@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import PhaseNavigation from "@/components/PhaseNavigation";
 import SlotSelector from "@/components/SlotSelector";
-import { SLOT_TEMPLATE } from "@shared/schema";
+import { SLOT_TEMPLATE, SEAMLESS_PAIRS } from "@shared/schema";
 import { usePilot } from "@/contexts/PilotContext";
 import { ArrowRight, ArrowLeft, Play, Volume2, VolumeX } from "lucide-react";
 import { videoStorage } from "@/utils/videoStorage";
@@ -175,6 +175,9 @@ export default function EditorChase() {
   }, []);
 
   const handleWindowStartChange = async (slotNumber: number, newStart: number) => {
+    console.log(`🔄 EditorChase: Changing slot ${slotNumber} to ${newStart}s`);
+    console.log(`🔄 Current recording ID: ${currentRecordingId}`);
+
     // Update local state immediately for responsive UI
     setSlotSelections(prev =>
       prev.map(slot =>
@@ -183,29 +186,70 @@ export default function EditorChase() {
           : slot
       )
     );
-    
+
+    // Check if this slot is a LEAD in a seamless pair
+    const seamlessPair = SEAMLESS_PAIRS.find(p => p.lead === slotNumber);
+    if (seamlessPair) {
+      const leadSlotConfig = SLOT_TEMPLATE.find(s => s.slotNumber === slotNumber);
+      if (leadSlotConfig) {
+        // Calculate where the follow slot should start (right after lead slot ends)
+        const followWindowStart = newStart + leadSlotConfig.duration;
+
+        console.log(`🔗 Auto-positioning seamless follow slot ${seamlessPair.follow} to ${followWindowStart}s`);
+
+        // Update follow slot in local state
+        setSlotSelections(prev =>
+          prev.map(slot =>
+            slot.slotNumber === seamlessPair.follow
+              ? { ...slot, windowStart: followWindowStart }
+              : slot
+          )
+        );
+
+        // Save follow slot to database
+        if (currentRecordingId) {
+          try {
+            await fetch(`/api/recordings/${currentRecordingId}/video-slots/${seamlessPair.follow}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ windowStart: followWindowStart })
+            });
+            console.log(`✅ Auto-saved seamless follow slot ${seamlessPair.follow}: ${followWindowStart}s`);
+          } catch (error) {
+            console.error('❌ Error auto-saving follow slot:', error);
+          }
+        }
+      }
+    }
+
     // Update video preview
     if (videoRef.current) {
       videoRef.current.currentTime = newStart;
     }
-    
+
     // Save to database
     if (currentRecordingId) {
       try {
+        console.log(`💾 Saving chase slot ${slotNumber} position ${newStart}s to API...`);
         const response = await fetch(`/api/recordings/${currentRecordingId}/video-slots/${slotNumber}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ windowStart: newStart })
         });
-        
+
         if (response.ok) {
-          console.log(`Saved timeline position for chase slot ${slotNumber}: ${newStart}s`);
+          const result = await response.json();
+          console.log(`✅ Saved chase timeline position for slot ${slotNumber}: ${newStart}s`, result);
         } else {
-          console.error('Failed to save timeline position:', response.statusText);
+          console.error('❌ Failed to save chase timeline position:', response.status, response.statusText);
+          const errorText = await response.text();
+          console.error('❌ Error response:', errorText);
         }
       } catch (error) {
-        console.error('Error saving timeline position:', error);
+        console.error('❌ Error saving chase timeline position:', error);
       }
+    } else {
+      console.warn('⚠️ No current recording ID - cannot save chase timeline position');
     }
   };
 

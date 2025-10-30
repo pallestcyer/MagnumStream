@@ -212,11 +212,12 @@ export class ClipGenerator {
   }
 
   private getSceneTypeFromSlotNumber(slotNumber: number): 'cruising' | 'chase' | 'arrival' {
-    // Based on NEW SLOT_TEMPLATE: slots 1-2 = cruising, 3-4 = chase, 5 = arrival
-    if (slotNumber >= 1 && slotNumber <= 2) return 'cruising';
-    if (slotNumber >= 3 && slotNumber <= 4) return 'chase';
-    if (slotNumber === 5) return 'arrival';
-    throw new Error(`Invalid slot number: ${slotNumber}. Valid range is 1-5.`);
+    // Based on 14-SLOT TEMPLATE matching DaVinci structure:
+    // Slots 1-7: cruising, 8-13: chase, 14: arrival
+    if (slotNumber >= 1 && slotNumber <= 7) return 'cruising';
+    if (slotNumber >= 8 && slotNumber <= 13) return 'chase';
+    if (slotNumber === 14) return 'arrival';
+    throw new Error(`Invalid slot number: ${slotNumber}. Valid range is 1-14.`);
   }
   
   private groupSlotsByScene(slots: SlotSelection[]): Record<string, SlotSelection[]> {

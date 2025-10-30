@@ -146,44 +146,44 @@ CREATE INDEX idx_scene_segments_segment_number ON scene_segments(segment_number)
 CREATE INDEX idx_scene_segments_start_time ON scene_segments(start_time);
 
 -- ===========================================================================
--- VIDEO SLOTS TABLE (8-slot template system)
+-- VIDEO SLOTS TABLE (14-slot template system - MAG_FERRARI)
 -- ===========================================================================
 CREATE TABLE video_slots (
     id VARCHAR PRIMARY KEY DEFAULT uuid_generate_v4(),
     recording_id VARCHAR NOT NULL,
-    slot_number INTEGER NOT NULL, -- 1-8
+    slot_number INTEGER NOT NULL, -- 1-14 (7 cruising, 6 chase, 1 arrival)
     scene_id VARCHAR NOT NULL,
     camera_angle INTEGER NOT NULL, -- 1 or 2
     window_start DECIMAL(8,2) NOT NULL DEFAULT 0, -- Start time in seconds
-    slot_duration DECIMAL(8,2) NOT NULL, -- Variable duration (was fixed 3s)
+    slot_duration DECIMAL(8,2) NOT NULL, -- Variable duration from template
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
+
     -- Foreign key constraints
-    CONSTRAINT fk_video_slots_recording_id 
-        FOREIGN KEY (recording_id) 
-        REFERENCES flight_recordings(id) 
+    CONSTRAINT fk_video_slots_recording_id
+        FOREIGN KEY (recording_id)
+        REFERENCES flight_recordings(id)
         ON DELETE CASCADE,
-    CONSTRAINT fk_video_slots_scene_id 
-        FOREIGN KEY (scene_id) 
-        REFERENCES scene_recordings(id) 
+    CONSTRAINT fk_video_slots_scene_id
+        FOREIGN KEY (scene_id)
+        REFERENCES scene_recordings(id)
         ON DELETE CASCADE,
-    
+
     -- Ensure valid slot numbers
-    CONSTRAINT chk_slot_number 
-        CHECK (slot_number >= 1 AND slot_number <= 8),
-    
+    CONSTRAINT chk_slot_number
+        CHECK (slot_number >= 1 AND slot_number <= 14),
+
     -- Ensure valid camera angles
-    CONSTRAINT chk_video_slots_camera_angle 
+    CONSTRAINT chk_video_slots_camera_angle
         CHECK (camera_angle IN (1, 2)),
-    
+
     -- Ensure positive values
-    CONSTRAINT chk_positive_window_start 
+    CONSTRAINT chk_positive_window_start
         CHECK (window_start >= 0),
-    CONSTRAINT chk_positive_slot_duration 
+    CONSTRAINT chk_positive_slot_duration
         CHECK (slot_duration > 0),
-    
+
     -- Unique constraint for slot numbers per recording
-    CONSTRAINT uk_video_slots_recording_slot 
+    CONSTRAINT uk_video_slots_recording_slot
         UNIQUE (recording_id, slot_number)
 );
 
@@ -255,9 +255,9 @@ CREATE TABLE generated_clips (
     CONSTRAINT chk_clip_status 
         CHECK (clip_status IN ('pending', 'generated', 'exported')),
     
-    -- Ensure valid slot numbers (1-8 for template)
-    CONSTRAINT chk_slot_number 
-        CHECK (slot_number >= 1 AND slot_number <= 8)
+    -- Ensure valid slot numbers (1-14 for MAG_FERRARI template)
+    CONSTRAINT chk_slot_number
+        CHECK (slot_number >= 1 AND slot_number <= 14)
 );
 
 -- Indexes for generated_clips
@@ -362,20 +362,26 @@ CREATE UNIQUE INDEX idx_project_templates_default
     ON project_templates(is_default) 
     WHERE is_default = true;
 
--- Insert default project template
+-- Insert default project template (14-slot MAG_FERRARI configuration)
 INSERT INTO project_templates (name, description, slot_configuration, is_default)
 VALUES (
-    'Standard Flight Video',
-    'Default 8-slot configuration for flight videos',
+    'DaVinci MAG_FERRARI Template',
+    '14-slot configuration matching DaVinci MAG_FERRARI template (7 cruising + 6 chase + 1 arrival)',
     '[
-        {"slotNumber": 1, "sceneType": "cruising", "cameraAngle": 1, "color": "#FF6B35"},
-        {"slotNumber": 2, "sceneType": "cruising", "cameraAngle": 2, "color": "#F7931E"},
-        {"slotNumber": 3, "sceneType": "cruising", "cameraAngle": 1, "color": "#FF8C42"},
-        {"slotNumber": 4, "sceneType": "chase", "cameraAngle": 1, "color": "#FFA500"},
-        {"slotNumber": 5, "sceneType": "chase", "cameraAngle": 2, "color": "#FF9E3D"},
-        {"slotNumber": 6, "sceneType": "chase", "cameraAngle": 1, "color": "#FFB84D"},
-        {"slotNumber": 7, "sceneType": "arrival", "cameraAngle": 1, "color": "#FF7A3D"},
-        {"slotNumber": 8, "sceneType": "arrival", "cameraAngle": 2, "color": "#FFAB5E"}
+        {"slotNumber": 1, "sceneType": "cruising", "cameraAngle": 2, "color": "#FF6B35", "duration": 0.876, "seamlessCut": false},
+        {"slotNumber": 2, "sceneType": "cruising", "cameraAngle": 2, "color": "#F7931E", "duration": 1.210, "seamlessCut": true},
+        {"slotNumber": 3, "sceneType": "cruising", "cameraAngle": 1, "color": "#FFA500", "duration": 1.293, "seamlessCut": false},
+        {"slotNumber": 4, "sceneType": "cruising", "cameraAngle": 2, "color": "#FF9E3D", "duration": 0.959, "seamlessCut": true},
+        {"slotNumber": 5, "sceneType": "cruising", "cameraAngle": 1, "color": "#FF7A3D", "duration": 1.502, "seamlessCut": false},
+        {"slotNumber": 6, "sceneType": "cruising", "cameraAngle": 2, "color": "#FF6B6B", "duration": 0.667, "seamlessCut": false},
+        {"slotNumber": 7, "sceneType": "cruising", "cameraAngle": 1, "color": "#FFA07A", "duration": 0.793, "seamlessCut": false},
+        {"slotNumber": 8, "sceneType": "chase", "cameraAngle": 2, "color": "#FFB347", "duration": 0.876, "seamlessCut": true},
+        {"slotNumber": 9, "sceneType": "chase", "cameraAngle": 1, "color": "#FFCC00", "duration": 1.418, "seamlessCut": false},
+        {"slotNumber": 10, "sceneType": "chase", "cameraAngle": 2, "color": "#FFD700", "duration": 0.542, "seamlessCut": false},
+        {"slotNumber": 11, "sceneType": "chase", "cameraAngle": 2, "color": "#FFA500", "duration": 1.460, "seamlessCut": true},
+        {"slotNumber": 12, "sceneType": "chase", "cameraAngle": 1, "color": "#FF8C00", "duration": 1.543, "seamlessCut": false},
+        {"slotNumber": 13, "sceneType": "chase", "cameraAngle": 1, "color": "#FF7F50", "duration": 0.542, "seamlessCut": false},
+        {"slotNumber": 14, "sceneType": "arrival", "cameraAngle": 1, "color": "#FF6347", "duration": 3.212, "seamlessCut": false}
     ]'::jsonb,
     true
 );
@@ -676,7 +682,7 @@ CREATE INDEX idx_export_jobs_active ON export_jobs(created_at DESC) WHERE status
 COMMENT ON TABLE flight_recordings IS 'Main project table for flight recording sessions';
 COMMENT ON TABLE scene_recordings IS 'Individual scenes within a flight recording (cruising, chase, arrival)';
 COMMENT ON TABLE scene_segments IS 'Configurable segments within scenes for the scene editor';
-COMMENT ON TABLE video_slots IS 'Final 8-slot video template configuration';
+COMMENT ON TABLE video_slots IS 'Final 14-slot video template configuration matching DaVinci MAG_FERRARI';
 COMMENT ON TABLE sales IS 'Customer sales and bundles for recordings';
 COMMENT ON TABLE export_jobs IS 'Background job tracking for video exports';
 COMMENT ON TABLE device_configurations IS 'Camera device setup configurations';

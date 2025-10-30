@@ -110,24 +110,44 @@ export const insertVideoSlotSchema = createInsertSchema(videoSlots).omit({
 export type InsertVideoSlot = z.infer<typeof insertVideoSlotSchema>;
 export type VideoSlot = typeof videoSlots.$inferSelect;
 
-// Scene configuration (defines the 5-slot template structure matching DaVinci template)
+// Scene configuration (defines the 14-slot template structure matching DaVinci template)
 export interface SlotConfig {
   slotNumber: number;
   sceneType: 'cruising' | 'chase' | 'arrival';
   cameraAngle: 1 | 2;
   color: string;
   duration: number; // Duration in seconds for DaVinci template compatibility
+  seamlessCut?: boolean; // True if this slot seamlessly transitions to the next
 }
 
 export const SLOT_TEMPLATE: SlotConfig[] = [
-  // Cruising Scene (2 slots) - matches DaVinci template positions 1-2
-  { slotNumber: 1, sceneType: 'cruising', cameraAngle: 1, color: '#FF6B35', duration: 1.627 }, // Front view (39 frames @ 23.976fps)
-  { slotNumber: 2, sceneType: 'cruising', cameraAngle: 2, color: '#F7931E', duration: 1.502 }, // Side view (36 frames @ 23.976fps)
-  // Chase Scene (2 slots) - matches DaVinci template positions 3-4  
-  { slotNumber: 3, sceneType: 'chase', cameraAngle: 2, color: '#FFA500', duration: 1.543 }, // Side view (37 frames @ 23.976fps)
-  { slotNumber: 4, sceneType: 'chase', cameraAngle: 2, color: '#FF9E3D', duration: 2.503 }, // Side view (60 frames @ 23.976fps)
-  // Arrival Scene (1 slot) - matches DaVinci template position 5
-  { slotNumber: 5, sceneType: 'arrival', cameraAngle: 2, color: '#FF7A3D', duration: 2.002 }, // Side view (48 frames @ 23.976fps)
+  // Cruising Scene (7 slots) - matches DaVinci template positions 1-7
+  { slotNumber: 1, sceneType: 'cruising', cameraAngle: 2, color: '#FF6B35', duration: 0.876, seamlessCut: false }, // Front view (21 frames @ 23.976fps)
+  { slotNumber: 2, sceneType: 'cruising', cameraAngle: 2, color: '#F7931E', duration: 1.210, seamlessCut: true },  // Front view (29 frames) → seamless to Slot 3
+  { slotNumber: 3, sceneType: 'cruising', cameraAngle: 1, color: '#FFA500', duration: 1.293, seamlessCut: false }, // Side view (31 frames) - follows Slot 2
+  { slotNumber: 4, sceneType: 'cruising', cameraAngle: 2, color: '#FF9E3D', duration: 0.959, seamlessCut: true },  // Front view (23 frames) → seamless to Slot 5
+  { slotNumber: 5, sceneType: 'cruising', cameraAngle: 1, color: '#FF7A3D', duration: 1.502, seamlessCut: false }, // Side view (36 frames) - follows Slot 4
+  { slotNumber: 6, sceneType: 'cruising', cameraAngle: 2, color: '#FF6B6B', duration: 0.667, seamlessCut: false }, // Front view (16 frames)
+  { slotNumber: 7, sceneType: 'cruising', cameraAngle: 1, color: '#FFA07A', duration: 0.793, seamlessCut: false }, // Side view (19 frames)
+
+  // Chase Scene (6 slots) - matches DaVinci template positions 8-13
+  { slotNumber: 8,  sceneType: 'chase', cameraAngle: 2, color: '#FFB347', duration: 0.876, seamlessCut: true },  // Front view (21 frames) → seamless to Slot 9
+  { slotNumber: 9,  sceneType: 'chase', cameraAngle: 1, color: '#FFCC00', duration: 1.418, seamlessCut: false }, // Side view (34 frames) - follows Slot 8
+  { slotNumber: 10, sceneType: 'chase', cameraAngle: 2, color: '#FFD700', duration: 0.542, seamlessCut: false }, // Front view (13 frames)
+  { slotNumber: 11, sceneType: 'chase', cameraAngle: 2, color: '#FFA500', duration: 1.460, seamlessCut: true },  // Front view (35 frames) → seamless to Slot 12
+  { slotNumber: 12, sceneType: 'chase', cameraAngle: 1, color: '#FF8C00', duration: 1.543, seamlessCut: false }, // Side view (37 frames) - follows Slot 11
+  { slotNumber: 13, sceneType: 'chase', cameraAngle: 1, color: '#FF7F50', duration: 0.542, seamlessCut: false }, // Side view (13 frames)
+
+  // Arrival Scene (1 slot) - matches DaVinci template position 14
+  { slotNumber: 14, sceneType: 'arrival', cameraAngle: 1, color: '#FF6347', duration: 3.212, seamlessCut: false }, // Side view (77 frames)
+];
+
+// Seamless cut pairs - slots that should auto-position to continue from previous slot
+export const SEAMLESS_PAIRS = [
+  { lead: 2, follow: 3 },   // Cruising: Front → Side
+  { lead: 4, follow: 5 },   // Cruising: Front → Side
+  { lead: 8, follow: 9 },   // Chase: Front → Side
+  { lead: 11, follow: 12 }, // Chase: Front → Side
 ];
 
 // Generated clips table for local file storage

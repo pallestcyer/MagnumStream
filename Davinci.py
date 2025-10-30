@@ -88,22 +88,37 @@ RENDER_PRESET = "YouTube 1080p"  # Name of your render preset in Resolve
 RENDER_FORMAT = "mp4"  # Output format
 RENDER_CODEC = "H.264"  # Video codec
 
-# Timeline Configuration - Updated for 5-slot MagnumStream template
+# Timeline Configuration - Updated for 14-slot MagnumStream template matching MAG_FERRARI
 TIMELINE_NAME = "MAG_FERARRI"  # Name of timeline in your template
 CLIP_TRACKS = {
     1: "V1",  # Track 1 for all clips (single track template)
 }
 
 # Clip Mapping - Maps slot numbers to timeline positions (matches actual timeline structure)
-# Based on observed timeline item positions in MAG_FERRARI-BACKUP template:
+# Based on actual DaVinci template analysis (debug.log output from get_timeline_clips_debug.lua)
 # All clips are on video track V3 (track index 3)
 # These are the EXACT frame positions from the template timeline
+# 14 slots total: 7 cruising (slots 1-7), 6 chase (slots 8-13), 1 arrival (slot 14)
 CLIP_POSITIONS = {
-    1: {"track": 3, "start_frame": 86570},    # Slot 1: Timeline item 1 (86570-86609)
-    2: {"track": 3, "start_frame": 86633},    # Slot 2: Timeline item 2 (86633-86669) 
-    3: {"track": 3, "start_frame": 87135},    # Slot 3: Timeline item 3 (87135-87172)
-    4: {"track": 3, "start_frame": 87328},    # Slot 4: Timeline item 4 (87328-87388)
-    5: {"track": 3, "start_frame": 87565},    # Slot 5: Timeline item 5 (87565-87613)
+    # Cruising Scene (7 slots)
+    1: {"track": 3, "start_frame": 86485},    # Cruising front view, 21 frames (0.876s)
+    2: {"track": 3, "start_frame": 86549},    # Cruising front view, 29 frames (1.210s) → seamless to 3
+    3: {"track": 3, "start_frame": 86578},    # Cruising side view, 31 frames (1.293s)
+    4: {"track": 3, "start_frame": 86631},    # Cruising front view, 23 frames (0.959s) → seamless to 5
+    5: {"track": 3, "start_frame": 86654},    # Cruising side view, 36 frames (1.502s)
+    6: {"track": 3, "start_frame": 86790},    # Cruising front view, 16 frames (0.667s)
+    7: {"track": 3, "start_frame": 86844},    # Cruising side view, 19 frames (0.793s)
+
+    # Chase Scene (6 slots)
+    8: {"track": 3, "start_frame": 86905},    # Chase front view, 21 frames (0.876s) → seamless to 9
+    9: {"track": 3, "start_frame": 86926},    # Chase side view, 34 frames (1.418s)
+    10: {"track": 3, "start_frame": 87035},   # Chase front view, 13 frames (0.542s)
+    11: {"track": 3, "start_frame": 87105},   # Chase front view, 35 frames (1.460s) → seamless to 12
+    12: {"track": 3, "start_frame": 87140},   # Chase side view, 37 frames (1.543s)
+    13: {"track": 3, "start_frame": 87216},   # Chase side view, 13 frames (0.542s)
+
+    # Arrival Scene (1 slot)
+    14: {"track": 3, "start_frame": 87352},   # Arrival side view, 77 frames (3.212s)
 }
 
 # Logging Configuration
