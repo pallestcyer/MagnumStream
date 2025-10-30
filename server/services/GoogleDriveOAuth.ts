@@ -218,6 +218,16 @@ export class GoogleDriveOAuth {
       console.log(`🔍 Searching for folder path in Drive: ${relativePath}`);
       console.log(`   Path parts: ${pathParts.join(' > ')}`);
 
+      // First, list what's actually at the root to help debugging
+      console.log(`   Listing folders at root to help debugging...`);
+      const rootFolders = await drive.files.list({
+        q: "'root' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
+        fields: 'files(id, name)',
+        pageSize: 20
+      });
+      console.log(`   Found ${rootFolders.data.files?.length || 0} folders at root:`);
+      rootFolders.data.files?.forEach(f => console.log(`      - ${f.name}`));
+
       let parentId = 'root';
 
       // Navigate through each folder in the path
@@ -236,7 +246,22 @@ export class GoogleDriveOAuth {
         if (!result.data.files || result.data.files.length === 0) {
           console.warn(`❌ Folder not found: "${folderName}" (part ${i + 1} of ${pathParts.length})`);
           console.warn(`   Full path attempted: ${relativePath}`);
-          console.warn(`   This means the folder structure in Google Drive doesn't match the local structure`);
+
+          // Try searching for the entire folder path as a fallback
+          console.log(`   🔄 Trying fallback: searching for "${pathParts[pathParts.length - 1]}" anywhere in Drive...`);
+          const finalFolderName = pathParts[pathParts.length - 1];
+          const searchResult = await drive.files.list({
+            q: `name='${finalFolderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+            fields: 'files(id, name, parents)',
+            spaces: 'drive'
+          });
+
+          if (searchResult.data.files && searchResult.data.files.length > 0) {
+            console.log(`   ✅ Found folder "${finalFolderName}" via search! Using ID: ${searchResult.data.files[0].id}`);
+            return searchResult.data.files[0].id!;
+          }
+
+          console.warn(`   ❌ Fallback search also failed. Folder structure doesn't match.`);
           return null;
         }
 
