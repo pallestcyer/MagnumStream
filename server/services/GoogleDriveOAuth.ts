@@ -21,18 +21,31 @@ export class GoogleDriveOAuth {
   }
 
   /**
-   * Load tokens from disk if they exist
+   * Load tokens from environment variable (Vercel) or disk (Mac service)
    */
   private loadTokens(): void {
     try {
+      // Priority 1: Check for refresh token in environment variable (for Vercel)
+      if (process.env.GOOGLE_REFRESH_TOKEN) {
+        const tokens = {
+          refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+        };
+        this.oauth2Client.setCredentials(tokens);
+        this.isAuthenticated = true;
+        console.log('✅ Google Drive OAuth tokens loaded from environment variable (Vercel)');
+        return;
+      }
+
+      // Priority 2: Check for tokens in local file (for Mac service)
       if (fs.existsSync(TOKEN_PATH)) {
         const tokens = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf-8'));
         this.oauth2Client.setCredentials(tokens);
         this.isAuthenticated = true;
-        console.log('✅ Google Drive OAuth tokens loaded from disk');
-      } else {
-        console.log('⚠️  No Google Drive OAuth tokens found. Authentication required.');
+        console.log('✅ Google Drive OAuth tokens loaded from disk (Mac service)');
+        return;
       }
+
+      console.log('⚠️  No Google Drive OAuth tokens found. Authentication required.');
     } catch (error) {
       console.error('Failed to load Google Drive tokens:', error);
     }
