@@ -15,9 +15,11 @@ import {
 } from "lucide-react";
 
 interface VideoPreviewProps {
+  recordingId?: string;
   driveFileId?: string | null;
   driveFileUrl?: string | null;
   driveFolderUrl?: string | null;
+  localVideoPath?: string | null;
   customerName: string;
   flightDate: string;
   flightTime: string;
@@ -32,9 +34,11 @@ interface VideoPreviewProps {
 }
 
 export default function VideoPreview({
+  recordingId,
   driveFileId,
   driveFileUrl,
   driveFolderUrl,
+  localVideoPath,
   customerName,
   flightDate,
   flightTime,
@@ -46,7 +50,8 @@ export default function VideoPreview({
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [thumbnailError, setThumbnailError] = useState(false);
 
-  // Check if Drive file is available
+  // Check if video is available (local path OR Drive file)
+  const hasVideo = !!(localVideoPath && recordingId) || (!!driveFileId && !!driveFileUrl);
   const hasDriveFile = !!driveFileId && !!driveFileUrl;
 
   // Prefer folder URL over file search URL for better user experience
@@ -80,7 +85,13 @@ export default function VideoPreview({
   };
 
   const handlePreviewVideo = async () => {
-    // For local Google Drive files, open the local file on Mac
+    // Priority 1: Use local video streaming if available (best experience)
+    if (localVideoPath && recordingId) {
+      setIsPreviewOpen(true);
+      return;
+    }
+
+    // Priority 2: For local Google Drive files, open the local file on Mac
     if (isLocalGoogleDrive && drivePath) {
       try {
         // Call backend to open the local file
@@ -98,7 +109,7 @@ export default function VideoPreview({
         alert('Failed to open video file. Please check the file exists in Google Drive folder.');
       }
     } else if (embedUrl) {
-      // For cloud-based Drive files, open preview modal
+      // Priority 3: For cloud-based Drive files, open preview modal
       setIsPreviewOpen(true);
     }
   };
@@ -147,8 +158,8 @@ export default function VideoPreview({
                 </div>
               )}
 
-              {/* Play Overlay - show if we have a Drive file (local or cloud) */}
-              {hasDriveFile && (
+              {/* Play Overlay - show if we have a video (local or cloud) */}
+              {hasVideo && (
                 <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <Button
                     size="lg"
@@ -262,13 +273,24 @@ export default function VideoPreview({
             </div>
 
             <div className="aspect-video bg-black">
-              <iframe
-                src={embedUrl}
-                className="w-full h-full"
-                allow="autoplay; encrypted-media"
-                allowFullScreen
-                title={`${customerName} Flight Video`}
-              />
+              {localVideoPath && recordingId ? (
+                <video
+                  controls
+                  autoPlay
+                  className="w-full h-full"
+                  src={`http://localhost:3001/api/videos/${recordingId}/stream`}
+                >
+                  Your browser does not support the video tag.
+                </video>
+              ) : (
+                <iframe
+                  src={embedUrl}
+                  className="w-full h-full"
+                  allow="autoplay; encrypted-media"
+                  allowFullScreen
+                  title={`${customerName} Flight Video`}
+                />
+              )}
             </div>
             
             <div className="p-4 border-t border-border flex justify-between items-center">

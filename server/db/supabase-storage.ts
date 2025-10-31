@@ -107,6 +107,7 @@ export class SupabaseStorage implements IStorage {
       driveFileId: data.drive_file_id,
       driveFileUrl: data.drive_file_url,
       driveFolderUrl: data.drive_folder_url,
+      localVideoPath: data.local_video_path,
       smsPhoneNumber: data.sms_phone_number,
       sold: data.sold,
       createdAt: new Date(data.created_at)
@@ -137,6 +138,7 @@ export class SupabaseStorage implements IStorage {
       driveFileId: data.drive_file_id,
       driveFileUrl: data.drive_file_url,
       driveFolderUrl: data.drive_folder_url,
+      localVideoPath: data.local_video_path,
       smsPhoneNumber: data.sms_phone_number,
       sold: data.sold,
       createdAt: new Date(data.created_at)
@@ -157,6 +159,7 @@ export class SupabaseStorage implements IStorage {
     if (updates.driveFileId !== undefined) dbUpdates.drive_file_id = updates.driveFileId;
     if (updates.driveFileUrl !== undefined) dbUpdates.drive_file_url = updates.driveFileUrl;
     if (updates.driveFolderUrl !== undefined) dbUpdates.drive_folder_url = updates.driveFolderUrl;
+    if (updates.localVideoPath !== undefined) dbUpdates.local_video_path = updates.localVideoPath;
     if (updates.smsPhoneNumber !== undefined) dbUpdates.sms_phone_number = updates.smsPhoneNumber;
     if (updates.sold !== undefined) dbUpdates.sold = updates.sold;
     
@@ -184,6 +187,7 @@ export class SupabaseStorage implements IStorage {
       driveFileId: data.drive_file_id,
       driveFileUrl: data.drive_file_url,
       driveFolderUrl: data.drive_folder_url,
+      localVideoPath: data.local_video_path,
       smsPhoneNumber: data.sms_phone_number,
       sold: data.sold,
       createdAt: new Date(data.created_at)
@@ -430,6 +434,7 @@ export class SupabaseStorage implements IStorage {
       driveFileId: data.drive_file_id,
       driveFileUrl: data.drive_file_url,
       driveFolderUrl: data.drive_folder_url,
+      localVideoPath: data.local_video_path,
       smsPhoneNumber: data.sms_phone_number,
       sold: data.sold,
       createdAt: new Date(data.created_at)

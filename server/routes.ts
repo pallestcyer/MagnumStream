@@ -698,9 +698,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.warn('⚠️ Google Drive for Desktop not found - skipping sync');
             console.warn('⚠️ Video file saved locally at: ' + outputPath);
 
-            // Update recording status without Drive info
+            // Update recording status without Drive info, but save local video path
             await storage.updateFlightRecording(actualRecordingId, {
-              exportStatus: "completed" as any
+              exportStatus: "completed" as any,
+              localVideoPath: outputPath
             });
 
             res.json({
@@ -757,12 +758,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.error('❌ Error getting folder URL:', error);
           }
 
-          // Update the recording in the database with Drive path info and completed status
+          // Update the recording in the database with Drive path info, local path, and completed status
           await storage.updateFlightRecording(actualRecordingId, {
             exportStatus: "completed" as any,
             driveFileUrl: linkInfo.webUrl, // Store the web URL for opening in browser
             driveFileId: linkInfo.relativePath, // Store relative path for reference
-            driveFolderUrl: driveFolderUrl // Store folder URL if available
+            driveFolderUrl: driveFolderUrl, // Store folder URL if available
+            localVideoPath: outputPath // Store local file path for direct playback
           });
 
           console.log(`✅ Recording ${actualRecordingId} marked as completed and ready for sale`);
@@ -792,7 +794,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Still mark as completed even if upload fails - video is rendered locally
           await storage.updateFlightRecording(actualRecordingId, {
-            exportStatus: "completed" as any
+            exportStatus: "completed" as any,
+            localVideoPath: outputPath // Store local file path for playback
           });
 
           res.json({
@@ -818,6 +821,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
         error: error.message,
         details: "Make sure DaVinci Resolve Studio is running and scripting is enabled"
       });
+    }
+  });
+
+  // Stream local video file for playback in browser
+  app.get("/api/videos/:recordingId/stream", async (req, res) => {
+    try {
+      const { recordingId } = req.params;
+
+      // Get recording to find local video path
+      const recording = await storage.getFlightRecording(recordingId);
+
+      if (!recording) {
+        return res.status(404).json({ error: "Recording not found" });
+      }
+
+      if (!recording.localVideoPath) {
+        return res.status(404).json({ error: "No local video path available for this recording" });
+      }
+
+      const fs = await import('fs');
+      const path = await import('path');
+      const videoPath = recording.localVideoPath;
+
+      // Check if file exists
+      if (!fs.existsSync(videoPath)) {
+        console.error(`Video file not found at: ${videoPath}`);
+        return res.status(404).json({ error: "Video file not found" });
+      }
+
+      const stat = fs.statSync(videoPath);
+      const fileSize = stat.size;
+      const range = req.headers.range;
+
+      // Handle range requests for video seeking
+      if (range) {
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunksize = (end - start) + 1;
+        const file = fs.createReadStream(videoPath, { start, end });
+        const head = {
+          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': chunksize,
+          'Content-Type': 'video/mp4',
+        };
+        res.writeHead(206, head);
+        file.pipe(res);
+      } else {
+        const head = {
+          'Content-Length': fileSize,
+          'Content-Type': 'video/mp4',
+        };
+        res.writeHead(200, head);
+        fs.createReadStream(videoPath).pipe(res);
+      }
+
+    } catch (error: any) {
+      console.error('Video streaming error:', error);
+      res.status(500).json({ error: error.message });
     }
   });
 

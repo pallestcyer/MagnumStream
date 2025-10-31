@@ -17,6 +17,7 @@ export const flightRecordings = sqliteTable("flight_recordings", {
   driveFileId: text("drive_file_id"),
   driveFileUrl: text("drive_file_url"),
   driveFolderUrl: text("drive_folder_url"),
+  localVideoPath: text("local_video_path"), // Local file path on Mac for direct playback
   smsPhoneNumber: text("sms_phone_number"),
   sold: integer("sold", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),

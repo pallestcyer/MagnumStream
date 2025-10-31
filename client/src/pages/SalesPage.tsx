@@ -315,9 +315,11 @@ export default function SalesPage() {
                   {unsoldRecordings.map((recording) => (
                     <VideoPreview
                       key={recording.id}
+                      recordingId={recording.id}
                       driveFileId={recording.driveFileId}
                       driveFileUrl={recording.driveFileUrl}
                       driveFolderUrl={recording.driveFolderUrl}
+                      localVideoPath={recording.localVideoPath}
                       customerName={recording.pilotName}
                       flightDate={recording.flightDate || 'Unknown date'}
                       flightTime={recording.flightTime || 'Unknown time'}

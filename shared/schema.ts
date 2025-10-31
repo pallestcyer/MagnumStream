@@ -31,6 +31,7 @@ export const flightRecordings = pgTable("flight_recordings", {
   driveFileId: text("drive_file_id"),
   driveFileUrl: text("drive_file_url"),
   driveFolderUrl: text("drive_folder_url"),
+  localVideoPath: text("local_video_path"), // Local file path on Mac for direct playback
   smsPhoneNumber: text("sms_phone_number"),
   sold: boolean("sold").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
