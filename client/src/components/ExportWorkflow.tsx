@@ -77,26 +77,46 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
       setProgress(40);
       console.log('✅ Videos uploaded successfully');
       
-      // Step 2: Generate clips from timeline slots (40% progress)
-      console.log('🎬 Generating clips from timeline slots...');
+      // Step 2: Generate clips from ALL 14 timeline slots (40% progress)
+      console.log('🎬 Generating clips for all 14 slots...');
+
+      // Fetch any custom slot selections from database (user-edited windowStart times)
       const slotsResponse = await fetch(`/api/recordings/${recordingId}/video-slots`);
-      if (!slotsResponse.ok) {
-        throw new Error('Failed to fetch video slots');
-      }
-      
-      const slots = await slotsResponse.json();
-      console.log('📊 Found video slots:', slots);
-      
-      if (slots.length === 0) {
-        console.warn('⚠️ No video slots found, generating clips without slots');
-      }
-      
-      const slotSelections = slots.map((slot: any) => ({
-        slotNumber: slot.slot_number,
-        windowStart: slot.window_start,
-        sceneType: slot.slot_number <= 3 ? 'cruising' : slot.slot_number <= 6 ? 'chase' : 'arrival',
-        cameraAngle: slot.camera_angle
+      const customSlots = slotsResponse.ok ? await slotsResponse.json() : [];
+      console.log('📊 Found custom video slots:', customSlots);
+
+      // Create a map of custom slot timings
+      const customSlotMap = new Map(
+        customSlots.map((slot: any) => [slot.slot_number, slot.window_start])
+      );
+
+      // Always generate ALL 14 slots based on SLOT_TEMPLATE
+      // Use custom windowStart if available, otherwise use default (0)
+      const SLOT_TEMPLATE = [
+        { slotNumber: 1, sceneType: 'cruising', cameraAngle: 2 },
+        { slotNumber: 2, sceneType: 'cruising', cameraAngle: 2 },
+        { slotNumber: 3, sceneType: 'cruising', cameraAngle: 1 },
+        { slotNumber: 4, sceneType: 'cruising', cameraAngle: 2 },
+        { slotNumber: 5, sceneType: 'cruising', cameraAngle: 1 },
+        { slotNumber: 6, sceneType: 'cruising', cameraAngle: 2 },
+        { slotNumber: 7, sceneType: 'cruising', cameraAngle: 1 },
+        { slotNumber: 8, sceneType: 'chase', cameraAngle: 2 },
+        { slotNumber: 9, sceneType: 'chase', cameraAngle: 1 },
+        { slotNumber: 10, sceneType: 'chase', cameraAngle: 2 },
+        { slotNumber: 11, sceneType: 'chase', cameraAngle: 2 },
+        { slotNumber: 12, sceneType: 'chase', cameraAngle: 1 },
+        { slotNumber: 13, sceneType: 'chase', cameraAngle: 1 },
+        { slotNumber: 14, sceneType: 'arrival', cameraAngle: 1 },
+      ];
+
+      const slotSelections = SLOT_TEMPLATE.map(slot => ({
+        slotNumber: slot.slotNumber,
+        windowStart: customSlotMap.get(slot.slotNumber) || 0,
+        sceneType: slot.sceneType as 'cruising' | 'chase' | 'arrival',
+        cameraAngle: slot.cameraAngle as 1 | 2
       }));
+
+      console.log('🎬 Generating all 14 slots:', slotSelections.map(s => s.slotNumber));
       
       // Get local device URL for Mac service FFmpeg processing
       const localDeviceUrl = await getLocalDeviceUrl();
