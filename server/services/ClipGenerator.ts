@@ -259,19 +259,28 @@ export class ClipGenerator {
   }
   
   private async generateClipFromVideo(sourceVideoPath: string, outputPath: string, startTime: number, duration: number): Promise<void> {
+    // Use frame-accurate cutting with precise settings
     const ffmpegCommand = [
       'ffmpeg', '-y',
+      '-ss', startTime.toString(),          // Seek before input for speed
       '-i', `"${sourceVideoPath}"`,
-      '-ss', startTime.toString(),
       '-t', duration.toString(),
       '-c:v', 'libx264',
+      '-preset', 'fast',                     // Balance speed and quality
+      '-crf', '18',                          // High quality
+      '-g', '1',                             // Keyframe every frame (GOP size 1) for frame accuracy
+      '-vsync', 'cfr',                       // Constant frame rate to prevent frame drops
+      '-r', '23.976',                        // Exact frame rate
       '-c:a', 'aac',
+      '-b:a', '192k',
+      '-ar', '48000',
+      '-avoid_negative_ts', 'make_zero',    // Fix timestamp issues
       '-movflags', '+faststart',
       `"${outputPath}"`
     ].join(' ');
-    
+
     console.log(`🔧 FFmpeg command: ${ffmpegCommand}`);
-    
+
     try {
       const { stderr } = await execAsync(ffmpegCommand);
       if (stderr && !stderr.includes('frame=')) {
