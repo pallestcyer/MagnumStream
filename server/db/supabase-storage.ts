@@ -99,6 +99,7 @@ export class SupabaseStorage implements IStorage {
       projectName: data.project_name,
       pilotName: data.pilot_name,
       pilotEmail: data.pilot_email,
+      flightPilot: data.flight_pilot,
       staffMember: data.staff_member,
       flightDate: data.flight_date,
       flightTime: data.flight_time,
@@ -148,6 +149,7 @@ export class SupabaseStorage implements IStorage {
     if (updates.projectName !== undefined) dbUpdates.project_name = updates.projectName;
     if (updates.pilotName !== undefined) dbUpdates.pilot_name = updates.pilotName;
     if (updates.pilotEmail !== undefined) dbUpdates.pilot_email = updates.pilotEmail;
+    if (updates.flightPilot !== undefined) dbUpdates.flight_pilot = updates.flightPilot;
     if (updates.staffMember !== undefined) dbUpdates.staff_member = updates.staffMember;
     if (updates.flightDate !== undefined) dbUpdates.flight_date = updates.flightDate;
     if (updates.flightTime !== undefined) dbUpdates.flight_time = updates.flightTime;
@@ -420,6 +422,7 @@ export class SupabaseStorage implements IStorage {
       projectName: data.project_name,
       pilotName: data.pilot_name,
       pilotEmail: data.pilot_email,
+      flightPilot: data.flight_pilot,
       staffMember: data.staff_member,
       flightDate: data.flight_date,
       flightTime: data.flight_time,

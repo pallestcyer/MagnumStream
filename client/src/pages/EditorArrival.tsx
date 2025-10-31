@@ -225,8 +225,8 @@ export default function EditorArrival() {
 
   const handleMetadataSubmit = (flightDate: string, flightTime: string, pilotName?: string) => {
     setFlightMetadata({ date: flightDate, time: flightTime });
-    
-    // Update the recording with pilot name if provided
+
+    // Update the recording with actual pilot name if provided
     if (pilotName) {
       const recordingId = localStorage.getItem('currentRecordingId');
       if (recordingId) {
@@ -234,22 +234,22 @@ export default function EditorArrival() {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            pilotName: pilotName,
+            flightPilot: pilotName, // Actual pilot who flew the aircraft
             flightDate: flightDate,
             flightTime: flightTime
           })
         }).then(response => {
           if (response.ok) {
-            console.log('📊 Updated recording with pilot name:', pilotName);
+            console.log('📊 Updated recording with flight pilot:', pilotName);
           } else {
-            console.warn('⚠️ Failed to update recording with pilot name');
+            console.warn('⚠️ Failed to update recording with flight pilot');
           }
         }).catch(error => {
           console.error('❌ Error updating recording:', error);
         });
       }
     }
-    
+
     setShowMetadataDialog(false);
     setShowExportDialog(true);
   };

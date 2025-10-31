@@ -7,14 +7,16 @@ import { z } from "zod";
 export const flightRecordings = sqliteTable("flight_recordings", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   projectName: text("project_name").notNull(),
-  pilotName: text("pilot_name").notNull(),
+  pilotName: text("pilot_name").notNull(), // Customer names (e.g., "Emily & John")
   pilotEmail: text("pilot_email"),
+  flightPilot: text("flight_pilot"), // Actual pilot who flew (optional)
   staffMember: text("staff_member"),
   flightDate: text("flight_date"),
   flightTime: text("flight_time"),
   exportStatus: text("export_status").notNull().default("pending"),
   driveFileId: text("drive_file_id"),
   driveFileUrl: text("drive_file_url"),
+  driveFolderUrl: text("drive_folder_url"),
   smsPhoneNumber: text("sms_phone_number"),
   sold: integer("sold", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),

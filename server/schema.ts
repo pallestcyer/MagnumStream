@@ -21,14 +21,16 @@ export type User = typeof users.$inferSelect;
 export const flightRecordings = pgTable("flight_recordings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectName: text("project_name").notNull(),
-  pilotName: text("pilot_name").notNull(),
+  pilotName: text("pilot_name").notNull(), // Customer names (e.g., "Emily & John")
   pilotEmail: text("pilot_email"),
+  flightPilot: text("flight_pilot"), // Actual pilot who flew (optional)
   staffMember: text("staff_member"),
   flightDate: text("flight_date"),
   flightTime: text("flight_time"),
   exportStatus: text("export_status").notNull().default("pending"),
   driveFileId: text("drive_file_id"),
   driveFileUrl: text("drive_file_url"),
+  driveFolderUrl: text("drive_folder_url"),
   smsPhoneNumber: text("sms_phone_number"),
   sold: boolean("sold").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
