@@ -158,26 +158,9 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
         setDriveUrl(null); // No Drive link available
       }
 
-      // Update recording with real data from server (server already did this, but UI updates it too for consistency)
-      if (recordingId && renderResult.driveInfo) {
-        try {
-          await fetch(`/api/recordings/${recordingId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              exportStatus: 'completed',
-              driveFileUrl: renderResult.driveInfo.fileUrl,
-              driveFileId: renderResult.driveInfo.fileId,
-              driveFolderUrl: renderResult.driveInfo.folderUrl  // Include folder URL from backend
-            })
-          });
-          console.log('📊 Recording updated with real Drive info');
-        } catch (error) {
-          console.error('❌ Failed to update recording:', error);
-        }
-      }
-
-      await videoStorage.updateProjectStatus('exported');
+      // Backend already updated the recording with all Drive info and status
+      // No need to update again from frontend - just log success
+      console.log('📊 Recording completed by backend with Drive info');
 
       setProgress(100);
       setStage("sms");
@@ -219,9 +202,9 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
 
                 console.log('📊 Project marked as completed (ready for manual sale if desired)');
               }
-              
-              await videoStorage.updateProjectStatus('exported');
-              console.log('📊 Project marked as completed after Drive upload');
+
+              // Recording already created and updated - no need to update status again
+              console.log('📊 Recording completed with Drive info');
             } catch (error) {
               console.error('❌ Failed to update export status after Drive upload:', error);
             }
@@ -261,9 +244,9 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
             })
           });
         }
-        
-        await videoStorage.updateProjectStatus('exported');
-        console.log('📊 Project marked as exported with SMS and Drive info');
+
+        // Recording already completed by backend - just log SMS sent
+        console.log('📊 SMS info added to recording');
       } catch (error) {
         console.error('❌ Failed to update export status:', error);
       }
