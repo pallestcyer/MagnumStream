@@ -213,7 +213,7 @@ export default function VideoPreview({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => window.open(driveFileUrl!, '_blank')}
+                    onClick={() => window.open(driveOpenUrl!, '_blank')}
                     className="flex-1"
                   >
                     <ExternalLink className="w-3 h-3 mr-2" />

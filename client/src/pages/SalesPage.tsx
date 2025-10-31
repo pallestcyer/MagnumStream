@@ -361,11 +361,11 @@ export default function SalesPage() {
                           <p>👤 Staff: {recording.staffMember || "Unknown"}</p>
                         </div>
 
-                        {recording.driveFileUrl && (
+                        {(recording.driveFolderUrl || recording.driveFileUrl) && (
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => window.open(recording.driveFileUrl!, '_blank')}
+                            onClick={() => window.open(recording.driveFolderUrl || recording.driveFileUrl!, '_blank')}
                             className="w-full"
                             data-testid={`button-view-sold-${recording.id}`}
                           >
