@@ -212,10 +212,10 @@ export default function SalesPage() {
     r.projectName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Show recordings that are completed AND have been uploaded to Google Drive
-  // This ensures only Drive versions appear on sales page (no local-only renders)
+  // Show recordings that are completed AND have a real Google Drive folder URL
+  // This filters out recordings with only search URLs and shows only those with proper folder links
   const exportedRecordings = filteredRecordings.filter(r =>
-    r.exportStatus === "completed" && r.driveFileUrl
+    r.exportStatus === "completed" && r.driveFolderUrl
   );
   const unsoldRecordings = exportedRecordings.filter(r => !r.sold);
   const soldRecordings = exportedRecordings.filter(r => r.sold);
