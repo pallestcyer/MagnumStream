@@ -767,10 +767,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           console.log(`✅ Recording ${actualRecordingId} marked as completed and ready for sale`);
 
-          // Debug: Log the values before sending response
-          console.log(`🔍 DEBUG - linkInfo.webUrl: ${linkInfo.webUrl}`);
-          console.log(`🔍 DEBUG - driveFolderUrl: ${driveFolderUrl}`);
-
           res.json({
             success: true,
             message: "DaVinci render completed and synced to Google Drive",
