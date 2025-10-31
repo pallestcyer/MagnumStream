@@ -69,43 +69,58 @@ class VideoStorage {
   async updateProjectStatus(status: 'recorded' | 'in_progress' | 'exported'): Promise<void> {
     const sessionId = this.getCurrentSessionId();
     const customerName = sessionId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-    
+
     try {
       // Map our status to export_status field
       const exportStatus = status === 'exported' ? 'completed' : status === 'recorded' ? 'recorded' : 'in_progress';
-      
+
       // Get pilot info from context
       const pilotEmail = localStorage.getItem('pilotEmail') || '';
       const staffMember = localStorage.getItem('staffMember') || '';
       const currentDate = new Date().toISOString().split('T')[0];
       const currentTime = new Date().toTimeString().split(' ')[0];
-      
-      const response = await fetch('/api/recordings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectName: `${customerName} Flight`,
-          pilotName: customerName,
-          pilotEmail: pilotEmail,
-          staffMember: staffMember,
-          flightDate: currentDate,
-          flightTime: currentTime,
-          exportStatus: exportStatus,
-          sessionId: sessionId
-        })
-      });
-      
+
+      // Check if we already have a recording ID for this session
+      const existingRecordingId = localStorage.getItem('currentRecordingId');
+
+      let response;
+      if (existingRecordingId) {
+        // UPDATE existing recording
+        console.log(`📊 Updating existing recording: ${existingRecordingId} with status: ${status}`);
+        response = await fetch(`/api/recordings/${existingRecordingId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            exportStatus: exportStatus,
+          })
+        });
+      } else {
+        // CREATE new recording
+        console.log(`📊 Creating new recording for session: ${sessionId} with status: ${status}`);
+        response = await fetch('/api/recordings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectName: `${customerName} Flight`,
+            pilotName: customerName,
+            pilotEmail: pilotEmail,
+            staffMember: staffMember,
+            flightDate: currentDate,
+            flightTime: currentTime,
+            exportStatus: exportStatus,
+            sessionId: sessionId
+          })
+        });
+      }
+
       if (response.ok) {
         const recording = await response.json();
         console.log(`📊 Updated project ${sessionId} status to: ${status}`, recording);
-        
-        // Only store the recording ID if we don't already have one
-        const existingRecordingId = localStorage.getItem('currentRecordingId');
+
+        // Store the recording ID if we don't have one yet
         if (!existingRecordingId) {
           console.log(`📊 Setting initial recording ID: ${recording.id}`);
           localStorage.setItem('currentRecordingId', recording.id);
-        } else {
-          console.log(`📊 Keeping existing recording ID: ${existingRecordingId} (not overwriting with ${recording.id})`);
         }
       } else {
         console.error('❌ Failed to update project status:', response.statusText);
