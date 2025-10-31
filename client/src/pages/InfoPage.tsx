@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { usePilot } from "@/contexts/PilotContext";
 import PhaseNavigation from "@/components/PhaseNavigation";
 import { videoStorage } from "@/utils/videoStorage";
+import { STAFF_MEMBERS } from "@/lib/constants";
 
 export default function InfoPage() {
   const [, setLocation] = useLocation();
@@ -284,11 +285,11 @@ export default function InfoPage() {
                     <SelectValue placeholder="Select staff member" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="john">John Smith</SelectItem>
-                    <SelectItem value="sarah">Sarah Johnson</SelectItem>
-                    <SelectItem value="michael">Michael Chen</SelectItem>
-                    <SelectItem value="emily">Emily Rodriguez</SelectItem>
-                    <SelectItem value="david">David Williams</SelectItem>
+                    {STAFF_MEMBERS.map(member => (
+                      <SelectItem key={member.value} value={member.value}>
+                        {member.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

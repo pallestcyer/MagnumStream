@@ -33,6 +33,7 @@ import type { FlightRecording } from "@shared/schema";
 import { BUNDLE_OPTIONS } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { STAFF_MEMBERS, getStaffMemberName } from "@/lib/constants";
 import VideoPreview from "@/components/VideoPreview";
 
 export default function SalesPage() {
@@ -358,7 +359,7 @@ export default function SalesPage() {
 
                         <div className="text-xs text-muted-foreground space-y-1">
                           <p>📅 {recording.flightDate} at {recording.flightTime}</p>
-                          <p>👤 Staff: {recording.staffMember || "Unknown"}</p>
+                          <p>👤 Staff: {getStaffMemberName(recording.staffMember || "")}</p>
                         </div>
 
                         {(recording.driveFolderUrl || recording.driveFileUrl) && (
@@ -553,13 +554,18 @@ export default function SalesPage() {
               </div>
               <div>
                 <Label htmlFor="staff-member">Staff Member</Label>
-                <Input
-                  id="staff-member"
-                  value={staffMember}
-                  onChange={(e) => setStaffMember(e.target.value)}
-                  placeholder="Your name"
-                  data-testid="input-staff-member"
-                />
+                <Select value={staffMember} onValueChange={setStaffMember}>
+                  <SelectTrigger id="staff-member" data-testid="select-staff-member">
+                    <SelectValue placeholder="Select staff member" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STAFF_MEMBERS.map(member => (
+                      <SelectItem key={member.value} value={member.value}>
+                        {member.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="bundle-select">Bundle Selection</Label>
