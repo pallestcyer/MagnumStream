@@ -167,7 +167,8 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
             body: JSON.stringify({
               exportStatus: 'completed',
               driveFileUrl: renderResult.driveInfo.fileUrl,
-              driveFileId: renderResult.driveInfo.fileId
+              driveFileId: renderResult.driveInfo.fileId,
+              driveFolderUrl: renderResult.driveInfo.folderUrl  // Include folder URL from backend
             })
           });
           console.log('📊 Recording updated with real Drive info');

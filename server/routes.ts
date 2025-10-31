@@ -775,7 +775,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               filePath: driveFilePath,
               relativePath: linkInfo.relativePath,
               displayPath: googleDriveLinkGenerator.getDisplayPath(driveFilePath),
-              instructions: linkInfo.instructions
+              instructions: linkInfo.instructions,
+              fileUrl: linkInfo.webUrl,
+              folderUrl: driveFolderUrl  // Include folder URL in response
             },
             renderInfo: {
               recordingId,
