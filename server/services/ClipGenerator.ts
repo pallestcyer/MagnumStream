@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { randomUUID } from 'crypto';
 import { storage } from '../storage';
-import { SLOT_TEMPLATE } from '../schema';
+import { SLOT_TEMPLATE } from '../../shared/schema';
 
 const execAsync = promisify(exec);
 
