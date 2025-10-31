@@ -52,6 +52,7 @@ class DatabaseStorage {
       exportStatus: result.export_status,
       driveFileId: result.drive_file_id,
       driveFileUrl: result.drive_file_url,
+      driveFolderUrl: result.drive_folder_url,
       smsPhoneNumber: result.sms_phone_number,
       sold: result.sold,
       createdAt: new Date(result.created_at)
@@ -60,7 +61,7 @@ class DatabaseStorage {
 
   async updateFlightRecording(id: string, data: any) {
     const updateData: any = {};
-    
+
     if (data.pilotName) updateData.pilot_name = data.pilotName;
     if (data.pilotEmail) updateData.pilot_email = data.pilotEmail;
     if (data.staffMember) updateData.staff_member = data.staffMember;
@@ -69,6 +70,7 @@ class DatabaseStorage {
     if (data.exportStatus) updateData.export_status = data.exportStatus;
     if (data.driveFileId) updateData.drive_file_id = data.driveFileId;
     if (data.driveFileUrl) updateData.drive_file_url = data.driveFileUrl;
+    if (data.driveFolderUrl) updateData.drive_folder_url = data.driveFolderUrl;
     if (data.smsPhoneNumber) updateData.sms_phone_number = data.smsPhoneNumber;
     if (data.sold !== undefined) updateData.sold = data.sold;
 
@@ -93,6 +95,7 @@ class DatabaseStorage {
       exportStatus: result.export_status,
       driveFileId: result.drive_file_id,
       driveFileUrl: result.drive_file_url,
+      driveFolderUrl: result.drive_folder_url,
       smsPhoneNumber: result.sms_phone_number,
       sold: result.sold,
       createdAt: new Date(result.created_at)
@@ -117,6 +120,7 @@ class DatabaseStorage {
       exportStatus: record.export_status,
       driveFileId: record.drive_file_id,
       driveFileUrl: record.drive_file_url,
+      driveFolderUrl: record.drive_folder_url,
       smsPhoneNumber: record.sms_phone_number,
       sold: record.sold,
       createdAt: new Date(record.created_at)

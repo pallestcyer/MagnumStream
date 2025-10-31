@@ -105,6 +105,7 @@ export class SupabaseStorage implements IStorage {
       exportStatus: data.export_status,
       driveFileId: data.drive_file_id,
       driveFileUrl: data.drive_file_url,
+      driveFolderUrl: data.drive_folder_url,
       smsPhoneNumber: data.sms_phone_number,
       sold: data.sold,
       createdAt: new Date(data.created_at)
@@ -134,6 +135,7 @@ export class SupabaseStorage implements IStorage {
       exportStatus: data.export_status,
       driveFileId: data.drive_file_id,
       driveFileUrl: data.drive_file_url,
+      driveFolderUrl: data.drive_folder_url,
       smsPhoneNumber: data.sms_phone_number,
       sold: data.sold,
       createdAt: new Date(data.created_at)
@@ -152,6 +154,7 @@ export class SupabaseStorage implements IStorage {
     if (updates.exportStatus !== undefined) dbUpdates.export_status = updates.exportStatus;
     if (updates.driveFileId !== undefined) dbUpdates.drive_file_id = updates.driveFileId;
     if (updates.driveFileUrl !== undefined) dbUpdates.drive_file_url = updates.driveFileUrl;
+    if (updates.driveFolderUrl !== undefined) dbUpdates.drive_folder_url = updates.driveFolderUrl;
     if (updates.smsPhoneNumber !== undefined) dbUpdates.sms_phone_number = updates.smsPhoneNumber;
     if (updates.sold !== undefined) dbUpdates.sold = updates.sold;
     
@@ -178,6 +181,7 @@ export class SupabaseStorage implements IStorage {
       exportStatus: data.export_status,
       driveFileId: data.drive_file_id,
       driveFileUrl: data.drive_file_url,
+      driveFolderUrl: data.drive_folder_url,
       smsPhoneNumber: data.sms_phone_number,
       sold: data.sold,
       createdAt: new Date(data.created_at)
@@ -219,6 +223,7 @@ export class SupabaseStorage implements IStorage {
       exportStatus: record.export_status,
       driveFileId: record.drive_file_id,
       driveFileUrl: record.drive_file_url,
+      driveFolderUrl: record.drive_folder_url,
       smsPhoneNumber: record.sms_phone_number,
       sold: record.sold,
       createdAt: new Date(record.created_at)
@@ -421,6 +426,7 @@ export class SupabaseStorage implements IStorage {
       exportStatus: data.export_status,
       driveFileId: data.drive_file_id,
       driveFileUrl: data.drive_file_url,
+      driveFolderUrl: data.drive_folder_url,
       smsPhoneNumber: data.sms_phone_number,
       sold: data.sold,
       createdAt: new Date(data.created_at)

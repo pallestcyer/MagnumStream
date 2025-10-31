@@ -1,0 +1,60 @@
+Script started
+Debug log path: /Users/magnummedia/Desktop/davinci_debug.log
+Frame Rate: 23.976
+Project: project
+Timeline: MAG_FERARRI
+Video tracks: 5
+Audio tracks: 5
+
+=== Attempting to get clips from V3 ===
+Method 1: GetItemListInTrack('video', 3)
+  Result type: table
+  Items count: 14
+  First item type: userdata
+  First item name: FERRARI_CHASE-CAM_B.MOV
+
+Method 2: Checking all timeline items
+  GetItemsInTrack result: table
+  Count: 14
+
+Method 3: Timeline boundaries
+  Start frame: 86400
+  End frame: 87726
+
+Checking track 3 accessibility:
+  Track 1: 1 items
+  Track 2: 0 items
+  Track 3: 14 items
+  Track 4: 0 items
+  Track 5: 0 items
+
+=== Building JSON output ===
+Processing clip 1
+  Name: FERRARI_CHASE-CAM_B.MOV, Start: 86485, Duration: 21
+Processing clip 2
+  Name: FERRARI_CHASE-CAM_B.MOV, Start: 86549, Duration: 29
+Processing clip 3
+  Name: FERRARI_CHASE-CAM_A.MOV, Start: 86578, Duration: 31
+Processing clip 4
+  Name: FERRARI_CHASE-CAM_B.MOV, Start: 86631, Duration: 23
+Processing clip 5
+  Name: FERRARI_CHASE-CAM_A.MOV, Start: 86654, Duration: 36
+Processing clip 6
+  Name: FERRARI_CHASE-CAM_B.MOV, Start: 86790, Duration: 16
+Processing clip 7
+  Name: FERRARI_CHASE-CAM_A.MOV, Start: 86844, Duration: 19
+Processing clip 8
+  Name: FERRARI_CHASE-CAM_B.MOV, Start: 86905, Duration: 21
+Processing clip 9
+  Name: FERRARI_CHASE-CAM_A.MOV, Start: 86926, Duration: 34
+Processing clip 10
+  Name: FERRARI_CHASE-CAM_B.MOV, Start: 87035, Duration: 13
+Processing clip 11
+  Name: FERRARI_CHASE-CAM_B.MOV, Start: 87105, Duration: 35
+Processing clip 12
+  Name: FERRARI_CHASE-CAM_A.MOV, Start: 87140, Duration: 37
+Processing clip 13
+  Name: FERRARI_CHASE-CAM_A.MOV, Start: 87216, Duration: 13
+Processing clip 14
+  Name: FERRARI_CHASE-CAM_A.MOV, Start: 87352, Duration: 77
+Clip positions saved to /Users/magnummedia/Desktop/clip_positions_auto.json

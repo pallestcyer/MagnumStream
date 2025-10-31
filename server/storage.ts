@@ -76,6 +76,7 @@ export class MemStorage implements IStorage {
       exportStatus: "pending",
       driveFileId: null,
       driveFileUrl: null,
+      driveFolderUrl: null,
       smsPhoneNumber: null,
       sold: false,
       ...recording,
