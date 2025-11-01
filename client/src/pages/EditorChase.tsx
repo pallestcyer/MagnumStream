@@ -21,6 +21,7 @@ export default function EditorChase() {
   const [isMuted, setIsMuted] = useState(true);
   const [sceneVideos, setSceneVideos] = useState<{camera1?: string, camera2?: string, duration?: number}>({});
   const videoRef = useRef<HTMLVideoElement>(null);
+  const templateVideoRef = useRef<HTMLVideoElement>(null);
   
   const [slotSelections, setSlotSelections] = useState<SlotSelection[]>(
     SLOT_TEMPLATE.filter(s => s.sceneType === 'chase').map(slot => ({
@@ -257,7 +258,19 @@ export default function EditorChase() {
     setActiveSlot(slotNumber);
     const selection = slotSelections.find(s => s.slotNumber === slotNumber);
     const slotConfig = chaseSlots.find(s => s.slotNumber === slotNumber);
-    
+
+    // Load template video for this slot
+    if (templateVideoRef.current) {
+      const slotIndex = chaseSlots.findIndex(s => s.slotNumber === slotNumber);
+      const templatePath = `/templates/CHASE_${slotIndex + 1}.mov`;
+      console.log(`🎬 Loading template video: ${templatePath}`);
+      templateVideoRef.current.src = templatePath;
+      templateVideoRef.current.load();
+      templateVideoRef.current.play().catch(error => {
+        console.error('❌ Error playing template video:', error);
+      });
+    }
+
     if (videoRef.current && selection && slotConfig) {
       // Load the appropriate camera video, fallback to camera 1 if camera 2 not available
       let videoUrl = slotConfig.cameraAngle === 1 ? sceneVideos.camera1 : sceneVideos.camera2;
@@ -416,7 +429,19 @@ export default function EditorChase() {
                   Background Template
                 </h2>
               </div>
-              <div className="relative aspect-video bg-gradient-to-br from-gray-950 to-gray-900 rounded-lg overflow-hidden border-2 border-orange-500/50">
+              <div className="relative aspect-video bg-black rounded-lg overflow-hidden border-2 border-orange-500/50">
+                <video
+                  ref={templateVideoRef}
+                  className="w-full h-full object-cover"
+                  muted
+                  loop
+                  data-testid="video-template-preview"
+                />
+                {!activeSlot && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-950 to-gray-900">
+                    <p className="text-sm text-muted-foreground">Click a slot to view template</p>
+                  </div>
+                )}
                 {activeSlot && (
                   <div className="absolute bottom-3 left-3 bg-black/80 px-3 py-1 rounded text-sm text-white">
                     Slot {activeSlot} • Chase • Camera {chaseSlots.find(s => s.slotNumber === activeSlot)?.cameraAngle}
