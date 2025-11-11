@@ -167,11 +167,12 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
       setProgress(85);
 
       // Server has already uploaded to Drive (or skipped if not connected)
-      // Use the real Drive info from the response
+      // Use the real Drive folder URL (not search URL) from the response
       if (renderResult.driveInfo) {
-        // Real Drive upload succeeded
-        setDriveUrl(renderResult.driveInfo.fileUrl || renderResult.driveInfo.webViewLink);
-        console.log('✅ Video uploaded to Drive:', renderResult.driveInfo.fileUrl);
+        // Real Drive upload succeeded - use folder URL which directly opens the folder
+        const folderUrl = renderResult.driveInfo.folderUrl;
+        setDriveUrl(folderUrl);
+        console.log('✅ Video uploaded to Drive folder:', folderUrl);
       } else if (renderResult.warning) {
         // Drive not connected, but video rendered locally
         console.warn('⚠️ ' + renderResult.warning);

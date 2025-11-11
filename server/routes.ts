@@ -666,29 +666,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const { googleDriveLinkGenerator } = await import('./services/GoogleDriveLinkGenerator');
 
           // Get the recording to extract customer info
-          // Try to find by ID first, fallback to finding latest by project name
+          // IMPORTANT: Use the exact recording ID provided - do NOT fall back to latest
           let recording = await storage.getFlightRecording(recordingId);
 
           if (!recording) {
-            console.warn(`⚠️  Recording not found by ID ${recordingId}, searching by latest recording...`);
-            const allRecordings = await storage.getAllFlightRecordings();
-            console.log(`📊 Found ${allRecordings.length} total recordings`);
-
-            // Find the most recent recording (regardless of status)
-            // This handles cases where the recording ID from frontend is stale
-            recording = allRecordings
-              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-
-            if (recording) {
-              console.log(`✅ Found latest recording: ${recording.id} (${recording.pilotName}, status: ${recording.exportStatus})`);
-              // Use the correct ID going forward
-              actualRecordingId = recording.id;
-            }
+            console.error(`❌ Recording not found by ID ${recordingId}`);
+            throw new Error(`Recording not found: ${recordingId}. Cannot update status for a different recording.`);
           }
 
-          if (!recording) {
-            throw new Error(`Recording not found: ${recordingId}`);
-          }
+          console.log(`✅ Found recording: ${recording.id} (${recording.pilotName}, status: ${recording.exportStatus})`);
+          actualRecordingId = recording.id;
 
           const customerName = recording.pilotName || 'Customer';
           const fileName = path.basename(outputPath);
@@ -947,6 +934,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     } catch (error: any) {
       console.error('Error opening video file:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Manual fix endpoint: Update recording status and video path
+  app.post("/api/recordings/:recordingId/fix-status", async (req, res) => {
+    try {
+      const { recordingId } = req.params;
+      const { exportStatus, localVideoPath } = req.body;
+
+      console.log(`🔧 Fixing recording ${recordingId} - status: ${exportStatus}, path: ${localVideoPath}`);
+
+      const updates: any = {};
+      if (exportStatus) updates.exportStatus = exportStatus;
+      if (localVideoPath) updates.localVideoPath = localVideoPath;
+
+      const updated = await storage.updateFlightRecording(recordingId, updates);
+
+      if (!updated) {
+        return res.status(404).json({ error: "Recording not found" });
+      }
+
+      res.json({
+        success: true,
+        message: "Recording updated successfully",
+        recording: updated
+      });
+
+    } catch (error: any) {
+      console.error('Fix status error:', error);
       res.status(500).json({ error: error.message });
     }
   });

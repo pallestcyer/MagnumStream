@@ -245,7 +245,7 @@ export default function VideoPreview({
                   title="Open video in Google Drive"
                 >
                   <ExternalLink className="w-3 h-3 mr-2" />
-                  Open in Drive
+                  Drive
                 </Button>
               ) : hasDriveFile ? (
                 <>
@@ -266,7 +266,7 @@ export default function VideoPreview({
                     className="flex-1"
                   >
                     <ExternalLink className="w-3 h-3 mr-2" />
-                    View in Drive
+                    Drive
                   </Button>
                 </>
               ) : localVideoPath || recordingId ? (
