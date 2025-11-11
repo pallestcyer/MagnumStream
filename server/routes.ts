@@ -649,11 +649,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // IMPORTANT: Always update status to completed when render succeeds
         // This ensures the recording appears in History as complete even if Drive upload fails
         console.log(`📊 Updating recording ${recordingId} status to completed...`);
-        await storage.updateFlightRecording(recordingId, {
-          exportStatus: "completed",
-          localVideoPath: outputPath
-        });
-        console.log(`✅ Recording ${recordingId} marked as completed`);
+        try {
+          await storage.updateFlightRecording(recordingId, {
+            exportStatus: "completed",
+            localVideoPath: outputPath
+          });
+          console.log(`✅ Recording ${recordingId} marked as completed`);
+
+          // VERIFY the update actually worked
+          const verifyRecording = await storage.getFlightRecording(recordingId);
+          if (verifyRecording) {
+            console.log(`✅ VERIFIED: Recording ${recordingId} status is now: ${verifyRecording.exportStatus}`);
+            if (verifyRecording.exportStatus !== 'completed') {
+              console.error(`❌ STATUS UPDATE FAILED! Expected 'completed', got '${verifyRecording.exportStatus}'`);
+            }
+          } else {
+            console.error(`❌ Could not verify recording ${recordingId} - recording not found after update`);
+          }
+        } catch (statusUpdateError) {
+          console.error(`❌ CRITICAL: Failed to update recording ${recordingId} status to completed:`, statusUpdateError);
+          // Continue with Drive upload even if status update fails
+        }
 
         // Copy the rendered video to Google Drive (local sync)
         // Declare actualRecordingId at outer scope so it's available in catch block
