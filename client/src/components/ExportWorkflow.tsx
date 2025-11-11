@@ -8,10 +8,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+// import { Input } from "@/components/ui/input"; // Unused - SMS feature disabled
+// import { Label } from "@/components/ui/label"; // Unused - SMS feature disabled
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle2, MessageSquare, Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2 } from "lucide-react"; // MessageSquare removed - SMS feature disabled
 
 // Get the local device URL for Mac service
 const getLocalDeviceUrl = async (): Promise<string> => {
@@ -44,13 +44,13 @@ interface ExportWorkflowProps {
   flightTime: string;
 }
 
-type ExportStage = "davinci" | "drive" | "sms" | "complete";
+type ExportStage = "davinci" | "drive" | "complete"; // | "sms" - SMS feature disabled for now
 
 export default function ExportWorkflow({ open, onOpenChange, flightDate, flightTime }: ExportWorkflowProps) {
   const [stage, setStage] = useState<ExportStage>("davinci");
   const [progress, setProgress] = useState(0);
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [driveUrl, setDriveUrl] = useState("");
+  // const [phoneNumber, setPhoneNumber] = useState(""); // Unused - SMS feature disabled
+  const [driveUrl, setDriveUrl] = useState<string | null>(null);
 
   const startExport = async () => {
     // Stage 1: DaVinci Export - Upload videos and generate clips
@@ -184,8 +184,8 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
       console.log('📊 Recording completed by backend with Drive info');
 
       setProgress(100);
-      setStage("sms");
-      
+      setStage("complete"); // Skip SMS stage - go directly to complete
+
     } catch (error) {
       console.error('❌ Export failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -282,7 +282,7 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
   const getStageIcon = (currentStage: ExportStage) => {
     if (stage === "complete") return <CheckCircle2 className="w-5 h-5 text-green-500" />;
     if (stage === currentStage) return <Loader2 className="w-5 h-5 animate-spin text-primary" />;
-    const stageOrder: ExportStage[] = ["davinci", "drive", "sms", "complete"];
+    const stageOrder: ExportStage[] = ["davinci", "drive", "complete"]; // SMS removed
     const currentIndex = stageOrder.indexOf(stage);
     const targetIndex = stageOrder.indexOf(currentStage);
     if (currentIndex > targetIndex) return <CheckCircle2 className="w-5 h-5 text-green-500" />;
@@ -291,15 +291,15 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg" onOpenAutoFocus={handleOpenExport}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto" onOpenAutoFocus={handleOpenExport}>
         <DialogHeader>
           <DialogTitle>Export Video</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="truncate">
             Flight: {flightDate} at {flightTime}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="space-y-6 py-4 overflow-x-hidden">
           {/* Stage 1: DaVinci Export */}
           <div className="space-y-2">
             <div className="flex items-center gap-3">
@@ -324,23 +324,23 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
             {stage === "drive" && (
               <Progress value={progress} className="h-2" />
             )}
-            {(stage === "sms" || stage === "complete") && driveUrl && (
+            {stage === "complete" && driveUrl && (
               <div className="pl-8">
                 <a
                   href={driveUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-primary hover:underline"
+                  className="text-sm text-primary hover:underline break-all"
                   data-testid="link-drive-url"
                 >
-                  {driveUrl}
+                  View in Google Drive
                 </a>
               </div>
             )}
           </div>
 
-          {/* Stage 3: SMS Link */}
-          {(stage === "sms" || stage === "complete") && (
+          {/* Stage 3: SMS Link - DISABLED FOR NOW */}
+          {/* {(stage === "sms" || stage === "complete") && (
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 {getStageIcon("sms")}
@@ -383,20 +383,22 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
                 </div>
               )}
             </div>
-          )}
+          )} */}
 
           {/* Complete Stage */}
           {stage === "complete" && (
             <div className="flex flex-col items-center justify-center py-6 gap-4">
               <CheckCircle2 className="w-16 h-16 text-green-500" />
-              <div className="text-center">
+              <div className="text-center space-y-2">
                 <h3 className="text-lg font-semibold text-foreground">Export Complete!</h3>
                 <p className="text-sm text-muted-foreground">
-                  {phoneNumber 
-                    ? `Video exported and link sent to ${phoneNumber}`
-                    : "Video exported and uploaded to Google Drive"
-                  }
+                  Video has been rendered and uploaded to Google Drive
                 </p>
+                {driveUrl && (
+                  <p className="text-xs text-muted-foreground">
+                    You can access it from the History or Sales page
+                  </p>
+                )}
               </div>
               <Button
                 onClick={() => onOpenChange(false)}
