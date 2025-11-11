@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Service identifier -->
+    <key>Label</key>
+    <string>com.magnumstream.service</string>
+
+    <!-- Program to run -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/magnummedia/MagnumStream/deploy/start-mac-service.sh</string>
+    </array>
+
+    <!-- Run on system load (startup) -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Keep the service alive - restart if it crashes -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Working directory -->
+    <key>WorkingDirectory</key>
+    <string>/Users/magnummedia/MagnumStream</string>
+
+    <!-- Standard output log -->
+    <key>StandardOutPath</key>
+    <string>/Users/magnummedia/MagnumStream/logs/launchd-stdout.log</string>
+
+    <!-- Standard error log -->
+    <key>StandardErrorPath</key>
+    <string>/Users/magnummedia/MagnumStream/logs/launchd-stderr.log</string>
+
+    <!-- Environment variables -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin</string>
+        <key>HOME</key>
+        <string>/Users/magnummedia</string>
+    </dict>
+
+    <!-- Don't show in Dock or menu bar -->
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <!-- Throttle restart attempts if service crashes repeatedly -->
+    <key>ThrottleInterval</key>
+    <integer>60</integer>
+
+    <!-- Optional: Delay start by 10 seconds after boot to ensure system is ready -->
+    <key>StartInterval</key>
+    <integer>10</integer>
+</dict>
+</plist>
