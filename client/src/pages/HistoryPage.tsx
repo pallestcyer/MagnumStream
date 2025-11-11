@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Calendar, 
-  ExternalLink, 
-  Download, 
-  MessageSquare, 
+import {
+  Calendar,
+  ExternalLink,
+  Download,
+  MessageSquare,
   Clock,
   CheckCircle2,
   AlertCircle,
@@ -35,72 +36,33 @@ interface ProjectRecord {
 }
 
 export default function HistoryPage() {
-  const [projects, setProjects] = useState<ProjectRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Fetch recordings with React Query for automatic refresh
+  const { data: recordings = [], isLoading: loading } = useQuery<any[]>({
+    queryKey: ["/api/recordings"],
+    queryFn: async () => {
+      const res = await fetch("/api/recordings");
+      if (!res.ok) throw new Error("Failed to fetch recordings");
+      return res.json();
+    },
+    refetchInterval: 5000, // Auto-refresh every 5 seconds to catch status updates
+  });
 
-  // Load projects from API
-  useEffect(() => {
-    const loadProjects = async () => {
-      try {
-        const response = await fetch('/api/recordings');
-        if (response.ok) {
-          const recordings = await response.json();
-          
-          // Enhance each recording with timeline and clip info
-          const projectRecords: ProjectRecord[] = await Promise.all(
-            recordings.map(async (recording: any) => {
-              let timelinePositions = 0;
-              let clipsGenerated = 0;
-              
-              try {
-                // Get timeline positions
-                const slotsResponse = await fetch(`/api/recordings/${recording.id}/video-slots`);
-                if (slotsResponse.ok) {
-                  const slots = await slotsResponse.json();
-                  timelinePositions = slots.length;
-                }
-                
-                // Get generated clips info
-                const clipsResponse = await fetch(`/api/recordings/${recording.id}/clips`);
-                if (clipsResponse.ok) {
-                  const clips = await clipsResponse.json();
-                  clipsGenerated = clips.length;
-                }
-              } catch (error) {
-                console.warn(`Failed to fetch additional data for ${recording.id}:`, error);
-              }
-              
-              return {
-                id: recording.id,
-                projectName: recording.projectName,
-                pilotName: recording.pilotName,
-                pilotEmail: recording.pilotEmail,
-                staffMember: recording.staffMember,
-                flightDate: recording.flightDate || new Date().toISOString().split('T')[0],
-                flightTime: recording.flightTime || '00:00',
-                exportStatus: recording.exportStatus,
-                createdAt: new Date(recording.createdAt),
-                driveUrl: recording.driveFileUrl,
-                smsPhoneNumber: recording.smsPhoneNumber,
-                timelinePositions,
-                clipsGenerated
-              };
-            })
-          );
-          
-          setProjects(projectRecords);
-        } else {
-          console.error('Failed to fetch recordings:', response.statusText);
-        }
-      } catch (error) {
-        console.error('Failed to load projects:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadProjects();
-  }, []);
+  // Transform recordings into ProjectRecords (synchronously, no additional fetches)
+  const projects: ProjectRecord[] = recordings.map((recording: any) => ({
+    id: recording.id,
+    projectName: recording.projectName,
+    pilotName: recording.pilotName,
+    pilotEmail: recording.pilotEmail,
+    staffMember: recording.staffMember,
+    flightDate: recording.flightDate || new Date().toISOString().split('T')[0],
+    flightTime: recording.flightTime || '00:00',
+    exportStatus: recording.exportStatus,
+    createdAt: new Date(recording.createdAt),
+    driveUrl: recording.driveFileUrl,
+    smsPhoneNumber: recording.smsPhoneNumber,
+    timelinePositions: 0, // These were causing extra API calls - can fetch on-demand if needed
+    clipsGenerated: 0
+  }));
 
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('en-US', {
