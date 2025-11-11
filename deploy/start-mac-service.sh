@@ -212,8 +212,6 @@ else
 fi
 
 echo "🔍 Starting ngrok with verbose logging..."
-# For now, remove auth token to use free version
-export NGROK_AUTHTOKEN=""
 nohup ngrok http 3001 --log=stdout --log-level=info > "$NGROK_LOG" 2>&1 &
 NGROK_PID=$!
 echo $NGROK_PID > "$LOG_DIR/ngrok.pid"
