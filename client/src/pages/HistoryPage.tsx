@@ -3,7 +3,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import PhaseNavigation from "@/components/PhaseNavigation";
 import { 
   Calendar, 
   ExternalLink, 
@@ -171,8 +170,6 @@ export default function HistoryPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <PhaseNavigation currentPhase="export" completedPhases={["info", "recording", "editing"]} />
-
       <main className="flex-1 overflow-auto p-8">
           <div className="max-w-7xl mx-auto space-y-6">
             {/* Header */}
