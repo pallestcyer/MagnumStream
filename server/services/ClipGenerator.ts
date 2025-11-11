@@ -259,23 +259,35 @@ export class ClipGenerator {
   }
   
   private async generateClipFromVideo(sourceVideoPath: string, outputPath: string, startTime: number, duration: number): Promise<void> {
-    // Use frame-accurate cutting with precise settings
+    // CRITICAL: Frame-accurate cutting for DaVinci Resolve timeline placement
+    // Must produce EXACT duration to match template slot positions on track V3
+
+    // Calculate exact frame count at 23.976 fps (DaVinci template frame rate)
+    const fps = 23.976;
+    const exactFrames = Math.round(duration * fps);
+    const exactDuration = exactFrames / fps;
+
+    console.log(`🎬 Generating clip: ${exactFrames} frames (${exactDuration.toFixed(3)}s) at ${fps} fps`);
+
     const ffmpegCommand = [
       'ffmpeg', '-y',
-      '-ss', startTime.toString(),          // Seek before input for speed
+      '-ss', startTime.toString(),          // Seek to start time
       '-i', `"${sourceVideoPath}"`,
-      '-t', duration.toString(),
+      '-t', exactDuration.toString(),       // Use frame-accurate duration
+      '-vf', `fps=${fps}`,                  // Force exact frame rate with filter
       '-c:v', 'libx264',
-      '-preset', 'fast',                     // Balance speed and quality
-      '-crf', '18',                          // High quality
-      '-g', '1',                             // Keyframe every frame (GOP size 1) for frame accuracy
-      '-vsync', 'cfr',                       // Constant frame rate to prevent frame drops
-      '-r', '23.976',                        // Exact frame rate
+      '-preset', 'fast',                    // Balance speed and quality
+      '-crf', '18',                         // High quality (visually lossless)
+      '-g', '1',                            // Keyframe every frame (GOP=1) for frame accuracy
+      '-vsync', 'cfr',                      // Constant frame rate - no dropped frames
+      '-video_track_timescale', '24000',    // Match DaVinci timeline timescale
       '-c:a', 'aac',
       '-b:a', '192k',
       '-ar', '48000',
-      '-avoid_negative_ts', 'make_zero',    // Fix timestamp issues
-      '-movflags', '+faststart',
+      '-ac', '2',                           // Stereo audio
+      '-avoid_negative_ts', 'make_zero',   // Fix timestamp issues
+      '-movflags', '+faststart',            // Optimize for playback
+      '-pix_fmt', 'yuv420p',               // Ensure compatible pixel format
       `"${outputPath}"`
     ].join(' ');
 

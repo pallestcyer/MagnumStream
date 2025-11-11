@@ -380,25 +380,37 @@ class DaVinciAutomation:
             for slot_num, clip_info in clips.items():
                 slot_number = int(slot_num)
                 clip_path = Path(clip_info['fullPath'])
-                
+
                 if not clip_path.exists():
                     logger.warning(f"Clip file not found: {clip_path}")
                     logger.warning(f"Expected path: {clip_info.get('fullPath', 'No path provided')}")
                     continue
-                
-                # Import clip
+
+                # Verify clip exists and get metadata before importing
+                expected_duration = clip_info.get('duration', 3.0)
+                expected_frames = self._seconds_to_frames(expected_duration)
+
+                # Import clip to media pool
                 imported = self.media_pool.ImportMedia([str(clip_path)])
                 if imported:
+                    media_item = imported[0]
+
+                    # Verify clip frame rate matches template (23.976 fps)
+                    try:
+                        clip_fps = media_item.GetClipProperty('FPS')
+                        if clip_fps and abs(float(clip_fps) - 23.976) > 0.01:
+                            logger.warning(f"⚠️ Slot {slot_number} FPS mismatch: {clip_fps} (expected 23.976)")
+                    except Exception as e:
+                        logger.debug(f"Could not verify FPS for slot {slot_number}: {e}")
+
                     # Calculate frame-based in/out points for precise timing
-                    duration_frames = self._seconds_to_frames(clip_info.get('duration', 3.0))
-                    
                     media_items[slot_number] = {
-                        'media': imported[0],
+                        'media': media_item,
                         'in_point': 0,  # Start from beginning of generated clip
-                        'out_point': duration_frames,  # Use exact duration from SLOT_TEMPLATE
+                        'out_point': expected_frames,  # Use exact duration from SLOT_TEMPLATE
                         'slot_info': clip_info
                     }
-                    logger.info(f"Imported slot {slot_number}: {clip_info['filename']} ({clip_info.get('duration', 3.0)}s)")
+                    logger.info(f"✅ Imported slot {slot_number}: {clip_info['filename']} ({expected_duration}s = {expected_frames} frames)")
             
             # Replace clips on timeline using direct replacement method
             logger.info(f"🔄 Starting clip replacement for {len(media_items)} imported clips")
@@ -468,28 +480,45 @@ class DaVinciAutomation:
                                 except Exception as e:
                                     logger.warning(f"Method 2 failed: {e}")
                             
-                            # Method 3: Delete and re-add (more compatible)
+                            # Method 3: Delete and re-add at exact position (most reliable)
                             try:
                                 # Delete the existing clip
                                 if hasattr(self.timeline, 'DeleteClips') and callable(getattr(self.timeline, 'DeleteClips', None)):
                                     self.timeline.DeleteClips([item])
                                     logger.info(f"Deleted existing clip at slot {slot_number}")
-                                    
-                                    # Add new clip at the same position
+
+                                    # CRITICAL: Add new clip at EXACT position on track V3
+                                    # Use AppendToTimeline with explicit track and frame position
                                     new_clips = [{
                                         "mediaPoolItem": media_item,
-                                        "startFrame": 0,
-                                        "endFrame": int(clip_data['out_point']),
-                                        "trackIndex": track_index,
-                                        "recordFrame": start_frame
+                                        "startFrame": 0,  # Start of source clip
+                                        "endFrame": int(clip_data['out_point']),  # Duration from slot template
+                                        "trackIndex": track_index,  # MUST be track 3 (V3)
+                                        "recordFrame": start_frame  # EXACT frame position from CLIP_POSITIONS
                                     }]
-                                    
+
+                                    logger.info(f"📍 Placing clip on track V{track_index} at frame {start_frame} (duration: {int(clip_data['out_point'])} frames)")
+
                                     if hasattr(self.media_pool, 'AppendToTimeline') and callable(getattr(self.media_pool, 'AppendToTimeline', None)):
-                                        if self.media_pool.AppendToTimeline(new_clips):
+                                        result = self.media_pool.AppendToTimeline(new_clips)
+                                        if result:
                                             logger.info(f"✅ Method 3: Replaced slot {slot_number} with {clip_data['slot_info']['filename']}")
-                                            replaced = True
+
+                                            # Verify the clip was placed correctly
+                                            new_timeline_items = self.timeline.GetItemListInTrack('video', track_index)
+                                            for new_item in new_timeline_items:
+                                                if new_item.GetStart() == start_frame:
+                                                    logger.info(f"✅ Verified: Clip placed correctly at frame {start_frame}")
+                                                    replaced = True
+                                                    break
+
+                                            if not replaced:
+                                                logger.warning(f"⚠️ Clip added but not at expected frame {start_frame}")
+                                                replaced = True  # Still mark as replaced since clip is in timeline
                                             break
-                                
+                                        else:
+                                            logger.warning(f"AppendToTimeline returned False for slot {slot_number}")
+
                             except Exception as e:
                                 logger.warning(f"Method 3 failed: {e}")
                             
