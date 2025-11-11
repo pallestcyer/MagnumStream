@@ -646,6 +646,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const outputPath = stdout.split('SUCCESS: ')[1]?.trim();
         console.log(`✅ DaVinci render completed: ${outputPath}`);
 
+        // IMPORTANT: Always update status to completed when render succeeds
+        // This ensures the recording appears in History as complete even if Drive upload fails
+        console.log(`📊 Updating recording ${recordingId} status to completed...`);
+        await storage.updateFlightRecording(recordingId, {
+          exportStatus: "completed",
+          localVideoPath: outputPath
+        });
+        console.log(`✅ Recording ${recordingId} marked as completed`);
+
         // Copy the rendered video to Google Drive (local sync)
         // Declare actualRecordingId at outer scope so it's available in catch block
         let actualRecordingId = recordingId;
@@ -685,11 +694,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.warn('⚠️ Google Drive for Desktop not found - skipping sync');
             console.warn('⚠️ Video file saved locally at: ' + outputPath);
 
-            // Update recording status without Drive info, but save local video path
-            await storage.updateFlightRecording(actualRecordingId, {
-              exportStatus: "completed" as any,
-              localVideoPath: outputPath
-            });
+            // Status already updated above, just log
+            console.log(`✅ Recording ${actualRecordingId} completed (Drive sync skipped)`);
 
             res.json({
               success: true,
@@ -745,16 +751,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.error('❌ Error getting folder URL:', error);
           }
 
-          // Update the recording in the database with Drive path info, local path, and completed status
+          // Update the recording in the database with Drive path info (status already set to completed above)
           await storage.updateFlightRecording(actualRecordingId, {
-            exportStatus: "completed" as any,
             driveFileUrl: linkInfo.webUrl, // Store the web URL for opening in browser
             driveFileId: linkInfo.relativePath, // Store relative path for reference
-            driveFolderUrl: driveFolderUrl, // Store folder URL if available
-            localVideoPath: outputPath // Store local file path for direct playback
+            driveFolderUrl: driveFolderUrl // Store folder URL if available
           });
 
-          console.log(`✅ Recording ${actualRecordingId} marked as completed and ready for sale`);
+          console.log(`✅ Recording ${actualRecordingId} Drive info updated and ready for sale`);
 
           res.json({
             success: true,
@@ -779,11 +783,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (uploadError: any) {
           console.error('❌ Failed to upload to Google Drive:', uploadError);
 
-          // Still mark as completed even if upload fails - video is rendered locally
-          await storage.updateFlightRecording(actualRecordingId, {
-            exportStatus: "completed" as any,
-            localVideoPath: outputPath // Store local file path for playback
-          });
+          // Status already marked as completed above - just log the error
+          console.log(`✅ Recording ${actualRecordingId} completed locally (Drive upload failed)`);
 
           res.json({
             success: true,
