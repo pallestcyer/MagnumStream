@@ -33,8 +33,9 @@ class VideoStorage {
       // Clear completion status for new projects to start fresh
       this.clearSceneCompletionStatus(sessionId);
       console.log('🧹 Cleared completion status for new project:', sessionId);
-      
-      // Also clear any recording ID from previous session
+
+      // CRITICAL: Always clear recording ID for new projects, even if session ID is the same
+      // This prevents updating a previous completed recording when starting a new one for the same pilot
       localStorage.removeItem('currentRecordingId');
       console.log('🧹 Cleared recording ID for fresh start');
     } else {

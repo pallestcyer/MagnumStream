@@ -39,20 +39,30 @@ export default function InfoPage() {
     const handleSessionTransition = async () => {
       // Check if there's an active project before clearing
       const existingRecordingId = localStorage.getItem('currentRecordingId');
-      
+
       if (existingRecordingId) {
-        // Save the current active project as "in_progress" before clearing
+        // Check current status before updating - DON'T overwrite completed recordings
         try {
-          await fetch(`/api/recordings/${existingRecordingId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              exportStatus: 'in_progress'
-            })
-          });
-          console.log('📊 Saved existing project to history as in_progress:', existingRecordingId);
+          const checkResponse = await fetch(`/api/recordings/${existingRecordingId}`);
+          if (checkResponse.ok) {
+            const recording = await checkResponse.json();
+
+            // Only update to in_progress if NOT already completed
+            if (recording.exportStatus !== 'completed' && recording.exportStatus !== 'failed') {
+              await fetch(`/api/recordings/${existingRecordingId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  exportStatus: 'in_progress'
+                })
+              });
+              console.log('📊 Saved existing project to history as in_progress:', existingRecordingId);
+            } else {
+              console.log(`📊 Recording ${existingRecordingId} already ${recording.exportStatus} - not overwriting`);
+            }
+          }
         } catch (error) {
-          console.error('❌ Failed to save project to history:', error);
+          console.error('❌ Failed to check/save project status:', error);
         }
       }
       
