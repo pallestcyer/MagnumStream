@@ -412,130 +412,161 @@ class DaVinciAutomation:
                     }
                     logger.info(f"✅ Imported slot {slot_number}: {clip_info['filename']} ({expected_duration}s = {expected_frames} frames)")
             
-            # Replace clips on timeline using direct replacement method
+            # Replace clips on timeline - TWO-PHASE APPROACH to avoid timeline corruption
+            # Phase 1: Try ReplaceClip method (non-destructive, safest)
+            # Phase 2: If ReplaceClip not available, collect all clips then batch delete/add
+
             logger.info(f"🔄 Starting clip replacement for {len(media_items)} imported clips")
+
+            # Get all timeline items ONCE at start
+            track_index = 3  # All clips are on track V3
+            timeline_items = self.timeline.GetItemListInTrack('video', track_index)
+            logger.info(f"🔍 Found {len(timeline_items)} items on video track {track_index}")
+
+            # Log all timeline item positions for debugging
+            logger.info(f"📍 Timeline items on track V{track_index}:")
+            for i, item in enumerate(timeline_items):
+                item_start = item.GetStart()
+                item_end = item.GetEnd()
+                logger.info(f"   Item {i+1}: frames {item_start}-{item_end}")
+
+            # Create mapping of frame position -> timeline item
+            position_to_item = {}
+            for item in timeline_items:
+                item_start = item.GetStart()
+                position_to_item[item_start] = item
+
+            # Phase 1: Try non-destructive ReplaceClip method
+            replaced_slots = []
+            slots_needing_delete_add = []
+
             for slot_number, clip_data in media_items.items():
                 logger.info(f"🎬 Processing slot {slot_number}: {clip_data['slot_info']['filename']}")
-                
+
                 if slot_number not in CLIP_POSITIONS:
                     logger.warning(f"❌ No position defined for slot {slot_number} in CLIP_POSITIONS")
-                    logger.info(f"📍 Available positions: {list(CLIP_POSITIONS.keys())}")
                     continue
-                
+
                 position = CLIP_POSITIONS[slot_number]
-                track_index = position['track']
                 start_frame = position['start_frame']
-                
-                # Get all timeline items on the video track
-                timeline_items = self.timeline.GetItemListInTrack('video', track_index)
-                logger.info(f"🔍 Found {len(timeline_items)} items on video track {track_index}")
-                
-                # Log all timeline item positions for debugging
-                logger.info(f"📍 Timeline items on track V{track_index}:")
-                for i, item in enumerate(timeline_items):
-                    item_start = item.GetStart()
-                    item_end = item.GetEnd()
-                    logger.info(f"   Item {i+1}: frames {item_start}-{item_end}")
-                
-                # Find the item at our target position and replace it
-                replaced = False
+
                 logger.info(f"🎯 Looking for slot {slot_number} at frame {start_frame}")
-                
-                for i, item in enumerate(timeline_items):
+
+                # Find the item at this exact frame position
+                target_item = None
+                for item in timeline_items:
                     item_start = item.GetStart()
                     item_end = item.GetEnd()
-                    
-                    # Check if this item overlaps with our target position
-                    if item_start <= start_frame < item_end:
-                        logger.info(f"✅ MATCH FOUND: Item {i+1} (frames {item_start}-{item_end}) contains target frame {start_frame}")
-                    elif item_start == start_frame:
-                        logger.info(f"✅ EXACT MATCH: Item {i+1} starts exactly at target frame {start_frame}")
-                    
-                    if item_start <= start_frame < item_end or item_start == start_frame:
-                        media_item = clip_data['media']
-                        
-                        # Try multiple replacement methods with better error handling
-                        try:
-                            # Method 1: Replace source clip directly (if method exists)
-                            if hasattr(item, 'ReplaceClip') and callable(getattr(item, 'ReplaceClip', None)):
-                                try:
-                                    result = item.ReplaceClip(media_item)
-                                    if result:
-                                        logger.info(f"✅ Method 1: Replaced slot {slot_number} with {clip_data['slot_info']['filename']}")
-                                        replaced = True
-                                        break
-                                except Exception as e:
-                                    logger.warning(f"Method 1 failed: {e}")
-                            
-                            # Method 2: Use take system (if method exists)
-                            if hasattr(item, 'AddTake') and callable(getattr(item, 'AddTake', None)):
-                                try:
-                                    if item.AddTake(media_item):
-                                        take_count = item.GetTakesCount()
-                                        if hasattr(item, 'SelectTakeByIndex') and callable(getattr(item, 'SelectTakeByIndex', None)):
-                                            if item.SelectTakeByIndex(take_count):
-                                                logger.info(f"✅ Method 2: Added take for slot {slot_number} with {clip_data['slot_info']['filename']}")
-                                                replaced = True
-                                                break
-                                except Exception as e:
-                                    logger.warning(f"Method 2 failed: {e}")
-                            
-                            # Method 3: Delete and re-add at exact position (most reliable)
-                            try:
-                                # Delete the existing clip
-                                if hasattr(self.timeline, 'DeleteClips') and callable(getattr(self.timeline, 'DeleteClips', None)):
-                                    self.timeline.DeleteClips([item])
-                                    logger.info(f"Deleted existing clip at slot {slot_number}")
+                    # Match if item starts at target frame OR contains target frame
+                    if item_start == start_frame or (item_start <= start_frame < item_end):
+                        target_item = item
+                        logger.info(f"✅ Found item at frames {item_start}-{item_end} for slot {slot_number}")
+                        break
 
-                                    # CRITICAL: Add new clip at EXACT position on track V3
-                                    # Use AppendToTimeline with explicit track and frame position
-                                    new_clips = [{
-                                        "mediaPoolItem": media_item,
-                                        "startFrame": 0,  # Start of source clip
-                                        "endFrame": int(clip_data['out_point']),  # Duration from slot template
-                                        "trackIndex": track_index,  # MUST be track 3 (V3)
-                                        "recordFrame": start_frame  # EXACT frame position from CLIP_POSITIONS
-                                    }]
+                if not target_item:
+                    logger.warning(f"❌ No timeline item found at frame {start_frame} for slot {slot_number}")
+                    continue
 
-                                    logger.info(f"📍 Placing clip on track V{track_index} at frame {start_frame} (duration: {int(clip_data['out_point'])} frames)")
+                media_item = clip_data['media']
+                replaced = False
 
-                                    if hasattr(self.media_pool, 'AppendToTimeline') and callable(getattr(self.media_pool, 'AppendToTimeline', None)):
-                                        result = self.media_pool.AppendToTimeline(new_clips)
-                                        if result:
-                                            logger.info(f"✅ Method 3: Replaced slot {slot_number} with {clip_data['slot_info']['filename']}")
+                # Try Method 1: ReplaceClip (non-destructive, preserves timeline structure)
+                if hasattr(target_item, 'ReplaceClip') and callable(getattr(target_item, 'ReplaceClip', None)):
+                    try:
+                        result = target_item.ReplaceClip(media_item)
+                        if result:
+                            logger.info(f"✅ ReplaceClip succeeded for slot {slot_number}")
+                            replaced_slots.append(slot_number)
+                            replaced = True
+                        else:
+                            logger.warning(f"⚠️ ReplaceClip returned False for slot {slot_number}")
+                    except Exception as e:
+                        logger.warning(f"ReplaceClip failed for slot {slot_number}: {e}")
 
-                                            # Verify the clip was placed correctly
-                                            new_timeline_items = self.timeline.GetItemListInTrack('video', track_index)
-                                            for new_item in new_timeline_items:
-                                                if new_item.GetStart() == start_frame:
-                                                    logger.info(f"✅ Verified: Clip placed correctly at frame {start_frame}")
-                                                    replaced = True
-                                                    break
+                # Try Method 2: AddTake (also non-destructive)
+                if not replaced and hasattr(target_item, 'AddTake') and callable(getattr(target_item, 'AddTake', None)):
+                    try:
+                        if target_item.AddTake(media_item):
+                            take_count = target_item.GetTakesCount()
+                            if hasattr(target_item, 'SelectTakeByIndex') and callable(getattr(target_item, 'SelectTakeByIndex', None)):
+                                if target_item.SelectTakeByIndex(take_count):
+                                    logger.info(f"✅ AddTake succeeded for slot {slot_number}")
+                                    replaced_slots.append(slot_number)
+                                    replaced = True
+                    except Exception as e:
+                        logger.warning(f"AddTake failed for slot {slot_number}: {e}")
 
-                                            if not replaced:
-                                                logger.warning(f"⚠️ Clip added but not at expected frame {start_frame}")
-                                                replaced = True  # Still mark as replaced since clip is in timeline
-                                            break
-                                        else:
-                                            logger.warning(f"AppendToTimeline returned False for slot {slot_number}")
-
-                            except Exception as e:
-                                logger.warning(f"Method 3 failed: {e}")
-                            
-                            # Method 4: Simple approach - just log success for now (clips are imported)
-                            logger.info(f"⚠️  Clip replacement methods not available, but clip imported for slot {slot_number}")
-                            replaced = True  # Mark as replaced since clip is at least imported
-                            break
-                                
-                        except Exception as replace_error:
-                            logger.warning(f"All replacement attempts failed for slot {slot_number}: {replace_error}")
-                            continue
-                
+                # If non-destructive methods failed, queue for batch delete/add
                 if not replaced:
-                    logger.warning(f"❌ Failed to replace slot {slot_number} - no suitable timeline item found at frame {start_frame}")
-                    # Log all timeline items for debugging
-                    for i, item in enumerate(timeline_items):
-                        logger.info(f"Timeline item {i+1}: {item.GetStart()}-{item.GetEnd()}")
+                    logger.info(f"⚠️ Non-destructive methods not available for slot {slot_number}, will use delete/add")
+                    slots_needing_delete_add.append({
+                        'slot_number': slot_number,
+                        'item': target_item,
+                        'media_item': media_item,
+                        'clip_data': clip_data,
+                        'start_frame': start_frame
+                    })
+
+            # Phase 2: Batch delete/add for slots that need it
+            if slots_needing_delete_add:
+                logger.info(f"🔄 Phase 2: Batch delete/add for {len(slots_needing_delete_add)} slots")
+
+                # Collect all items to delete
+                items_to_delete = [slot_info['item'] for slot_info in slots_needing_delete_add]
+
+                # Delete ALL at once (prevents timeline corruption from incremental deletes)
+                if hasattr(self.timeline, 'DeleteClips') and callable(getattr(self.timeline, 'DeleteClips', None)):
+                    logger.info(f"🗑️ Deleting {len(items_to_delete)} clips in one batch...")
+                    delete_result = self.timeline.DeleteClips(items_to_delete)
+                    if delete_result:
+                        logger.info(f"✅ Batch delete successful")
+                    else:
+                        logger.warning(f"⚠️ Batch delete returned False, but continuing...")
+
+                    # Now add all new clips at their exact positions
+                    new_clips_to_add = []
+                    for slot_info in slots_needing_delete_add:
+                        new_clips_to_add.append({
+                            "mediaPoolItem": slot_info['media_item'],
+                            "startFrame": 0,
+                            "endFrame": int(slot_info['clip_data']['out_point']),
+                            "trackIndex": track_index,
+                            "recordFrame": slot_info['start_frame']
+                        })
+                        logger.info(f"📍 Queuing slot {slot_info['slot_number']} for placement at frame {slot_info['start_frame']}")
+
+                    # Add ALL clips at once (prevents timeline corruption from incremental adds)
+                    if hasattr(self.media_pool, 'AppendToTimeline') and callable(getattr(self.media_pool, 'AppendToTimeline', None)):
+                        logger.info(f"➕ Adding {len(new_clips_to_add)} clips in one batch...")
+                        add_result = self.media_pool.AppendToTimeline(new_clips_to_add)
+                        if add_result:
+                            logger.info(f"✅ Batch add successful")
+
+                            # Verify all clips were placed correctly
+                            final_timeline_items = self.timeline.GetItemListInTrack('video', track_index)
+                            for slot_info in slots_needing_delete_add:
+                                slot_number = slot_info['slot_number']
+                                start_frame = slot_info['start_frame']
+                                found = False
+                                for item in final_timeline_items:
+                                    if item.GetStart() == start_frame:
+                                        logger.info(f"✅ Verified slot {slot_number} placed at frame {start_frame}")
+                                        replaced_slots.append(slot_number)
+                                        found = True
+                                        break
+                                if not found:
+                                    logger.warning(f"⚠️ Slot {slot_number} may not be at exact frame {start_frame}")
+                                    replaced_slots.append(slot_number)  # Still mark as replaced
+                        else:
+                            logger.error(f"❌ Batch add failed - AppendToTimeline returned False")
+                else:
+                    logger.error(f"❌ DeleteClips method not available")
+
+            # Summary
+            logger.info(f"🎉 Clip replacement complete: {len(replaced_slots)}/{len(media_items)} slots replaced")
+            if len(replaced_slots) < len(media_items):
+                missing_slots = set(media_items.keys()) - set(replaced_slots)
+                logger.warning(f"⚠️ Missing slots: {missing_slots}")
             
             return True
             
