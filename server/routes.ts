@@ -887,32 +887,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Open local video file on Mac (for sales page preview)
   app.post("/api/recordings/open-local-video", async (req, res) => {
     try {
-      const { drivePath } = req.body;
-
-      if (!drivePath) {
-        return res.status(400).json({ error: "drivePath is required" });
-      }
+      const { drivePath, localVideoPath, recordingId } = req.body;
 
       const { exec } = await import('child_process');
       const { promisify } = await import('util');
       const execAsync = promisify(exec);
       const os = await import('os');
       const path = await import('path');
-
-      // Construct full path to Google Drive file
-      const homeDir = os.homedir();
-      const googleDriveBase = path.join(homeDir, 'Library', 'CloudStorage');
-
-      // Find the Google Drive folder
       const fs = await import('fs');
-      const cloudStorageContents = fs.readdirSync(googleDriveBase);
-      const googleDriveFolder = cloudStorageContents.find(folder => folder.startsWith('GoogleDrive-'));
 
-      if (!googleDriveFolder) {
-        return res.status(404).json({ error: "Google Drive folder not found" });
+      let fullPath: string;
+
+      // Priority 1: Use direct localVideoPath if provided
+      if (localVideoPath) {
+        fullPath = localVideoPath;
       }
+      // Priority 2: Look up recording by ID and get localVideoPath
+      else if (recordingId) {
+        const recording = await storage.getFlightRecording(recordingId);
+        if (!recording || !recording.localVideoPath) {
+          return res.status(404).json({ error: "Recording not found or no local video path" });
+        }
+        fullPath = recording.localVideoPath;
+      }
+      // Priority 3: Legacy drivePath format (Google Drive sync)
+      else if (drivePath) {
+        // Construct full path to Google Drive file
+        const homeDir = os.homedir();
+        const googleDriveBase = path.join(homeDir, 'Library', 'CloudStorage');
 
-      const fullPath = path.join(googleDriveBase, googleDriveFolder, 'My Drive', drivePath);
+        // Find the Google Drive folder
+        const cloudStorageContents = fs.readdirSync(googleDriveBase);
+        const googleDriveFolder = cloudStorageContents.find(folder => folder.startsWith('GoogleDrive-'));
+
+        if (!googleDriveFolder) {
+          return res.status(404).json({ error: "Google Drive folder not found" });
+        }
+
+        fullPath = path.join(googleDriveBase, googleDriveFolder, 'My Drive', drivePath);
+      } else {
+        return res.status(400).json({ error: "localVideoPath, recordingId, or drivePath is required" });
+      }
 
       // Check if file exists
       if (!fs.existsSync(fullPath)) {

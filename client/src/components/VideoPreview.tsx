@@ -85,10 +85,48 @@ export default function VideoPreview({
   };
 
   const handlePreviewVideo = async () => {
-    // Priority 1: Use local video streaming if available (best experience)
-    if (localVideoPath && recordingId) {
-      setIsPreviewOpen(true);
-      return;
+    // Priority 1: Open local video file in Mac's native player (QuickTime, etc.)
+    if (localVideoPath || recordingId) {
+      try {
+        // Get the local device URL for Mac service
+        const healthResponse = await fetch('/api/health');
+        let localDeviceUrl = '';
+
+        if (healthResponse.ok) {
+          const healthData = await healthResponse.json();
+          localDeviceUrl = healthData.services?.localDevice || '';
+        }
+
+        // Fallback to localhost in development
+        if (!localDeviceUrl) {
+          localDeviceUrl = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+        }
+
+        const apiUrl = localDeviceUrl || '';
+
+        // Call backend to open the local file in native player
+        const response = await fetch(`${apiUrl}/api/recordings/open-local-video`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            localVideoPath: localVideoPath || undefined,
+            recordingId: recordingId || undefined
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to open video');
+        }
+
+        const result = await response.json();
+        console.log('✅ Video opened in native player:', result.path);
+        return;
+      } catch (error) {
+        console.error('Error opening video:', error);
+        alert('Failed to open video file. Please check the file exists locally on the Mac.');
+        return;
+      }
     }
 
     // Priority 2: For local Google Drive files, open the local file on Mac
@@ -231,6 +269,11 @@ export default function VideoPreview({
                     View in Drive
                   </Button>
                 </>
+              ) : localVideoPath || recordingId ? (
+                <Badge variant="outline" className="flex-1 py-2 justify-center bg-blue-500/10 text-blue-500 border-blue-500/50">
+                  <FileVideo className="w-3 h-3 mr-2" />
+                  Local video - Click play above
+                </Badge>
               ) : (
                 <Badge variant="outline" className="flex-1 py-2 justify-center bg-yellow-500/10 text-yellow-500 border-yellow-500/50">
                   <FileVideo className="w-3 h-3 mr-2" />

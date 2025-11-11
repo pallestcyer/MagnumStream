@@ -6,6 +6,35 @@ import { randomUUID } from 'crypto';
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 
+// Slot template configuration
+interface SlotConfig {
+  slotNumber: number;
+  sceneType: 'cruising' | 'chase' | 'arrival';
+  cameraAngle: 1 | 2;
+  color: string;
+  duration: number;
+}
+
+const SLOT_TEMPLATE: SlotConfig[] = [
+  // Cruising Scene (7 slots)
+  { slotNumber: 1, sceneType: 'cruising', cameraAngle: 2, color: '#FF6B35', duration: 0.876 },
+  { slotNumber: 2, sceneType: 'cruising', cameraAngle: 2, color: '#F7931E', duration: 1.210 },
+  { slotNumber: 3, sceneType: 'cruising', cameraAngle: 1, color: '#FFA500', duration: 1.293 },
+  { slotNumber: 4, sceneType: 'cruising', cameraAngle: 2, color: '#FF9E3D', duration: 0.959 },
+  { slotNumber: 5, sceneType: 'cruising', cameraAngle: 1, color: '#FF7A3D', duration: 1.502 },
+  { slotNumber: 6, sceneType: 'cruising', cameraAngle: 2, color: '#FF6B6B', duration: 0.667 },
+  { slotNumber: 7, sceneType: 'cruising', cameraAngle: 1, color: '#FFA07A', duration: 0.793 },
+  // Chase Scene (6 slots)
+  { slotNumber: 8,  sceneType: 'chase', cameraAngle: 2, color: '#FFB347', duration: 0.876 },
+  { slotNumber: 9,  sceneType: 'chase', cameraAngle: 1, color: '#FFCC00', duration: 1.418 },
+  { slotNumber: 10, sceneType: 'chase', cameraAngle: 2, color: '#FFD700', duration: 0.542 },
+  { slotNumber: 11, sceneType: 'chase', cameraAngle: 2, color: '#FFA500', duration: 1.460 },
+  { slotNumber: 12, sceneType: 'chase', cameraAngle: 1, color: '#FF8C00', duration: 1.543 },
+  { slotNumber: 13, sceneType: 'chase', cameraAngle: 1, color: '#FF7F50', duration: 0.542 },
+  // Arrival Scene (1 slot)
+  { slotNumber: 14, sceneType: 'arrival', cameraAngle: 1, color: '#FF6347', duration: 3.212 },
+];
+
 // Inline Supabase setup
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -150,7 +179,7 @@ class DatabaseStorage {
       .from('sales')
       .select('*')
       .order('sale_date', { ascending: false });
-      
+
     if (error) throw error;
     return data?.map((sale: any) => ({
       id: sale.id,
@@ -163,6 +192,44 @@ class DatabaseStorage {
       saleDate: new Date(sale.sale_date),
       driveShared: sale.drive_shared
     })) || [];
+  }
+
+  async getVideoSlotsByRecordingId(recordingId: string) {
+    const { data, error } = await (supabase as any)
+      .from('video_slots')
+      .select('*')
+      .eq('recording_id', recordingId)
+      .order('slot_number');
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  async createVideoSlot(slotData: {
+    recordingId: string;
+    slotNumber: number;
+    sceneId: string;
+    cameraAngle: number;
+    windowStart: number;
+    slotDuration: number;
+  }) {
+    const { data, error } = await (supabase as any)
+      .from('video_slots')
+      .upsert({
+        recording_id: slotData.recordingId,
+        slot_number: slotData.slotNumber,
+        scene_id: slotData.sceneId,
+        camera_angle: slotData.cameraAngle,
+        window_start: slotData.windowStart,
+        slot_duration: slotData.slotDuration
+      }, {
+        onConflict: 'recording_id,slot_number'
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
   }
 }
 
@@ -337,30 +404,85 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       });
 
-      // Video slots routes (delegated to local device)
+      // Video slots routes (handled by Vercel database)
       app.get('/api/recordings/:recordingId/video-slots', async (req, res) => {
         try {
-          const result = await videoOps.delegateToLocal(`/recordings/${req.params.recordingId}/video-slots`);
-          res.json(result);
-        } catch (error) {
+          const { recordingId } = req.params;
+          const slots = await storage.getVideoSlotsByRecordingId(recordingId);
+          res.setHeader('Content-Type', 'application/json');
+          res.json(Array.isArray(slots) ? slots : []);
+        } catch (error: any) {
           res.status(500).json({ error: error.message });
         }
       });
 
       app.post('/api/recordings/:recordingId/video-slots', async (req, res) => {
         try {
-          const result = await videoOps.delegateToLocal(`/recordings/${req.params.recordingId}/video-slots`, req.body, 'POST');
-          res.json(result);
-        } catch (error) {
+          const { recordingId } = req.params;
+          const { slotNumber, sceneId, cameraAngle, windowStart, slotDuration } = req.body;
+
+          if (!slotNumber || !sceneId || !cameraAngle || windowStart === undefined) {
+            return res.status(400).json({
+              error: "Missing required fields: slotNumber, sceneId, cameraAngle, windowStart"
+            });
+          }
+
+          const slot = await storage.createVideoSlot({
+            recordingId,
+            slotNumber: parseInt(slotNumber),
+            sceneId,
+            cameraAngle: parseInt(cameraAngle),
+            windowStart: parseFloat(windowStart),
+            slotDuration: slotDuration || 3.0
+          });
+
+          res.json(slot);
+        } catch (error: any) {
           res.status(500).json({ error: error.message });
         }
       });
 
       app.patch('/api/recordings/:recordingId/video-slots/:slotNumber', async (req, res) => {
         try {
-          const result = await videoOps.delegateToLocal(`/recordings/${req.params.recordingId}/video-slots/${req.params.slotNumber}`, req.body, 'PATCH');
-          res.json(result);
-        } catch (error) {
+          const { recordingId, slotNumber } = req.params;
+          const { windowStart } = req.body;
+
+          if (windowStart === undefined) {
+            return res.status(400).json({ error: "windowStart is required" });
+          }
+
+          const existingSlots = await storage.getVideoSlotsByRecordingId(recordingId);
+          const existingSlot = existingSlots.find((s: any) => s.slot_number === parseInt(slotNumber));
+
+          if (existingSlot) {
+            // Update existing slot
+            const updatedSlot = await storage.createVideoSlot({
+              recordingId,
+              slotNumber: parseInt(slotNumber),
+              sceneId: existingSlot.scene_id,
+              cameraAngle: existingSlot.camera_angle,
+              windowStart: parseFloat(windowStart),
+              slotDuration: existingSlot.slot_duration
+            });
+            res.json(updatedSlot);
+          } else {
+            // Create new slot with default values from SLOT_TEMPLATE
+            const slotConfig = SLOT_TEMPLATE.find(s => s.slotNumber === parseInt(slotNumber));
+            if (!slotConfig) {
+              return res.status(400).json({ error: "Invalid slot number" });
+            }
+
+            const newSlot = await storage.createVideoSlot({
+              recordingId,
+              slotNumber: parseInt(slotNumber),
+              sceneId: `${recordingId}_${slotConfig.sceneType}`,
+              cameraAngle: slotConfig.cameraAngle,
+              windowStart: parseFloat(windowStart),
+              slotDuration: slotConfig.duration
+            });
+            res.json(newSlot);
+          }
+        } catch (error: any) {
           res.status(500).json({ error: error.message });
         }
       });

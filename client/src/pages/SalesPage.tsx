@@ -213,10 +213,11 @@ export default function SalesPage() {
     r.projectName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Show recordings that are completed AND have a real Google Drive folder URL
-  // This filters out recordings with only search URLs and shows only those with proper folder links
+  // Show recordings that are completed AND have either:
+  // 1. A Google Drive folder URL (for cloud access)
+  // 2. A local video path (for Mac local playback)
   const exportedRecordings = filteredRecordings.filter(r =>
-    r.exportStatus === "completed" && r.driveFolderUrl
+    r.exportStatus === "completed" && (r.driveFolderUrl || r.localVideoPath)
   );
   const unsoldRecordings = exportedRecordings.filter(r => !r.sold);
   const soldRecordings = exportedRecordings.filter(r => r.sold);
