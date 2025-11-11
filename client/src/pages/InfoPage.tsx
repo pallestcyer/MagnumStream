@@ -83,8 +83,8 @@ export default function InfoPage() {
       console.log('🚀 InfoPage camera initialization started');
       
       let cameraConfig = {
-        camera1: { deviceId: 'default', label: 'Camera 1 (Straight View)' },
-        camera2: { deviceId: 'default', label: 'Camera 2 (Side View)' }
+        camera1: { deviceId: 'default', label: 'Camera 1 (Side View)' },
+        camera2: { deviceId: 'default', label: 'Camera 2 (Front View)' }
       };
 
       // Try to get camera configuration from server, but use fallback if it fails
@@ -100,8 +100,8 @@ export default function InfoPage() {
         console.warn('⚠️ Camera config API unavailable, using default cameras:', configError);
       }
 
-      // Camera 1 (Straight View)
-      console.log('🎥 Initializing Camera 1 (Straight View)...');
+      // Camera 1 (Side View)
+      console.log('🎥 Initializing Camera 1 (Side View)...');
       try {
         const constraints = cameraConfig.camera1.deviceId === 'default' 
           ? { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } }
@@ -316,7 +316,7 @@ export default function InfoPage() {
               {/* Camera 1 */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label className="text-base">Camera 1 (Straight On)</Label>
+                  <Label className="text-base">Camera 1 (Side View)</Label>
                   {camera1Ready ? (
                     <CheckCircle2 className="w-5 h-5 text-orange-500" data-testid="status-camera1-ready" />
                   ) : (
@@ -343,7 +343,7 @@ export default function InfoPage() {
               {/* Camera 2 */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label className="text-base">Camera 2 (Side View)</Label>
+                  <Label className="text-base">Camera 2 (Front View)</Label>
                   {camera2Ready ? (
                     <CheckCircle2 className="w-5 h-5 text-orange-500" data-testid="status-camera2-ready" />
                   ) : (

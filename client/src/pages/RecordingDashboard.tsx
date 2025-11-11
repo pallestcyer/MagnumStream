@@ -197,8 +197,8 @@ export default function RecordingDashboard() {
     try {
       // Get camera configuration from server
       let cameraConfig: any = {
-        camera1: { deviceId: 'default', label: 'Camera 1 (Straight View)' },
-        camera2: { deviceId: 'default', label: 'Camera 2 (Side View)' }
+        camera1: { deviceId: 'default', label: 'Camera 1 (Side View)' },
+        camera2: { deviceId: 'default', label: 'Camera 2 (Front View)' }
       };
 
       try {
@@ -219,8 +219,8 @@ export default function RecordingDashboard() {
         console.warn('⚠️ Camera config API unavailable, using default cameras:', configError);
       }
 
-      // Camera 1 (Straight View)
-      console.log('🎥 Initializing Camera 1 (Straight View)...');
+      // Camera 1 (Side View)
+      console.log('🎥 Initializing Camera 1 (Side View)...');
       const stream1 = await navigator.mediaDevices.getUserMedia({
         video: {
           deviceId: cameraConfig.camera1.deviceId === 'default' ? undefined : { exact: cameraConfig.camera1.deviceId },

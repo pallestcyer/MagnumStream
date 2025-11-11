@@ -52,8 +52,8 @@ export default function DeviceSelector({
         console.error('❌ Failed to fetch camera config:', error);
         // Fallback to default config
         const fallbackConfig = {
-          camera1: { deviceId: "default-camera-1", label: "Camera 1 (Straight View)" },
-          camera2: { deviceId: "default-camera-2", label: "Camera 2 (Side View)" }
+          camera1: { deviceId: "default-camera-1", label: "Camera 1 (Side View)" },
+          camera2: { deviceId: "default-camera-2", label: "Camera 2 (Front View)" }
         };
         setCameraConfig(fallbackConfig);
       } finally {
@@ -84,7 +84,7 @@ export default function DeviceSelector({
     <div className="flex items-center gap-4">
       <div className="flex items-center gap-2 min-w-0">
         <Camera className="w-4 h-4 text-green-500 flex-shrink-0" />
-        <span className="text-xs text-muted-foreground">Camera 1 (Straight View):</span>
+        <span className="text-xs text-muted-foreground">Camera 1 (Side View):</span>
         <div className="px-3 py-1.5 bg-green-100 dark:bg-green-900/30 rounded-md border">
           <span className="text-xs font-mono text-green-700 dark:text-green-300">
             {cameraConfig.camera1.label}

@@ -36,11 +36,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cameraConfig = {
         camera1: {
           deviceId: process.env.CAMERA_1_DEVICE_ID || "default-camera-1",
-          label: "Camera 1 (Straight View)"
+          label: "Camera 1 (Side View)"
         },
         camera2: {
-          deviceId: process.env.CAMERA_2_DEVICE_ID || "default-camera-2", 
-          label: "Camera 2 (Side View)"
+          deviceId: process.env.CAMERA_2_DEVICE_ID || "default-camera-2",
+          label: "Camera 2 (Front View)"
         }
       };
       
