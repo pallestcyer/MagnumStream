@@ -162,18 +162,26 @@ export class SupabaseStorage implements IStorage {
     if (updates.localVideoPath !== undefined) dbUpdates.local_video_path = updates.localVideoPath;
     if (updates.smsPhoneNumber !== undefined) dbUpdates.sms_phone_number = updates.smsPhoneNumber;
     if (updates.sold !== undefined) dbUpdates.sold = updates.sold;
-    
+
+    console.log(`🔍 SUPABASE UPDATE: Recording ${id}`);
+    console.log(`   Updates requested:`, updates);
+    console.log(`   DB updates (snake_case):`, dbUpdates);
+
     const { data, error } = await db
       .from('flight_recordings')
       .update(dbUpdates)
       .eq('id', id)
       .select()
       .single();
-    
+
     if (error) {
-      console.error('Error updating flight recording:', error);
+      console.error(`❌ SUPABASE ERROR updating recording ${id}:`, error);
+      console.error(`   Error details:`, JSON.stringify(error, null, 2));
       return undefined;
     }
+
+    console.log(`✅ SUPABASE UPDATE SUCCESS: Recording ${id}`);
+    console.log(`   Updated export_status:`, data?.export_status);
     
     return data ? {
       id: data.id,
