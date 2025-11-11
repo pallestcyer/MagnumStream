@@ -160,11 +160,33 @@ if [ "$DAVINCI_STARTED" = false ]; then
     echo "⚠️  DaVinci Resolve not started (will auto-start when needed)"
 fi
 
+# Run cleanup of old project clips (older than 24 hours) on startup
+echo "🧹 Cleaning up old project clips..."
+if [ -f "$PROJECT_DIR/cleanup-old-clips.sh" ]; then
+    bash "$PROJECT_DIR/cleanup-old-clips.sh"
+else
+    echo "⚠️  Cleanup script not found, skipping..."
+fi
+
 # Start the Express server in background
 echo "🖥️  Starting local video processing server..."
 nohup npm start > "$SERVER_LOG" 2>&1 &
 SERVER_PID=$!
 echo $SERVER_PID > "$LOG_DIR/server.pid"
+
+# Start background cleanup job (runs every 24 hours)
+echo "🔄 Starting background cleanup service..."
+(
+    while true; do
+        sleep 86400  # 24 hours
+        if [ -f "$PROJECT_DIR/cleanup-old-clips.sh" ]; then
+            bash "$PROJECT_DIR/cleanup-old-clips.sh"
+        fi
+    done
+) > "$LOG_DIR/cleanup-bg.log" 2>&1 &
+CLEANUP_PID=$!
+echo $CLEANUP_PID > "$LOG_DIR/cleanup.pid"
+echo "✅ Background cleanup started (PID: $CLEANUP_PID)"
 
 # Wait for server to start
 sleep 3
@@ -250,14 +272,16 @@ echo "   Local Server:  http://localhost:3001"
 echo "   Public URL:    $NGROK_URL"
 echo "   Server PID:    $SERVER_PID"
 echo "   ngrok PID:     $NGROK_PID"
+echo "   Cleanup PID:   $CLEANUP_PID (runs every 24h)"
 echo ""
 echo "📝 Important: Add this to your Vercel environment variables:"
 echo "   LOCAL_DEVICE_URL=$NGROK_URL"
 echo ""
 echo "📋 Logs:"
-echo "   Server: $SERVER_LOG"
-echo "   ngrok:  $NGROK_LOG"
+echo "   Server:  $SERVER_LOG"
+echo "   ngrok:   $NGROK_LOG"
 echo "   DaVinci: $DAVINCI_LOG"
+echo "   Cleanup: $LOG_DIR/cleanup.log"
 echo ""
 echo "🎬 DaVinci Resolve Integration:"
 echo "   - Ensure DaVinci Resolve Studio is running"

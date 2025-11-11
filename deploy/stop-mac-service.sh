@@ -37,6 +37,20 @@ if [ -f "$LOG_DIR/ngrok.pid" ]; then
     fi
 fi
 
+# Stop background cleanup job
+if [ -f "$LOG_DIR/cleanup.pid" ]; then
+    CLEANUP_PID=$(cat "$LOG_DIR/cleanup.pid")
+    if kill -0 $CLEANUP_PID 2>/dev/null; then
+        echo "🧹 Stopping cleanup service (PID: $CLEANUP_PID)..."
+        kill $CLEANUP_PID
+        rm "$LOG_DIR/cleanup.pid"
+        echo "✅ Cleanup service stopped"
+    else
+        echo "⚠️  Cleanup service not running"
+        rm -f "$LOG_DIR/cleanup.pid"
+    fi
+fi
+
 # Clean up URL file
 rm -f "$LOG_DIR/ngrok-url.txt"
 
