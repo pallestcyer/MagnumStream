@@ -28,9 +28,22 @@ export default function PhaseNavigation({ currentPhase, completedPhases = [] }: 
   };
 
   const isPhaseAccessible = (phase: Phase) => {
-    // Always allow going back to previous phases
-    // Allow going to editing at any time (skip ahead feature)
-    return phase.order <= getCurrentPhaseOrder() || phase.id === "editing";
+    // Always allow going back to completed phases
+    if (isPhaseComplete(phase.id)) {
+      return true;
+    }
+
+    // Allow accessing current phase and all previous phases
+    if (phase.order <= getCurrentPhaseOrder()) {
+      return true;
+    }
+
+    // For editing phase: only allow if recording is completed
+    if (phase.id === "editing" && isPhaseComplete("recording")) {
+      return true;
+    }
+
+    return false;
   };
 
   const isPhaseComplete = (phaseId: string) => {
