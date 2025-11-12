@@ -288,3 +288,9 @@ echo "   - Template project: 'MAG_FERRARI-BACKUP' with 5-slot timeline"
 echo "   - Clips will be processed: FFMPEG → DaVinci → Final render"
 echo ""
 echo "🛑 To stop the service: ./deploy/stop-mac-service.sh"
+echo ""
+echo "✅ Service running - keeping parent process alive..."
+
+# Keep the script running so launchd doesn't kill child processes
+# This wait command will keep the script alive until all background jobs finish (which they won't)
+wait
