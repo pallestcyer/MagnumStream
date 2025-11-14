@@ -54,17 +54,20 @@ export default function ManualPage() {
             <div className="flex items-start gap-4">
               <Badge className="mt-1">Step 3</Badge>
               <div>
-                <h3 className="font-semibold text-foreground">Editing - Select 3-Second Clips</h3>
+                <h3 className="font-semibold text-foreground">Editing - Select 14 Video Clips</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  The editing workflow is split into 3 separate pages for each scene:
+                  The editing workflow is split into 3 separate pages for each scene. Select the best moments from your footage - each slot has a specific duration that matches the final video template:
                 </p>
                 <ul className="list-disc list-inside text-sm text-muted-foreground mt-2 ml-4 space-y-1">
-                  <li><strong>Cruising Editor:</strong> Click on slots 1-3 to select your best 3-second moments</li>
-                  <li><strong>Chase Editor:</strong> Click on slots 4-6 to pick exciting chase clips</li>
-                  <li><strong>Arrival Editor:</strong> Click on slots 7-8 for landing highlights</li>
+                  <li><strong>Cruising Editor:</strong> Select 7 clips (slots 1-7) alternating between front and side camera views</li>
+                  <li><strong>Chase Editor:</strong> Select 6 clips (slots 8-13) with dynamic chase angles</li>
+                  <li><strong>Arrival Editor:</strong> Select 1 clip (slot 14) showing the landing approach</li>
                 </ul>
                 <p className="text-sm text-blue-600 dark:text-blue-400 mt-2">
-                  💡 Tip: Click a slot card to activate it. The video preview will play your selected 3-second window while you adjust the timeline.
+                  💡 Tip: Click a slot card to activate it. The video preview will play your selected clip duration while you adjust the timeline. Each slot has a preset duration (ranging from 0.5 to 3.2 seconds) for a total final video of approximately 17 seconds.
+                </p>
+                <p className="text-sm text-purple-600 dark:text-purple-400 mt-2">
+                  ✨ Smart Feature: Some slots are paired for seamless camera transitions. When you adjust the timing of certain slots, the next slot will automatically position itself to create smooth continuity between camera angles.
                 </p>
               </div>
             </div>
@@ -72,16 +75,38 @@ export default function ManualPage() {
             <div className="flex items-start gap-4">
               <Badge className="mt-1">Step 4</Badge>
               <div>
-                <h3 className="font-semibold text-foreground">Export - Finalize & Share</h3>
+                <h3 className="font-semibold text-foreground">Render - Automated Video Production</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  After editing, export your video:
+                  After selecting all 14 clips, click the "Render" button to start the automated process:
                 </p>
                 <ul className="list-disc list-inside text-sm text-muted-foreground mt-2 ml-4 space-y-1">
-                  <li>Enter flight date and time (automatically rounded to nearest hour/half-hour)</li>
-                  <li>System exports to DaVinci Resolve format</li>
-                  <li>Video is uploaded to Google Drive</li>
-                  <li>SMS link sent to customer's phone</li>
+                  <li>System extracts all 14 clips from your source videos using FFmpeg</li>
+                  <li>DaVinci Resolve automatically imports clips and replaces template footage</li>
+                  <li>Final video is rendered (approximately 17 seconds long)</li>
+                  <li>Video is automatically copied to Google Drive for syncing</li>
+                  <li>Video appears on the Sales page once rendering is complete</li>
                 </ul>
+                <p className="text-sm text-muted-foreground mt-2">
+                  The entire rendering process is fully automated and typically takes 2-3 minutes. You can track the status in the Export Workflow page.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4">
+              <Badge className="mt-1">Step 5</Badge>
+              <div>
+                <h3 className="font-semibold text-foreground">Sales Page - Preview & Deliver</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Once rendering is complete, use the Sales page to preview and share videos with customers:
+                </p>
+                <ul className="list-disc list-inside text-sm text-muted-foreground mt-2 ml-4 space-y-1">
+                  <li><strong>Play Button:</strong> Opens video in QuickTime for instant local preview</li>
+                  <li><strong>Drive Icon:</strong> Opens Google Drive to get a shareable link for the customer</li>
+                  <li><strong>Create Sale:</strong> Records the purchase and marks the video as sold</li>
+                </ul>
+                <p className="text-sm text-green-600 dark:text-green-400 mt-2">
+                  ✅ Videos are organized by date in Google Drive and automatically sync to the cloud for easy sharing with customers.
+                </p>
               </div>
             </div>
           </div>
@@ -104,7 +129,14 @@ export default function ManualPage() {
               <div className="w-2 h-2 rounded-full bg-primary mt-2" />
               <div>
                 <p className="font-semibold text-foreground">Record More Than 30 Seconds</p>
-                <p className="text-sm text-muted-foreground">Aim for 45-60 seconds per scene to have more options when selecting clips</p>
+                <p className="text-sm text-muted-foreground">Aim for 45-60 seconds per scene to have more options when selecting the 14 clips. More footage means more flexibility in finding the perfect moments.</p>
+              </div>
+            </li>
+            <li className="flex items-start gap-3">
+              <div className="w-2 h-2 rounded-full bg-primary mt-2" />
+              <div>
+                <p className="font-semibold text-foreground">Trust the Seamless Transitions</p>
+                <p className="text-sm text-muted-foreground">When editing paired slots, the system automatically positions clips for smooth camera angle changes. Just focus on selecting great moments.</p>
               </div>
             </li>
             <li className="flex items-start gap-3">
