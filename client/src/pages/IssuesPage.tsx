@@ -24,9 +24,9 @@ export default function IssuesPage() {
     description: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.staffName || !formData.issueType || !formData.description) {
       toast({
         title: "Missing Information",
@@ -36,25 +36,52 @@ export default function IssuesPage() {
       return;
     }
 
-    // Simulate submission
-    console.log("Issue submitted:", formData);
-    setSubmitted(true);
-    
-    toast({
-      title: "Issue Reported",
-      description: "Your issue has been submitted successfully. Our team will review it shortly.",
-    });
-
-    // Reset form after 3 seconds
-    setTimeout(() => {
-      setSubmitted(false);
-      setFormData({
-        staffName: "",
-        issueType: "",
-        priority: "",
-        description: "",
+    try {
+      const response = await fetch("/api/issues", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          staffName: formData.staffName,
+          issueType: formData.issueType,
+          priority: formData.priority || null,
+          description: formData.description,
+        }),
       });
-    }, 3000);
+
+      if (!response.ok) {
+        throw new Error("Failed to submit issue");
+      }
+
+      const result = await response.json();
+      console.log("Issue submitted successfully:", result);
+
+      setSubmitted(true);
+
+      toast({
+        title: "Issue Reported",
+        description: "Your issue has been submitted successfully. Our team will review it shortly.",
+      });
+
+      // Reset form after 3 seconds
+      setTimeout(() => {
+        setSubmitted(false);
+        setFormData({
+          staffName: "",
+          issueType: "",
+          priority: "",
+          description: "",
+        });
+      }, 3000);
+    } catch (error) {
+      console.error("Error submitting issue:", error);
+      toast({
+        title: "Submission Failed",
+        description: "There was an error submitting your issue. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (submitted) {

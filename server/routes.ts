@@ -338,6 +338,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Submit issue report
+  app.post("/api/issues", async (req, res) => {
+    try {
+      const { staffName, issueType, priority, description } = req.body;
+
+      if (!staffName || !issueType || !description) {
+        return res.status(400).json({
+          error: "Missing required fields: staffName, issueType, and description are required"
+        });
+      }
+
+      const issue = await storage.createIssue({
+        staffName,
+        issueType,
+        priority: priority || null,
+        description,
+      });
+
+      console.log('📝 Issue reported:', {
+        id: issue.id,
+        staffName,
+        issueType,
+        priority: priority || 'not specified',
+      });
+
+      res.json(issue);
+    } catch (error: any) {
+      console.error('❌ Error creating issue:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get all issues
+  app.get("/api/issues", async (_req, res) => {
+    try {
+      const issues = await storage.getAllIssues();
+      res.json(issues);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update issue status
+  app.patch("/api/issues/:issueId", async (req, res) => {
+    try {
+      const { issueId } = req.params;
+      const { status, notes } = req.body;
+
+      const updatedIssue = await storage.updateIssue(issueId, {
+        status,
+        notes,
+        ...(status === 'resolved' || status === 'closed' ? { resolvedAt: new Date().toISOString() } : {}),
+      });
+
+      res.json(updatedIssue);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Debug storage info
   app.get("/api/debug/storage-info", async (req, res) => {
     try {

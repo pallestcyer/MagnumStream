@@ -448,4 +448,101 @@ export class SupabaseStorage implements IStorage {
       createdAt: new Date(data.created_at)
     };
   }
+
+  // Issue methods
+  async createIssue(issue: {
+    staffName: string;
+    issueType: 'camera' | 'recording' | 'editing' | 'export' | 'performance' | 'ui' | 'other';
+    priority?: 'low' | 'medium' | 'high' | 'critical' | null;
+    description: string;
+  }) {
+    const { data, error } = await db
+      .from('issues')
+      .insert({
+        staff_name: issue.staffName,
+        issue_type: issue.issueType,
+        priority: issue.priority || null,
+        description: issue.description,
+        status: 'open'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to create issue: ${error.message}`);
+    }
+
+    return {
+      id: data.id,
+      staffName: data.staff_name,
+      issueType: data.issue_type,
+      priority: data.priority,
+      description: data.description,
+      status: data.status,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      resolvedAt: data.resolved_at,
+      notes: data.notes
+    };
+  }
+
+  async getAllIssues() {
+    const { data, error } = await db
+      .from('issues')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`Failed to fetch issues: ${error.message}`);
+    }
+
+    return data.map((issue: any) => ({
+      id: issue.id,
+      staffName: issue.staff_name,
+      issueType: issue.issue_type,
+      priority: issue.priority,
+      description: issue.description,
+      status: issue.status,
+      createdAt: issue.created_at,
+      updatedAt: issue.updated_at,
+      resolvedAt: issue.resolved_at,
+      notes: issue.notes
+    }));
+  }
+
+  async updateIssue(issueId: string, updates: {
+    status?: 'open' | 'in_progress' | 'resolved' | 'closed';
+    notes?: string;
+    resolvedAt?: string;
+  }) {
+    const updateData: any = {};
+
+    if (updates.status) updateData.status = updates.status;
+    if (updates.notes !== undefined) updateData.notes = updates.notes;
+    if (updates.resolvedAt) updateData.resolved_at = updates.resolvedAt;
+
+    const { data, error } = await db
+      .from('issues')
+      .update(updateData)
+      .eq('id', issueId)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to update issue: ${error.message}`);
+    }
+
+    return {
+      id: data.id,
+      staffName: data.staff_name,
+      issueType: data.issue_type,
+      priority: data.priority,
+      description: data.description,
+      status: data.status,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      resolvedAt: data.resolved_at,
+      notes: data.notes
+    };
+  }
 }

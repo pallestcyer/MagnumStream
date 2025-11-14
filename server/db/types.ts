@@ -153,6 +153,44 @@ export interface Database {
           drive_shared?: boolean;
         };
       };
+      issues: {
+        Row: {
+          id: string;
+          staff_name: string;
+          issue_type: 'camera' | 'recording' | 'editing' | 'export' | 'performance' | 'ui' | 'other';
+          priority: 'low' | 'medium' | 'high' | 'critical' | null;
+          description: string;
+          status: 'open' | 'in_progress' | 'resolved' | 'closed';
+          created_at: string;
+          updated_at: string;
+          resolved_at: string | null;
+          notes: string | null;
+        };
+        Insert: {
+          id?: string;
+          staff_name: string;
+          issue_type: 'camera' | 'recording' | 'editing' | 'export' | 'performance' | 'ui' | 'other';
+          priority?: 'low' | 'medium' | 'high' | 'critical' | null;
+          description: string;
+          status?: 'open' | 'in_progress' | 'resolved' | 'closed';
+          created_at?: string;
+          updated_at?: string;
+          resolved_at?: string | null;
+          notes?: string | null;
+        };
+        Update: {
+          id?: string;
+          staff_name?: string;
+          issue_type?: 'camera' | 'recording' | 'editing' | 'export' | 'performance' | 'ui' | 'other';
+          priority?: 'low' | 'medium' | 'high' | 'critical' | null;
+          description?: string;
+          status?: 'open' | 'in_progress' | 'resolved' | 'closed';
+          created_at?: string;
+          updated_at?: string;
+          resolved_at?: string | null;
+          notes?: string | null;
+        };
+      };
     };
   };
 }

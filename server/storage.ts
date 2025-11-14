@@ -34,6 +34,20 @@ export interface IStorage {
     slotDuration: number;
   }): Promise<any>;
   getVideoSlotsByRecordingId?(recordingId: string): Promise<any[]>;
+
+  // Issue methods
+  createIssue?(issue: {
+    staffName: string;
+    issueType: 'camera' | 'recording' | 'editing' | 'export' | 'performance' | 'ui' | 'other';
+    priority?: 'low' | 'medium' | 'high' | 'critical' | null;
+    description: string;
+  }): Promise<any>;
+  getAllIssues?(): Promise<any[]>;
+  updateIssue?(issueId: string, updates: {
+    status?: 'open' | 'in_progress' | 'resolved' | 'closed';
+    notes?: string;
+    resolvedAt?: string;
+  }): Promise<any>;
 }
 
 export class MemStorage implements IStorage {
