@@ -469,80 +469,84 @@ class DaVinciAutomation:
                     continue
 
                 media_item = clip_data['media']
-                new_clip_path = str(Path(clip_data['slot_info']['fullPath']))
                 replaced = False
 
-                # BEST METHOD: Replace source media directly on the MediaPoolItem
-                # This preserves EXACT timeline position, effects, keyframes, everything
-                try:
-                    # Get the MediaPoolItem that this timeline item references
-                    if hasattr(target_item, 'GetMediaPoolItem') and callable(getattr(target_item, 'GetMediaPoolItem', None)):
-                        source_media_pool_item = target_item.GetMediaPoolItem()
+                # NOTE: We CANNOT use MediaPoolItem.ReplaceClip() because if the template
+                # reuses the same MediaPoolItem across multiple slots, it would replace
+                # all instances globally. We must use TimelineItem methods only.
 
-                        if source_media_pool_item:
-                            logger.info(f"📦 Found MediaPoolItem for slot {slot_number}")
-
-                            # Try to replace the source media file directly
-                            # This updates the timeline item WITHOUT moving it
-                            if hasattr(source_media_pool_item, 'ReplaceClip') and callable(getattr(source_media_pool_item, 'ReplaceClip', None)):
-                                try:
-                                    # ReplaceClip on MediaPoolItem takes a file path
-                                    result = source_media_pool_item.ReplaceClip(new_clip_path)
-                                    if result:
-                                        logger.info(f"✅ MediaPoolItem.ReplaceClip succeeded for slot {slot_number}")
-                                        logger.info(f"   Timeline position preserved, source updated to: {clip_data['slot_info']['filename']}")
-                                        replaced_slots.append(slot_number)
-                                        replaced = True
-                                    else:
-                                        logger.debug(f"MediaPoolItem.ReplaceClip returned False for slot {slot_number}")
-                                except Exception as e:
-                                    logger.debug(f"MediaPoolItem.ReplaceClip failed for slot {slot_number}: {e}")
-                except Exception as e:
-                    logger.debug(f"Could not get MediaPoolItem for slot {slot_number}: {e}")
-
-                # Method 1: ReplaceClip on TimelineItem (preserves position and effects)
-                if not replaced and hasattr(target_item, 'ReplaceClip') and callable(getattr(target_item, 'ReplaceClip', None)):
+                # Method 1: ReplaceClip on TimelineItem (should preserve exact position)
+                # This replaces only THIS timeline item's source, not the MediaPoolItem globally
+                if hasattr(target_item, 'ReplaceClip') and callable(getattr(target_item, 'ReplaceClip', None)):
                     try:
+                        # Ensure our generated clip matches template expectations exactly
+                        logger.info(f"🔄 Attempting TimelineItem.ReplaceClip for slot {slot_number}")
+                        logger.info(f"   Source clip: {clip_data['slot_info']['filename']}")
+                        logger.info(f"   Duration: {clip_data['slot_info'].get('duration')} seconds")
+
                         result = target_item.ReplaceClip(media_item)
                         if result:
                             logger.info(f"✅ TimelineItem.ReplaceClip succeeded for slot {slot_number}")
+                            logger.info(f"   Position preserved at frame {start_frame} on track V{track_index}")
                             replaced_slots.append(slot_number)
                             replaced = True
                         else:
-                            logger.debug(f"TimelineItem.ReplaceClip returned False for slot {slot_number}")
+                            logger.warning(f"⚠️ TimelineItem.ReplaceClip returned False for slot {slot_number}")
+                            logger.warning(f"   This may indicate clip property mismatch (fps, duration, codec)")
                     except Exception as e:
-                        logger.debug(f"TimelineItem.ReplaceClip failed for slot {slot_number}: {e}")
+                        logger.warning(f"❌ TimelineItem.ReplaceClip failed for slot {slot_number}: {e}")
 
-                # Method 2: LinkProxyMedia (if using proxy workflow)
+                # Method 2: AddTake (creates alternate take, preserves position)
+                # This is safer than ReplaceClip as it doesn't modify the original
+                if not replaced and hasattr(target_item, 'AddTake') and callable(getattr(target_item, 'AddTake', None)):
+                    try:
+                        logger.info(f"🔄 Attempting AddTake for slot {slot_number}")
+                        if target_item.AddTake(media_item):
+                            take_count = target_item.GetTakesCount()
+                            logger.info(f"   Take added, total takes: {take_count}")
+
+                            if hasattr(target_item, 'SelectTakeByIndex') and callable(getattr(target_item, 'SelectTakeByIndex', None)):
+                                # Select the newly added take (last one)
+                                if target_item.SelectTakeByIndex(take_count):
+                                    logger.info(f"✅ AddTake succeeded for slot {slot_number}")
+                                    logger.info(f"   Selected take {take_count}, position preserved")
+                                    replaced_slots.append(slot_number)
+                                    replaced = True
+                                else:
+                                    logger.warning(f"⚠️ Take added but could not select for slot {slot_number}")
+                            else:
+                                logger.warning(f"⚠️ SelectTakeByIndex method not available")
+                        else:
+                            logger.warning(f"⚠️ AddTake returned False for slot {slot_number}")
+                    except Exception as e:
+                        logger.warning(f"❌ AddTake failed for slot {slot_number}: {e}")
+
+                # Method 3: LinkProxyMedia (last resort, for proxy workflows)
                 if not replaced and hasattr(target_item, 'LinkProxyMedia') and callable(getattr(target_item, 'LinkProxyMedia', None)):
                     try:
+                        logger.info(f"🔄 Attempting LinkProxyMedia for slot {slot_number}")
                         result = target_item.LinkProxyMedia(media_item)
                         if result:
                             logger.info(f"✅ LinkProxyMedia succeeded for slot {slot_number}")
                             replaced_slots.append(slot_number)
                             replaced = True
+                        else:
+                            logger.debug(f"LinkProxyMedia returned False for slot {slot_number}")
                     except Exception as e:
                         logger.debug(f"LinkProxyMedia not applicable for slot {slot_number}: {e}")
 
-                # Method 3: AddTake (creates alternate take, preserves position)
-                if not replaced and hasattr(target_item, 'AddTake') and callable(getattr(target_item, 'AddTake', None)):
-                    try:
-                        if target_item.AddTake(media_item):
-                            take_count = target_item.GetTakesCount()
-                            if hasattr(target_item, 'SelectTakeByIndex') and callable(getattr(target_item, 'SelectTakeByIndex', None)):
-                                if target_item.SelectTakeByIndex(take_count):
-                                    logger.info(f"✅ AddTake succeeded for slot {slot_number}")
-                                    replaced_slots.append(slot_number)
-                                    replaced = True
-                    except Exception as e:
-                        logger.debug(f"AddTake failed for slot {slot_number}: {e}")
-
-                # Final check - DO NOT use delete/add as it corrupts timeline positions
+                # Final check - if all methods failed, we have a problem
                 if not replaced:
                     logger.error(f"❌ ALL replacement methods failed for slot {slot_number}")
-                    logger.error(f"   Template placeholder at frame {start_frame} could not be updated")
+                    logger.error(f"   Timeline item at frame {start_frame} could not be updated")
+                    logger.error(f"   Possible causes:")
+                    logger.error(f"   - Clip properties don't match template (fps: 23.976, codec: H.264)")
+                    logger.error(f"   - DaVinci API version doesn't support these methods")
+                    logger.error(f"   - Template uses locked or compound clips")
                     logger.error(f"   This will cause 'media not found' error during render")
-                    logger.error(f"   Manual replacement in DaVinci Resolve may be required")
+                    logger.error(f"   ")
+                    logger.error(f"   RECOMMENDATION: Check davinci_automation.log for details")
+                    logger.error(f"   Consider manual replacement in DaVinci Resolve as workaround")
 
             # Phase 2: DISABLED - Batch delete/add was causing all clips to be removed
             # Keeping this code commented for reference but NOT executing
