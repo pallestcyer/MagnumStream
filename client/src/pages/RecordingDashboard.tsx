@@ -1024,22 +1024,24 @@ export default function RecordingDashboard() {
                       <Button
                         size="lg"
                         onClick={handleRetake}
-                        variant="outline"
-                        className="min-w-40"
+                        variant={allScenesCompleted ? "outline" : undefined}
+                        className={allScenesCompleted ? "min-w-40" : "bg-gradient-purple-blue min-w-40"}
                         data-testid="button-retake"
                       >
                         <RotateCcw className="w-5 h-5 mr-2" />
                         Re-record
                       </Button>
-                      <Button
-                        size="lg"
-                        onClick={() => setLocation("/editor/cruising")}
-                        className="bg-gradient-purple-blue min-w-40"
-                        data-testid="button-move-to-editing-idle"
-                      >
-                        Move to Editing
-                        <ArrowRight className="w-5 h-5 ml-2" />
-                      </Button>
+                      {allScenesCompleted && (
+                        <Button
+                          size="lg"
+                          onClick={() => setLocation("/editor/cruising")}
+                          className="bg-gradient-purple-blue min-w-40"
+                          data-testid="button-move-to-editing-idle"
+                        >
+                          Move to Editing
+                          <ArrowRight className="w-5 h-5 ml-2" />
+                        </Button>
+                      )}
                     </>
                   )}
                 </>
@@ -1096,22 +1098,24 @@ export default function RecordingDashboard() {
                   <Button
                     size="lg"
                     onClick={handleRetake}
-                    variant="outline"
-                    className="min-w-40"
+                    variant={allScenesCompleted ? "outline" : undefined}
+                    className={allScenesCompleted ? "min-w-40" : "bg-gradient-purple-blue min-w-40"}
                     data-testid="button-retake-after-completed"
                   >
                     <RotateCcw className="w-5 h-5 mr-2" />
                     Re-record
                   </Button>
-                  <Button
-                    size="lg"
-                    onClick={() => setLocation("/editor/cruising")}
-                    className="bg-gradient-purple-blue min-w-40"
-                    data-testid="button-move-to-editing"
-                  >
-                    Move to Editing
-                    <ArrowRight className="w-5 h-5 ml-2" />
-                  </Button>
+                  {allScenesCompleted && (
+                    <Button
+                      size="lg"
+                      onClick={() => setLocation("/editor/cruising")}
+                      className="bg-gradient-purple-blue min-w-40"
+                      data-testid="button-move-to-editing"
+                    >
+                      Move to Editing
+                      <ArrowRight className="w-5 h-5 ml-2" />
+                    </Button>
+                  )}
                 </>
               )}
             </div>
