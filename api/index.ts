@@ -83,6 +83,7 @@ class DatabaseStorage {
       driveFileUrl: result.drive_file_url,
       driveFolderUrl: result.drive_folder_url,
       localVideoPath: result.local_video_path,
+      thumbnailUrl: result.thumbnail_url,
       smsPhoneNumber: result.sms_phone_number,
       sold: result.sold,
       createdAt: new Date(result.created_at)
@@ -102,6 +103,7 @@ class DatabaseStorage {
     if (data.driveFileUrl) updateData.drive_file_url = data.driveFileUrl;
     if (data.driveFolderUrl) updateData.drive_folder_url = data.driveFolderUrl;
     if (data.localVideoPath) updateData.local_video_path = data.localVideoPath;
+    if (data.thumbnailUrl) updateData.thumbnail_url = data.thumbnailUrl;
     if (data.smsPhoneNumber) updateData.sms_phone_number = data.smsPhoneNumber;
     if (data.sold !== undefined) updateData.sold = data.sold;
 
@@ -128,6 +130,7 @@ class DatabaseStorage {
       driveFileUrl: result.drive_file_url,
       driveFolderUrl: result.drive_folder_url,
       localVideoPath: result.local_video_path,
+      thumbnailUrl: result.thumbnail_url,
       smsPhoneNumber: result.sms_phone_number,
       sold: result.sold,
       createdAt: new Date(result.created_at)
@@ -154,6 +157,7 @@ class DatabaseStorage {
       driveFileUrl: record.drive_file_url,
       driveFolderUrl: record.drive_folder_url,
       localVideoPath: record.local_video_path,
+      thumbnailUrl: record.thumbnail_url,
       smsPhoneNumber: record.sms_phone_number,
       sold: record.sold,
       createdAt: new Date(record.created_at)
