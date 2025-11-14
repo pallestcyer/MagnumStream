@@ -68,7 +68,7 @@ class DatabaseStorage {
       .single();
       
     if (error) throw error;
-    
+
     // Transform the result to match the client expectations
     return {
       id: result.id,
@@ -82,6 +82,7 @@ class DatabaseStorage {
       driveFileId: result.drive_file_id,
       driveFileUrl: result.drive_file_url,
       driveFolderUrl: result.drive_folder_url,
+      localVideoPath: result.local_video_path,
       smsPhoneNumber: result.sms_phone_number,
       sold: result.sold,
       createdAt: new Date(result.created_at)
@@ -100,6 +101,7 @@ class DatabaseStorage {
     if (data.driveFileId) updateData.drive_file_id = data.driveFileId;
     if (data.driveFileUrl) updateData.drive_file_url = data.driveFileUrl;
     if (data.driveFolderUrl) updateData.drive_folder_url = data.driveFolderUrl;
+    if (data.localVideoPath) updateData.local_video_path = data.localVideoPath;
     if (data.smsPhoneNumber) updateData.sms_phone_number = data.smsPhoneNumber;
     if (data.sold !== undefined) updateData.sold = data.sold;
 
@@ -125,6 +127,7 @@ class DatabaseStorage {
       driveFileId: result.drive_file_id,
       driveFileUrl: result.drive_file_url,
       driveFolderUrl: result.drive_folder_url,
+      localVideoPath: result.local_video_path,
       smsPhoneNumber: result.sms_phone_number,
       sold: result.sold,
       createdAt: new Date(result.created_at)
@@ -150,6 +153,7 @@ class DatabaseStorage {
       driveFileId: record.drive_file_id,
       driveFileUrl: record.drive_file_url,
       driveFolderUrl: record.drive_folder_url,
+      localVideoPath: record.local_video_path,
       smsPhoneNumber: record.sms_phone_number,
       sold: record.sold,
       createdAt: new Date(record.created_at)
