@@ -2,17 +2,19 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
+import { supabase } from '../db/supabase';
 
 const execAsync = promisify(exec);
 
 /**
- * Service for generating video thumbnails using FFmpeg
+ * Service for generating video thumbnails using FFmpeg and uploading to Supabase Storage
  */
 export class ThumbnailGenerator {
   private thumbnailsDir: string;
+  private supabaseBucket = 'thumbnails';
 
   constructor() {
-    // Store thumbnails in a dedicated directory
+    // Store thumbnails in a dedicated directory (temporary before upload)
     this.thumbnailsDir = path.join(process.cwd(), 'thumbnails');
     this.ensureThumbnailsDirectory();
   }
@@ -28,11 +30,58 @@ export class ThumbnailGenerator {
   }
 
   /**
-   * Generate a thumbnail from a video file at a specific timestamp
+   * Upload thumbnail to Supabase Storage
+   * @param localPath - Local file path to the thumbnail
+   * @param recordingId - Recording ID for naming the file
+   * @returns Public URL of the uploaded thumbnail
+   */
+  async uploadToSupabase(localPath: string, recordingId: string): Promise<string> {
+    try {
+      const fileBuffer = fs.readFileSync(localPath);
+      const fileName = `${recordingId}.jpg`;
+
+      console.log(`📤 Uploading thumbnail to Supabase Storage: ${fileName}`);
+
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from(this.supabaseBucket)
+        .upload(fileName, fileBuffer, {
+          contentType: 'image/jpeg',
+          upsert: true // Overwrite if exists
+        });
+
+      if (error) {
+        throw new Error(`Supabase upload failed: ${error.message}`);
+      }
+
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from(this.supabaseBucket)
+        .getPublicUrl(fileName);
+
+      console.log(`✅ Thumbnail uploaded to Supabase: ${publicUrlData.publicUrl}`);
+
+      // Clean up local file after successful upload
+      try {
+        fs.unlinkSync(localPath);
+        console.log(`🗑️  Cleaned up local thumbnail: ${localPath}`);
+      } catch (cleanupError) {
+        console.warn(`⚠️  Could not delete local thumbnail: ${cleanupError}`);
+      }
+
+      return publicUrlData.publicUrl;
+    } catch (error: any) {
+      console.error(`❌ Failed to upload thumbnail to Supabase:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate a thumbnail from a video file and upload to Supabase Storage
    * @param videoPath - Absolute path to the video file
    * @param recordingId - Recording ID for naming the thumbnail
    * @param timeOffset - Time in seconds to extract the frame (default: 5)
-   * @returns Path to the generated thumbnail image
+   * @returns Public URL of the uploaded thumbnail
    */
   async generateThumbnail(
     videoPath: string,
@@ -47,12 +96,6 @@ export class ThumbnailGenerator {
     // Generate thumbnail filename
     const thumbnailFilename = `${recordingId}.jpg`;
     const thumbnailPath = path.join(this.thumbnailsDir, thumbnailFilename);
-
-    // Check if thumbnail already exists
-    if (fs.existsSync(thumbnailPath)) {
-      console.log(`✓ Thumbnail already exists: ${thumbnailPath}`);
-      return thumbnailPath;
-    }
 
     console.log(`🎬 Generating thumbnail for ${recordingId} at ${timeOffset}s...`);
 
@@ -82,7 +125,10 @@ export class ThumbnailGenerator {
       const stats = fs.statSync(thumbnailPath);
       console.log(`✅ Thumbnail generated: ${thumbnailPath} (${(stats.size / 1024).toFixed(1)} KB)`);
 
-      return thumbnailPath;
+      // Upload to Supabase Storage and get public URL
+      const publicUrl = await this.uploadToSupabase(thumbnailPath, recordingId);
+
+      return publicUrl;
     } catch (error: any) {
       console.error(`❌ Failed to generate thumbnail for ${recordingId}:`, error.message);
 
@@ -96,13 +142,12 @@ export class ThumbnailGenerator {
   }
 
   /**
-   * Get the web-accessible URL for a thumbnail
-   * @param thumbnailPath - Local file path to the thumbnail
-   * @returns Relative URL path for serving the thumbnail
+   * Get the web-accessible URL for a thumbnail (now returns Supabase URL directly)
+   * @param publicUrl - Supabase public URL
+   * @returns Public URL for the thumbnail
    */
-  getThumbnailUrl(thumbnailPath: string): string {
-    const filename = path.basename(thumbnailPath);
-    return `/api/thumbnails/${filename}`;
+  getThumbnailUrl(publicUrl: string): string {
+    return publicUrl;
   }
 
   /**

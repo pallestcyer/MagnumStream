@@ -749,27 +749,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Continue with thumbnail generation and Drive upload even if status update fails
         }
 
-        // Generate thumbnail from the rendered video
+        // Generate thumbnail from the rendered video and upload to Supabase
         console.log(`📸 Generating thumbnail for recording ${recordingId}...`);
         try {
           const { thumbnailGenerator } = await import('./services/ThumbnailGenerator');
 
-          // Generate thumbnail at 41 seconds into the video
-          const thumbnailPath = await thumbnailGenerator.generateThumbnail(
+          // Generate thumbnail at 41 seconds and upload to Supabase Storage
+          // Returns the Supabase public URL
+          const thumbnailUrl = await thumbnailGenerator.generateThumbnail(
             outputPath,
             recordingId,
             41 // Time offset in seconds
           );
 
-          // Get the web-accessible URL
-          const thumbnailUrl = thumbnailGenerator.getThumbnailUrl(thumbnailPath);
-
-          // Update recording with thumbnail URL
+          // Update recording with Supabase public URL
           await storage.updateFlightRecording(recordingId, {
             thumbnailUrl
           });
 
-          console.log(`✅ Thumbnail generated and saved: ${thumbnailUrl}`);
+          console.log(`✅ Thumbnail generated and uploaded to Supabase: ${thumbnailUrl}`);
         } catch (thumbnailError) {
           console.error(`⚠️  Failed to generate thumbnail (non-critical):`, thumbnailError);
           // Don't fail the whole render if thumbnail generation fails
@@ -1015,27 +1013,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { thumbnailGenerator } = await import('./services/ThumbnailGenerator');
 
-      // Generate thumbnail with specified time offset (default: 5 seconds)
-      const thumbnailPath = await thumbnailGenerator.generateThumbnail(
+      // Generate thumbnail and upload to Supabase (returns public URL)
+      const thumbnailUrl = await thumbnailGenerator.generateThumbnail(
         recording.localVideoPath,
         recordingId,
-        timeOffset || 5
+        timeOffset || 41
       );
 
-      // Get the web-accessible URL
-      const thumbnailUrl = thumbnailGenerator.getThumbnailUrl(thumbnailPath);
-
-      // Update recording with thumbnail URL
+      // Update recording with Supabase public URL
       await storage.updateFlightRecording(recordingId, {
         thumbnailUrl
       });
 
-      console.log(`✅ Thumbnail generated for ${recordingId}: ${thumbnailUrl}`);
+      console.log(`✅ Thumbnail generated and uploaded for ${recordingId}: ${thumbnailUrl}`);
 
       res.json({
         success: true,
-        thumbnailUrl,
-        thumbnailPath
+        thumbnailUrl
       });
 
     } catch (error: any) {
