@@ -231,6 +231,63 @@ class DatabaseStorage {
     if (error) throw error;
     return data;
   }
+
+  // Issue methods
+  async createIssue(issue: {
+    staffName: string;
+    issueType: string;
+    priority?: string | null;
+    description: string;
+  }) {
+    const { data, error } = await (supabase as any)
+      .from('issues')
+      .insert({
+        staff_name: issue.staffName,
+        issue_type: issue.issueType,
+        priority: issue.priority || null,
+        description: issue.description,
+        status: 'open'
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      id: data.id,
+      staffName: data.staff_name,
+      issueType: data.issue_type,
+      priority: data.priority,
+      description: data.description,
+      status: data.status,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      resolvedAt: data.resolved_at,
+      notes: data.notes
+    };
+  }
+
+  async getAllIssues() {
+    const { data, error } = await (supabase as any)
+      .from('issues')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return data?.map((issue: any) => ({
+      id: issue.id,
+      staffName: issue.staff_name,
+      issueType: issue.issue_type,
+      priority: issue.priority,
+      description: issue.description,
+      status: issue.status,
+      createdAt: issue.created_at,
+      updatedAt: issue.updated_at,
+      resolvedAt: issue.resolved_at,
+      notes: issue.notes
+    })) || [];
+  }
 }
 
 // Video operations delegator (calls local device)
@@ -364,6 +421,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           res.json(sale);
         } catch (error) {
           res.status(500).json({ error: 'Failed to create sale' });
+        }
+      });
+
+      // Issue routes (handled by Vercel database)
+      app.post('/api/issues', async (req, res) => {
+        try {
+          const { staffName, issueType, priority, description } = req.body;
+
+          if (!staffName || !issueType || !description) {
+            return res.status(400).json({
+              error: "Missing required fields: staffName, issueType, and description are required"
+            });
+          }
+
+          const issue = await storage.createIssue({
+            staffName,
+            issueType,
+            priority: priority || null,
+            description,
+          });
+
+          console.log('📝 Issue reported:', {
+            id: issue.id,
+            staffName,
+            issueType,
+            priority: priority || 'not specified',
+          });
+
+          res.json(issue);
+        } catch (error: any) {
+          console.error('❌ Error creating issue:', error);
+          res.status(500).json({ error: error.message });
+        }
+      });
+
+      app.get('/api/issues', async (req, res) => {
+        try {
+          const issues = await storage.getAllIssues();
+          res.json(issues);
+        } catch (error: any) {
+          res.status(500).json({ error: error.message });
         }
       });
 
@@ -592,15 +690,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           message: 'MagnumStream API - Hybrid Architecture',
           timestamp: new Date().toISOString(),
           endpoints: {
-            database: ['GET /api/recordings', 'POST /api/recordings', 'GET /api/sales', 'POST /api/sales'],
+            database: ['GET /api/recordings', 'POST /api/recordings', 'GET /api/sales', 'POST /api/sales', 'GET /api/issues', 'POST /api/issues'],
             video: [
-              'POST /api/recordings/:id/generate-clips', 
+              'POST /api/recordings/:id/generate-clips',
               'GET /api/recordings/:id/clips',
               'POST /api/recordings/:id/create-davinci-job',
               'GET /api/recordings/:id/project-info'
             ],
             google: [
-              'GET /api/google/auth-url', 
+              'GET /api/google/auth-url',
               'GET /api/google/auth-status',
               'POST /api/google/upload-video',
               'POST /api/google/signout'
@@ -610,7 +708,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           architecture: {
             database: 'Handled by Vercel + Supabase',
             video: 'Delegated to local device',
-            google: 'Delegated to local device'
+            google: 'Delegated to local device',
+            issues: 'Handled by Vercel + Supabase'
           }
         });
       });
