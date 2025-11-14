@@ -746,7 +746,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } catch (statusUpdateError) {
           console.error(`❌ CRITICAL: Failed to update recording ${recordingId} status to completed:`, statusUpdateError);
-          // Continue with Drive upload even if status update fails
+          // Continue with thumbnail generation and Drive upload even if status update fails
+        }
+
+        // Generate thumbnail from the rendered video
+        console.log(`📸 Generating thumbnail for recording ${recordingId}...`);
+        try {
+          const { thumbnailGenerator } = await import('./services/ThumbnailGenerator');
+
+          // Generate thumbnail at 41 seconds into the video
+          const thumbnailPath = await thumbnailGenerator.generateThumbnail(
+            outputPath,
+            recordingId,
+            41 // Time offset in seconds
+          );
+
+          // Get the web-accessible URL
+          const thumbnailUrl = thumbnailGenerator.getThumbnailUrl(thumbnailPath);
+
+          // Update recording with thumbnail URL
+          await storage.updateFlightRecording(recordingId, {
+            thumbnailUrl
+          });
+
+          console.log(`✅ Thumbnail generated and saved: ${thumbnailUrl}`);
+        } catch (thumbnailError) {
+          console.error(`⚠️  Failed to generate thumbnail (non-critical):`, thumbnailError);
+          // Don't fail the whole render if thumbnail generation fails
         }
 
         // Copy the rendered video to Google Drive (local sync)
@@ -962,6 +988,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     } catch (error: any) {
       console.error('Video streaming error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // THUMBNAIL ENDPOINTS
+  // ============================================================================
+
+  // Generate thumbnail for a recording
+  app.post("/api/recordings/:recordingId/generate-thumbnail", async (req, res) => {
+    try {
+      const { recordingId } = req.params;
+      const { timeOffset } = req.body;
+
+      // Get recording to find local video path
+      const recording = await storage.getFlightRecording(recordingId);
+
+      if (!recording) {
+        return res.status(404).json({ error: "Recording not found" });
+      }
+
+      if (!recording.localVideoPath) {
+        return res.status(400).json({ error: "No local video path available for this recording" });
+      }
+
+      const { thumbnailGenerator } = await import('./services/ThumbnailGenerator');
+
+      // Generate thumbnail with specified time offset (default: 5 seconds)
+      const thumbnailPath = await thumbnailGenerator.generateThumbnail(
+        recording.localVideoPath,
+        recordingId,
+        timeOffset || 5
+      );
+
+      // Get the web-accessible URL
+      const thumbnailUrl = thumbnailGenerator.getThumbnailUrl(thumbnailPath);
+
+      // Update recording with thumbnail URL
+      await storage.updateFlightRecording(recordingId, {
+        thumbnailUrl
+      });
+
+      console.log(`✅ Thumbnail generated for ${recordingId}: ${thumbnailUrl}`);
+
+      res.json({
+        success: true,
+        thumbnailUrl,
+        thumbnailPath
+      });
+
+    } catch (error: any) {
+      console.error('Thumbnail generation error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Serve thumbnail images
+  app.get("/api/thumbnails/:filename", async (req, res) => {
+    try {
+      const { filename } = req.params;
+      const path = await import('path');
+      const fs = await import('fs');
+
+      // Security: Only allow jpg files and sanitize filename
+      if (!filename.endsWith('.jpg') || filename.includes('..')) {
+        return res.status(400).json({ error: "Invalid filename" });
+      }
+
+      const thumbnailsDir = path.join(process.cwd(), 'thumbnails');
+      const thumbnailPath = path.join(thumbnailsDir, filename);
+
+      // Check if file exists
+      if (!fs.existsSync(thumbnailPath)) {
+        return res.status(404).json({ error: "Thumbnail not found" });
+      }
+
+      // Serve the image file
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+      fs.createReadStream(thumbnailPath).pipe(res);
+
+    } catch (error: any) {
+      console.error('Thumbnail serving error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get thumbnail info for a recording
+  app.get("/api/recordings/:recordingId/thumbnail", async (req, res) => {
+    try {
+      const { recordingId } = req.params;
+      const { thumbnailGenerator } = await import('./services/ThumbnailGenerator');
+
+      const exists = thumbnailGenerator.thumbnailExists(recordingId);
+
+      if (exists) {
+        const thumbnailPath = thumbnailGenerator.getThumbnailPath(recordingId);
+        const thumbnailUrl = thumbnailGenerator.getThumbnailUrl(thumbnailPath);
+
+        res.json({
+          exists: true,
+          thumbnailUrl,
+          thumbnailPath
+        });
+      } else {
+        res.json({
+          exists: false
+        });
+      }
+
+    } catch (error: any) {
+      console.error('Thumbnail info error:', error);
       res.status(500).json({ error: error.message });
     }
   });

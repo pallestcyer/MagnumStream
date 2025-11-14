@@ -108,6 +108,7 @@ export class SupabaseStorage implements IStorage {
       driveFileUrl: data.drive_file_url,
       driveFolderUrl: data.drive_folder_url,
       localVideoPath: data.local_video_path,
+      thumbnailUrl: data.thumbnail_url,
       smsPhoneNumber: data.sms_phone_number,
       sold: data.sold,
       createdAt: new Date(data.created_at)
@@ -120,12 +121,12 @@ export class SupabaseStorage implements IStorage {
       .select('*')
       .eq('id', id)
       .single();
-    
+
     if (error) {
       console.error('Error fetching flight recording:', error);
       return undefined;
     }
-    
+
     return data ? {
       id: data.id,
       projectName: data.project_name,
@@ -139,6 +140,7 @@ export class SupabaseStorage implements IStorage {
       driveFileUrl: data.drive_file_url,
       driveFolderUrl: data.drive_folder_url,
       localVideoPath: data.local_video_path,
+      thumbnailUrl: data.thumbnail_url,
       smsPhoneNumber: data.sms_phone_number,
       sold: data.sold,
       createdAt: new Date(data.created_at)
@@ -160,6 +162,7 @@ export class SupabaseStorage implements IStorage {
     if (updates.driveFileUrl !== undefined) dbUpdates.drive_file_url = updates.driveFileUrl;
     if (updates.driveFolderUrl !== undefined) dbUpdates.drive_folder_url = updates.driveFolderUrl;
     if (updates.localVideoPath !== undefined) dbUpdates.local_video_path = updates.localVideoPath;
+    if (updates.thumbnailUrl !== undefined) dbUpdates.thumbnail_url = updates.thumbnailUrl;
     if (updates.smsPhoneNumber !== undefined) dbUpdates.sms_phone_number = updates.smsPhoneNumber;
     if (updates.sold !== undefined) dbUpdates.sold = updates.sold;
 
@@ -196,6 +199,7 @@ export class SupabaseStorage implements IStorage {
       driveFileUrl: data.drive_file_url,
       driveFolderUrl: data.drive_folder_url,
       localVideoPath: data.local_video_path,
+      thumbnailUrl: data.thumbnail_url,
       smsPhoneNumber: data.sms_phone_number,
       sold: data.sold,
       createdAt: new Date(data.created_at)
@@ -443,6 +447,7 @@ export class SupabaseStorage implements IStorage {
       driveFileUrl: data.drive_file_url,
       driveFolderUrl: data.drive_folder_url,
       localVideoPath: data.local_video_path,
+      thumbnailUrl: data.thumbnail_url,
       smsPhoneNumber: data.sms_phone_number,
       sold: data.sold,
       createdAt: new Date(data.created_at)

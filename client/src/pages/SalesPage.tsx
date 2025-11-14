@@ -326,6 +326,9 @@ export default function SalesPage() {
                       flightTime={recording.flightTime || 'Unknown time'}
                       onSale={() => handleMarkAsSold(recording)}
                       showSaleButton={true}
+                      videoInfo={{
+                        thumbnailUrl: recording.thumbnailUrl || undefined
+                      }}
                     />
                   ))}
                 </div>
