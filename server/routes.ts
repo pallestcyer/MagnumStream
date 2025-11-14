@@ -1334,6 +1334,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const shared = await googleDriveOAuth.shareFolderWithEmail(folderInfo.id, customerEmail);
 
       if (shared) {
+        // Update the sale record to mark Drive as shared
+        // Find the most recent sale for this recording and customer email
+        try {
+          const sales = await storage.getAllSales?.();
+          if (sales) {
+            const matchingSale = sales
+              .filter((s: any) => s.recordingId === recordingId && s.customerEmail === customerEmail)
+              .sort((a: any, b: any) => new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime())[0];
+
+            if (matchingSale && storage.updateSale) {
+              await storage.updateSale(matchingSale.id, { driveShared: true });
+              console.log(`✅ Updated sale ${matchingSale.id} - marked Drive as shared`);
+            }
+          }
+        } catch (updateError) {
+          console.warn('⚠️ Could not update sale drive_shared status:', updateError);
+          // Don't fail the sharing if sale update fails
+        }
+
         res.json({ success: true, message: `Folder shared with ${customerEmail}` });
       } else {
         res.status(500).json({ error: 'Failed to share folder' });
