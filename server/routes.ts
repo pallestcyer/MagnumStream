@@ -341,6 +341,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Submit issue report
   app.post("/api/issues", async (req, res) => {
     try {
+      if (!storage.createIssue) {
+        return res.status(501).json({
+          error: "Issue reporting not available with current storage implementation"
+        });
+      }
+
       const { staffName, issueType, priority, description } = req.body;
 
       if (!staffName || !issueType || !description) {
@@ -373,6 +379,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all issues
   app.get("/api/issues", async (_req, res) => {
     try {
+      if (!storage.getAllIssues) {
+        return res.status(501).json({
+          error: "Issue retrieval not available with current storage implementation"
+        });
+      }
+
       const issues = await storage.getAllIssues();
       res.json(issues);
     } catch (error: any) {
@@ -383,6 +395,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update issue status
   app.patch("/api/issues/:issueId", async (req, res) => {
     try {
+      if (!storage.updateIssue) {
+        return res.status(501).json({
+          error: "Issue updates not available with current storage implementation"
+        });
+      }
+
       const { issueId } = req.params;
       const { status, notes } = req.body;
 
