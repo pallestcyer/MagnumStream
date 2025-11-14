@@ -43,11 +43,11 @@ const menuItems = [
     url: "/manual",
     icon: BookOpen,
   },
-  {
-    title: "AI Chat",
-    url: "/chat",
-    icon: MessageSquare,
-  },
+  // {
+  //   title: "AI Chat",
+  //   url: "/chat",
+  //   icon: MessageSquare,
+  // },
   {
     title: "Report Issue",
     url: "/issues",
