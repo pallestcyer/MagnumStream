@@ -453,11 +453,22 @@ class DaVinciAutomation:
 
                 logger.info(f"🎯 Looking for slot {slot_number} at frame {start_frame} on track V{track_index}")
 
+                # CRITICAL: Re-fetch timeline items for EACH slot to avoid stale references
+                # After delete/add operations, the old list contains invalid item references
+                current_timeline_items = self.timeline.GetItemListInTrack('video', track_index)
+                logger.debug(f"📋 Refreshed timeline items, found {len(current_timeline_items)} items")
+
                 # Find the item at this exact frame position
                 target_item = None
-                for item in timeline_items:
+                for item in current_timeline_items:
                     item_start = item.GetStart()
                     item_end = item.GetEnd()
+
+                    # Skip items that return None (deleted or invalid references)
+                    if item_start is None or item_end is None:
+                        logger.debug(f"⚠️ Skipping invalid item reference")
+                        continue
+
                     # Match if item starts at target frame OR contains target frame
                     if item_start == start_frame or (item_start <= start_frame < item_end):
                         target_item = item
