@@ -173,9 +173,33 @@ class DatabaseStorage {
       })
       .select()
       .single();
-      
+
     if (error) throw error;
-    return result;
+
+    // Mark the recording as sold
+    try {
+      await (supabase as any)
+        .from('flight_recordings')
+        .update({ sold: true })
+        .eq('id', data.recordingId);
+
+      console.log(`✅ Marked recording ${data.recordingId} as sold`);
+    } catch (updateError) {
+      console.warn('⚠️ Failed to mark recording as sold:', updateError);
+      // Don't fail the sale if this update fails
+    }
+
+    return {
+      id: result.id,
+      recordingId: result.recording_id,
+      customerName: result.customer_name,
+      customerEmail: result.customer_email,
+      staffMember: result.staff_member,
+      bundle: result.bundle,
+      saleAmount: result.sale_amount,
+      saleDate: new Date(result.sale_date),
+      driveShared: result.drive_shared
+    };
   }
 
   async getAllSales() {
