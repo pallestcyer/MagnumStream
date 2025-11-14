@@ -469,10 +469,52 @@ class DaVinciAutomation:
                     continue
 
                 media_item = clip_data['media']
+                new_clip_path = str(Path(clip_data['slot_info']['fullPath']))
                 replaced = False
 
-                # CRITICAL: Try LinkProxyMedia first (if clips use proxies)
-                if hasattr(target_item, 'LinkProxyMedia') and callable(getattr(target_item, 'LinkProxyMedia', None)):
+                # BEST METHOD: Replace source media directly on the MediaPoolItem
+                # This preserves EXACT timeline position, effects, keyframes, everything
+                try:
+                    # Get the MediaPoolItem that this timeline item references
+                    if hasattr(target_item, 'GetMediaPoolItem') and callable(getattr(target_item, 'GetMediaPoolItem', None)):
+                        source_media_pool_item = target_item.GetMediaPoolItem()
+
+                        if source_media_pool_item:
+                            logger.info(f"📦 Found MediaPoolItem for slot {slot_number}")
+
+                            # Try to replace the source media file directly
+                            # This updates the timeline item WITHOUT moving it
+                            if hasattr(source_media_pool_item, 'ReplaceClip') and callable(getattr(source_media_pool_item, 'ReplaceClip', None)):
+                                try:
+                                    # ReplaceClip on MediaPoolItem takes a file path
+                                    result = source_media_pool_item.ReplaceClip(new_clip_path)
+                                    if result:
+                                        logger.info(f"✅ MediaPoolItem.ReplaceClip succeeded for slot {slot_number}")
+                                        logger.info(f"   Timeline position preserved, source updated to: {clip_data['slot_info']['filename']}")
+                                        replaced_slots.append(slot_number)
+                                        replaced = True
+                                    else:
+                                        logger.debug(f"MediaPoolItem.ReplaceClip returned False for slot {slot_number}")
+                                except Exception as e:
+                                    logger.debug(f"MediaPoolItem.ReplaceClip failed for slot {slot_number}: {e}")
+                except Exception as e:
+                    logger.debug(f"Could not get MediaPoolItem for slot {slot_number}: {e}")
+
+                # Method 1: ReplaceClip on TimelineItem (preserves position and effects)
+                if not replaced and hasattr(target_item, 'ReplaceClip') and callable(getattr(target_item, 'ReplaceClip', None)):
+                    try:
+                        result = target_item.ReplaceClip(media_item)
+                        if result:
+                            logger.info(f"✅ TimelineItem.ReplaceClip succeeded for slot {slot_number}")
+                            replaced_slots.append(slot_number)
+                            replaced = True
+                        else:
+                            logger.debug(f"TimelineItem.ReplaceClip returned False for slot {slot_number}")
+                    except Exception as e:
+                        logger.debug(f"TimelineItem.ReplaceClip failed for slot {slot_number}: {e}")
+
+                # Method 2: LinkProxyMedia (if using proxy workflow)
+                if not replaced and hasattr(target_item, 'LinkProxyMedia') and callable(getattr(target_item, 'LinkProxyMedia', None)):
                     try:
                         result = target_item.LinkProxyMedia(media_item)
                         if result:
@@ -482,20 +524,7 @@ class DaVinciAutomation:
                     except Exception as e:
                         logger.debug(f"LinkProxyMedia not applicable for slot {slot_number}: {e}")
 
-                # Try Method 1: ReplaceClip (non-destructive, preserves timeline structure)
-                if not replaced and hasattr(target_item, 'ReplaceClip') and callable(getattr(target_item, 'ReplaceClip', None)):
-                    try:
-                        result = target_item.ReplaceClip(media_item)
-                        if result:
-                            logger.info(f"✅ ReplaceClip succeeded for slot {slot_number}")
-                            replaced_slots.append(slot_number)
-                            replaced = True
-                        else:
-                            logger.warning(f"⚠️ ReplaceClip returned False for slot {slot_number}")
-                    except Exception as e:
-                        logger.warning(f"ReplaceClip failed for slot {slot_number}: {e}")
-
-                # Try Method 2: AddTake (also non-destructive)
+                # Method 3: AddTake (creates alternate take, preserves position)
                 if not replaced and hasattr(target_item, 'AddTake') and callable(getattr(target_item, 'AddTake', None)):
                     try:
                         if target_item.AddTake(media_item):
@@ -506,67 +535,14 @@ class DaVinciAutomation:
                                     replaced_slots.append(slot_number)
                                     replaced = True
                     except Exception as e:
-                        logger.warning(f"AddTake failed for slot {slot_number}: {e}")
+                        logger.debug(f"AddTake failed for slot {slot_number}: {e}")
 
-                # Method 3: Delete and re-add ONE AT A TIME (fallback for when Methods 1 & 2 fail)
-                # This approach works reliably unlike batch operations
+                # Final check - DO NOT use delete/add as it corrupts timeline positions
                 if not replaced:
-                    logger.info(f"⚠️ Methods 1 & 2 failed for slot {slot_number}, using Method 3 (delete/add)")
-                    try:
-                        # Delete the existing clip ONE AT A TIME
-                        if hasattr(self.timeline, 'DeleteClips') and callable(getattr(self.timeline, 'DeleteClips', None)):
-                            logger.info(f"🗑️ Deleting existing clip at slot {slot_number}")
-                            delete_result = self.timeline.DeleteClips([target_item])
-
-                            if delete_result or True:  # Continue even if delete returns False
-                                # CRITICAL: Add new clip at EXACT position on correct track
-                                new_clip_info = [{
-                                    "mediaPoolItem": media_item,
-                                    "startFrame": 0,  # Start of source clip
-                                    "endFrame": int(clip_data['out_point']),  # Duration from slot template
-                                    "trackIndex": track_index,  # Track 3 (V3)
-                                    "recordFrame": start_frame  # EXACT frame position
-                                }]
-
-                                logger.info(f"📍 Adding clip on track V{track_index} at frame {start_frame} (duration: {int(clip_data['out_point'])} frames)")
-
-                                if hasattr(self.media_pool, 'AppendToTimeline') and callable(getattr(self.media_pool, 'AppendToTimeline', None)):
-                                    add_result = self.media_pool.AppendToTimeline(new_clip_info)
-
-                                    if add_result:
-                                        # Verify the clip was placed correctly
-                                        verification_items = self.timeline.GetItemListInTrack('video', track_index)
-                                        clip_verified = False
-
-                                        for verify_item in verification_items:
-                                            if verify_item.GetStart() == start_frame:
-                                                logger.info(f"✅ Method 3: Slot {slot_number} placed and verified at frame {start_frame}")
-                                                replaced_slots.append(slot_number)
-                                                replaced = True
-                                                clip_verified = True
-                                                break
-
-                                        if not clip_verified:
-                                            logger.warning(f"⚠️ Slot {slot_number} added but not at expected frame {start_frame}")
-                                            # Still mark as replaced since it's in the timeline
-                                            replaced_slots.append(slot_number)
-                                            replaced = True
-                                    else:
-                                        logger.error(f"❌ AppendToTimeline failed for slot {slot_number}")
-                                else:
-                                    logger.error(f"❌ AppendToTimeline method not available")
-                            else:
-                                logger.error(f"❌ DeleteClips failed for slot {slot_number}")
-                        else:
-                            logger.error(f"❌ DeleteClips method not available")
-
-                    except Exception as e:
-                        logger.error(f"❌ Method 3 failed for slot {slot_number}: {e}")
-
-                # Final check
-                if not replaced:
-                    logger.warning(f"❌ ALL METHODS FAILED for slot {slot_number}")
-                    logger.warning(f"   This slot was NOT replaced - manual intervention may be needed")
+                    logger.error(f"❌ ALL replacement methods failed for slot {slot_number}")
+                    logger.error(f"   Template placeholder at frame {start_frame} could not be updated")
+                    logger.error(f"   This will cause 'media not found' error during render")
+                    logger.error(f"   Manual replacement in DaVinci Resolve may be required")
 
             # Phase 2: DISABLED - Batch delete/add was causing all clips to be removed
             # Keeping this code commented for reference but NOT executing
