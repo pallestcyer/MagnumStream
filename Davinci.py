@@ -419,15 +419,58 @@ class DaVinciAutomation:
         except Exception as e:
             logger.warning(f"Could not configure all project settings: {e}")
             logger.info("Continuing with template default settings")
-    
+
+    def _cleanup_old_clip_bins(self):
+        """Remove old Clips_* bins from previous renders to prevent media pool pollution"""
+        try:
+            logger.info("🧹 Cleaning up old clip bins from previous renders...")
+            root_folder = self.media_pool.GetRootFolder()
+
+            if not root_folder:
+                logger.warning("Could not access root folder for cleanup")
+                return
+
+            # Get all subfolders
+            subfolders = root_folder.GetSubFolderList()
+            if not subfolders:
+                logger.info("   No subfolders found, nothing to clean")
+                return
+
+            bins_removed = 0
+            for folder in subfolders:
+                folder_name = folder.GetName()
+                # Match folders created by previous renders (Clips_* pattern)
+                if folder_name.startswith("Clips_"):
+                    logger.info(f"   Removing old bin: {folder_name}")
+                    # Delete all clips in the bin first
+                    self.media_pool.SetCurrentFolder(folder)
+                    clips_in_folder = folder.GetClipList()
+                    if clips_in_folder:
+                        self.media_pool.DeleteClips(clips_in_folder)
+                    # Now delete the empty folder
+                    self.media_pool.DeleteFolders([folder])
+                    bins_removed += 1
+
+            logger.info(f"🧹 Cleanup complete: removed {bins_removed} old bin(s)")
+            # Reset to root folder
+            self.media_pool.SetCurrentFolder(root_folder)
+
+        except Exception as e:
+            logger.warning(f"Could not clean up old bins: {e}")
+            logger.info("Continuing without cleanup")
+
     def _replace_clips_from_project(self, clips, recording_id):
         """Replace placeholder clips with new recordings from ClipGenerator output"""
         try:
+            # CRITICAL: Clean up old imported clips from previous renders
+            # This prevents media pool pollution and potential AddTake failures
+            self._cleanup_old_clip_bins()
+
             # Create a new bin for this project's clips
             root_folder = self.media_pool.GetRootFolder()
             clip_bin = self.media_pool.AddSubFolder(root_folder, f"Clips_{recording_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
             self.media_pool.SetCurrentFolder(clip_bin)
-            
+
             # Import all clips to media pool (using absolute paths from ClipGenerator)
             media_items = {}
             for slot_num, clip_info in clips.items():
@@ -539,13 +582,18 @@ class DaVinciAutomation:
                 # Method 1: ReplaceClip (non-destructive, preserves timeline structure)
                 if hasattr(target_item, 'ReplaceClip') and callable(getattr(target_item, 'ReplaceClip', None)):
                     try:
+                        logger.info(f"   Trying Method 1: ReplaceClip")
                         result = target_item.ReplaceClip(media_item)
                         if result:
                             logger.info(f"✅ Method 1: ReplaceClip succeeded for slot {slot_number}")
                             replaced_slots.append(slot_number)
                             replaced = True
+                        else:
+                            logger.warning(f"⚠️ Method 1: ReplaceClip returned False for slot {slot_number}")
                     except Exception as e:
                         logger.warning(f"Method 1 failed: {e}")
+                else:
+                    logger.info(f"   Method 1: ReplaceClip not available")
 
                 # Method 2: Use take system (if method exists)
                 if not replaced and hasattr(target_item, 'AddTake') and callable(getattr(target_item, 'AddTake', None)):
