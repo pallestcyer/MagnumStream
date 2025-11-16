@@ -221,7 +221,13 @@ class DaVinciAutomation:
             # Load template project
             if not self._load_template_project():
                 return False
-            
+
+            # PRE-FLIGHT CHECK: Verify all 14 expected slots exist in template
+            if not self._verify_template_integrity():
+                logger.error("❌ CRITICAL: Template integrity check failed - aborting render")
+                logger.error("   The template is missing expected clips. Please restore from backup.")
+                return False
+
             # Import and replace clips using existing project structure
             if not self._replace_clips_from_project(clips, recording_id):
                 return False
@@ -300,6 +306,53 @@ class DaVinciAutomation:
 
         except Exception as e:
             logger.error(f"Failed to load template project: {e}")
+            return False
+
+    def _verify_template_integrity(self):
+        """Verify all 14 expected clip positions exist in the template before starting"""
+        try:
+            logger.info("🔍 Verifying template integrity (checking for all 14 expected slots)...")
+
+            track_index = 3  # All clips should be on track V3
+            timeline_items = self.timeline.GetItemListInTrack('video', track_index)
+
+            if not timeline_items:
+                logger.error(f"❌ No items found on track V{track_index}")
+                return False
+
+            logger.info(f"   Found {len(timeline_items)} items on track V{track_index}")
+
+            # Get all start frames from timeline
+            actual_frames = set()
+            for item in timeline_items:
+                start = item.GetStart()
+                if start is not None:
+                    actual_frames.add(start)
+
+            # Check each expected position
+            expected_frames = {pos['start_frame'] for pos in CLIP_POSITIONS.values()}
+            missing_frames = expected_frames - actual_frames
+            extra_frames = actual_frames - expected_frames
+
+            if missing_frames:
+                logger.error(f"❌ Template is missing clips at these frame positions:")
+                for slot_num, pos in CLIP_POSITIONS.items():
+                    if pos['start_frame'] in missing_frames:
+                        logger.error(f"   Slot {slot_num}: frame {pos['start_frame']} NOT FOUND")
+                return False
+
+            if extra_frames:
+                logger.warning(f"⚠️ Template has unexpected clips at frames: {sorted(extra_frames)}")
+                logger.warning("   This may be okay, but template might have been modified")
+
+            logger.info(f"✅ Template integrity verified: All 14 expected slots found")
+            logger.info(f"   Expected frames: {sorted(expected_frames)}")
+            logger.info(f"   Actual frames: {sorted(actual_frames)}")
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to verify template integrity: {e}")
             return False
 
     def _configure_project_settings(self):
@@ -616,12 +669,18 @@ class DaVinciAutomation:
                 else:
                     logger.error(f"❌ DeleteClips method not available")
 
-            # Summary
+            # POST-REPLACEMENT VALIDATION: Ensure ALL clips were successfully replaced
             logger.info(f"🎉 Clip replacement complete: {len(replaced_slots)}/{len(media_items)} slots replaced")
+
             if len(replaced_slots) < len(media_items):
                 missing_slots = set(media_items.keys()) - set(replaced_slots)
-                logger.warning(f"⚠️ Missing slots: {missing_slots}")
-            
+                logger.error(f"❌ CRITICAL: Failed to replace {len(missing_slots)} slot(s): {sorted(missing_slots)}")
+                logger.error(f"   Successfully replaced: {sorted(replaced_slots)}")
+                logger.error(f"   Missing: {sorted(missing_slots)}")
+                logger.error(f"   ABORTING: Will not save or render incomplete timeline")
+                return False
+
+            logger.info(f"✅ SUCCESS: All {len(replaced_slots)} slots were successfully replaced")
             return True
             
         except Exception as e:
