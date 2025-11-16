@@ -550,61 +550,47 @@ class DaVinciAutomation:
                 # Method 2: Use take system (if method exists)
                 if not replaced and hasattr(target_item, 'AddTake') and callable(getattr(target_item, 'AddTake', None)):
                     try:
+                        # Log current take count before adding
+                        current_takes = target_item.GetTakesCount() if hasattr(target_item, 'GetTakesCount') else 0
+                        logger.info(f"   Current takes count before AddTake: {current_takes}")
+
+                        # Try to finalize existing takes first (if any)
+                        if current_takes > 0 and hasattr(target_item, 'FinalizeTake') and callable(getattr(target_item, 'FinalizeTake', None)):
+                            logger.info(f"   Finalizing existing takes before adding new one")
+                            target_item.FinalizeTake()
+
                         if target_item.AddTake(media_item):
                             take_count = target_item.GetTakesCount()
+                            logger.info(f"   Takes count after AddTake: {take_count}")
                             if hasattr(target_item, 'SelectTakeByIndex') and callable(getattr(target_item, 'SelectTakeByIndex', None)):
                                 if target_item.SelectTakeByIndex(take_count):
                                     logger.info(f"✅ Method 2: AddTake succeeded for slot {slot_number}")
                                     replaced_slots.append(slot_number)
                                     replaced = True
+
+                                    # Try to finalize the new take immediately
+                                    if hasattr(target_item, 'FinalizeTake') and callable(getattr(target_item, 'FinalizeTake', None)):
+                                        logger.info(f"   Finalizing new take to make it permanent")
+                                        target_item.FinalizeTake()
+                                else:
+                                    logger.warning(f"⚠️ Method 2: AddTake added but SelectTakeByIndex failed for slot {slot_number}")
+                            else:
+                                logger.warning(f"⚠️ Method 2: AddTake succeeded but SelectTakeByIndex not available")
+                        else:
+                            logger.warning(f"⚠️ Method 2: AddTake returned False for slot {slot_number}")
                     except Exception as e:
                         logger.warning(f"Method 2 failed: {e}")
 
-                # Method 3: Delete and re-add at exact position (most reliable - THIS WAS WORKING)
+                # Method 3: DISABLED - Delete and re-add is DANGEROUS because AppendToTimeline
+                # does not respect recordFrame parameter and places clips at end of timeline
+                # This corrupts the template by leaving gaps. DO NOT USE.
                 if not replaced:
-                    try:
-                        # Delete the existing clip ONE AT A TIME
-                        if hasattr(self.timeline, 'DeleteClips') and callable(getattr(self.timeline, 'DeleteClips', None)):
-                            logger.info(f"🔄 Method 3: Attempting delete/add for slot {slot_number}")
-                            self.timeline.DeleteClips([target_item])
-                            logger.info(f"   Deleted existing clip at slot {slot_number}")
-
-                            # CRITICAL: Add new clip at EXACT position on track V3
-                            # Use AppendToTimeline with explicit track and frame position
-                            new_clips = [{
-                                "mediaPoolItem": media_item,
-                                "startFrame": 0,  # Start of source clip
-                                "endFrame": int(clip_data['out_point']),  # Duration from slot template
-                                "trackIndex": track_index,  # MUST be track 3 (V3)
-                                "recordFrame": start_frame  # EXACT frame position from CLIP_POSITIONS
-                            }]
-
-                            logger.info(f"   Placing clip on track V{track_index} at frame {start_frame} (duration: {int(clip_data['out_point'])} frames)")
-
-                            if hasattr(self.media_pool, 'AppendToTimeline') and callable(getattr(self.media_pool, 'AppendToTimeline', None)):
-                                result = self.media_pool.AppendToTimeline(new_clips)
-                                if result:
-                                    logger.info(f"✅ Method 3: Replaced slot {slot_number} with {clip_data['slot_info']['filename']}")
-
-                                    # Verify the clip was placed correctly
-                                    new_timeline_items = self.timeline.GetItemListInTrack('video', track_index)
-                                    for new_item in new_timeline_items:
-                                        if new_item.GetStart() == start_frame:
-                                            logger.info(f"✅ Verified: Clip placed correctly at frame {start_frame}")
-                                            replaced_slots.append(slot_number)
-                                            replaced = True
-                                            break
-
-                                    if not replaced:
-                                        logger.warning(f"⚠️ Clip added but not at expected frame {start_frame}")
-                                        replaced_slots.append(slot_number)
-                                        replaced = True  # Still mark as replaced since clip is in timeline
-                                else:
-                                    logger.warning(f"⚠️ AppendToTimeline returned False for slot {slot_number}")
-                            else:
-                                logger.warning(f"⚠️ AppendToTimeline method not available")
-                    except Exception as e:
-                        logger.warning(f"Method 3 failed for slot {slot_number}: {e}")
+                    logger.error(f"❌ CRITICAL: All safe replacement methods failed for slot {slot_number}")
+                    logger.error(f"   Method 1 (ReplaceClip): Failed or not available")
+                    logger.error(f"   Method 2 (AddTake): Failed or not available")
+                    logger.error(f"   Method 3 (Delete/Add): DISABLED - causes template corruption")
+                    logger.error(f"   This clip will NOT be replaced. Aborting to protect template.")
+                    # Don't try Method 3 - it will corrupt the template
 
                 # Final check
                 if not replaced:
