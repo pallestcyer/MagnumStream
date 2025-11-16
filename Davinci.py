@@ -629,16 +629,50 @@ class DaVinciAutomation:
                     except Exception as e:
                         logger.warning(f"Method 2 failed: {e}")
 
-                # Method 3: DISABLED - Delete and re-add is DANGEROUS because AppendToTimeline
-                # does not respect recordFrame parameter and places clips at end of timeline
-                # This corrupts the template by leaving gaps. DO NOT USE.
+                # Method 3: Swap media source - replace the underlying media file reference
                 if not replaced:
-                    logger.error(f"❌ CRITICAL: All safe replacement methods failed for slot {slot_number}")
-                    logger.error(f"   Method 1 (ReplaceClip): Failed or not available")
+                    try:
+                        logger.info(f"   Trying Method 3: Swap media source path")
+                        # Get the current media pool item from the timeline clip
+                        current_media = target_item.GetMediaPoolItem()
+                        if current_media:
+                            # Get the new clip's file path
+                            new_clip_path = str(Path(clip_data['slot_info']['fullPath']))
+                            logger.info(f"   Swapping source to: {new_clip_path}")
+
+                            # Try to replace the media source
+                            if hasattr(current_media, 'ReplaceClip') and callable(getattr(current_media, 'ReplaceClip', None)):
+                                result = current_media.ReplaceClip(new_clip_path)
+                                if result:
+                                    logger.info(f"✅ Method 3: Media source swap succeeded for slot {slot_number}")
+                                    replaced_slots.append(slot_number)
+                                    replaced = True
+                                else:
+                                    logger.warning(f"⚠️ Method 3: ReplaceClip on media pool item returned False")
+
+                            # Alternative: Try LinkProxyMedia or SetClipProperty
+                            if not replaced and hasattr(current_media, 'SetClipProperty'):
+                                try:
+                                    # Try setting the file path property directly
+                                    result = current_media.SetClipProperty('File Path', new_clip_path)
+                                    if result:
+                                        logger.info(f"✅ Method 3b: SetClipProperty succeeded for slot {slot_number}")
+                                        replaced_slots.append(slot_number)
+                                        replaced = True
+                                except Exception as e:
+                                    logger.warning(f"   SetClipProperty failed: {e}")
+                        else:
+                            logger.warning(f"   Could not get MediaPoolItem from timeline item")
+                    except Exception as e:
+                        logger.warning(f"Method 3 failed: {e}")
+
+                # Method 4: Last resort - log failure but don't corrupt template
+                if not replaced:
+                    logger.error(f"❌ CRITICAL: All replacement methods failed for slot {slot_number}")
+                    logger.error(f"   Method 1 (ReplaceClip on timeline item): Failed or not available")
                     logger.error(f"   Method 2 (AddTake): Failed or not available")
-                    logger.error(f"   Method 3 (Delete/Add): DISABLED - causes template corruption")
+                    logger.error(f"   Method 3 (Swap media source): Failed or not available")
                     logger.error(f"   This clip will NOT be replaced. Aborting to protect template.")
-                    # Don't try Method 3 - it will corrupt the template
 
                 # Final check
                 if not replaced:
