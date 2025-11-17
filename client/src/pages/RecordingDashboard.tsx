@@ -931,7 +931,7 @@ export default function RecordingDashboard() {
             <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-foreground">Camera 1 (Main)</span>
+                  <span className="text-sm font-medium text-foreground">Camera 1 (Side)</span>
                   <Video className="w-4 h-4 text-orange-500" />
                 </div>
                 <div className="relative aspect-video bg-black rounded-lg overflow-hidden border-2 border-orange-500/50">
@@ -954,7 +954,7 @@ export default function RecordingDashboard() {
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-foreground">Camera 2 (Side)</span>
+                  <span className="text-sm font-medium text-foreground">Camera 2 (Front)</span>
                   <Video className="w-4 h-4 text-orange-400" />
                 </div>
                 <div className="relative aspect-video bg-black rounded-lg overflow-hidden border-2 border-orange-400/50">
