@@ -269,11 +269,16 @@ export class ClipGenerator {
 
     console.log(`🎬 Generating clip: ${exactFrames} frames (${exactDuration.toFixed(3)}s) at ${fps} fps`);
 
+    // FRAME-ACCURATE SEEKING STRATEGY:
+    // Use -ss AFTER -i for precision (slower but accurate)
+    // Add -start_at_zero to ensure timestamps start from 0
+    // Use -frames:v for exact frame count instead of -t duration
     const ffmpegCommand = [
       'ffmpeg', '-y',
-      '-ss', startTime.toString(),          // Seek to start time
+      '-accurate_seek',                     // Enable accurate seeking
       '-i', `"${sourceVideoPath}"`,
-      '-t', exactDuration.toString(),       // Use frame-accurate duration
+      '-ss', startTime.toString(),          // Seek AFTER input for frame accuracy
+      '-frames:v', exactFrames.toString(),  // Extract exact number of frames
       '-vf', `fps=${fps}`,                  // Force exact frame rate with filter
       '-c:v', 'libx264',
       '-preset', 'fast',                    // Balance speed and quality
@@ -281,6 +286,7 @@ export class ClipGenerator {
       '-g', '1',                            // Keyframe every frame (GOP=1) for frame accuracy
       '-vsync', 'cfr',                      // Constant frame rate - no dropped frames
       '-video_track_timescale', '24000',    // Match DaVinci timeline timescale
+      '-start_at_zero',                     // Ensure output starts at timestamp 0
       '-c:a', 'aac',
       '-b:a', '192k',
       '-ar', '48000',

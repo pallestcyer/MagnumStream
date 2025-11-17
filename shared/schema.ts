@@ -125,20 +125,20 @@ export interface SlotConfig {
 
 export const SLOT_TEMPLATE: SlotConfig[] = [
   // Cruising Scene (7 slots) - matches DaVinci template positions 1-7
-  { slotNumber: 1, sceneType: 'cruising', cameraAngle: 2, color: '#FF6B35', duration: 0.876, seamlessCut: false }, // Front view (21 frames @ 23.976fps)
+  { slotNumber: 1, sceneType: 'cruising', cameraAngle: 2, color: '#FF6B35', duration: 0.918, seamlessCut: false }, // Front view (22 frames @ 23.976fps)
   { slotNumber: 2, sceneType: 'cruising', cameraAngle: 2, color: '#F7931E', duration: 1.210, seamlessCut: true },  // Front view (29 frames) → seamless to Slot 3
   { slotNumber: 3, sceneType: 'cruising', cameraAngle: 1, color: '#FFA500', duration: 1.293, seamlessCut: false }, // Side view (31 frames) - follows Slot 2
   { slotNumber: 4, sceneType: 'cruising', cameraAngle: 2, color: '#FF9E3D', duration: 0.959, seamlessCut: true },  // Front view (23 frames) → seamless to Slot 5
-  { slotNumber: 5, sceneType: 'cruising', cameraAngle: 1, color: '#FF7A3D', duration: 1.502, seamlessCut: false }, // Side view (36 frames) - follows Slot 4
+  { slotNumber: 5, sceneType: 'cruising', cameraAngle: 1, color: '#FF7A3D', duration: 1.543, seamlessCut: false }, // Side view (37 frames) - follows Slot 4
   { slotNumber: 6, sceneType: 'cruising', cameraAngle: 2, color: '#FF6B6B', duration: 0.667, seamlessCut: false }, // Front view (16 frames)
-  { slotNumber: 7, sceneType: 'cruising', cameraAngle: 1, color: '#FFA07A', duration: 0.793, seamlessCut: false }, // Side view (19 frames)
+  { slotNumber: 7, sceneType: 'cruising', cameraAngle: 1, color: '#FFA07A', duration: 0.792, seamlessCut: false }, // Side view (19 frames)
 
   // Chase Scene (6 slots) - matches DaVinci template positions 8-13
-  { slotNumber: 8,  sceneType: 'chase', cameraAngle: 2, color: '#FFB347', duration: 0.876, seamlessCut: true },  // Front view (21 frames) → seamless to Slot 9
-  { slotNumber: 9,  sceneType: 'chase', cameraAngle: 1, color: '#FFCC00', duration: 1.418, seamlessCut: false }, // Side view (34 frames) - follows Slot 8
-  { slotNumber: 10, sceneType: 'chase', cameraAngle: 2, color: '#FFD700', duration: 0.542, seamlessCut: false }, // Front view (13 frames)
-  { slotNumber: 11, sceneType: 'chase', cameraAngle: 2, color: '#FFA500', duration: 1.460, seamlessCut: true },  // Front view (35 frames) → seamless to Slot 12
-  { slotNumber: 12, sceneType: 'chase', cameraAngle: 1, color: '#FF8C00', duration: 1.543, seamlessCut: false }, // Side view (37 frames) - follows Slot 11
+  { slotNumber: 8,  sceneType: 'chase', cameraAngle: 2, color: '#FFB347', duration: 0.918, seamlessCut: true },  // Front view (22 frames) → seamless to Slot 9
+  { slotNumber: 9,  sceneType: 'chase', cameraAngle: 1, color: '#FFCC00', duration: 1.376, seamlessCut: false }, // Side view (33 frames) - follows Slot 8
+  { slotNumber: 10, sceneType: 'chase', cameraAngle: 2, color: '#FFD700', duration: 0.584, seamlessCut: false }, // Front view (14 frames)
+  { slotNumber: 11, sceneType: 'chase', cameraAngle: 2, color: '#FFA500', duration: 1.502, seamlessCut: true },  // Front view (36 frames) → seamless to Slot 12
+  { slotNumber: 12, sceneType: 'chase', cameraAngle: 1, color: '#FF8C00', duration: 1.418, seamlessCut: false }, // Side view (34 frames) - follows Slot 11
   { slotNumber: 13, sceneType: 'chase', cameraAngle: 1, color: '#FF7F50', duration: 0.542, seamlessCut: false }, // Side view (13 frames)
 
   // Arrival Scene (1 slot) - matches DaVinci template position 14

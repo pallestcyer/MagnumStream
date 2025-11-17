@@ -101,24 +101,24 @@ CLIP_TRACKS = {
 # 14 slots total: 7 cruising (slots 1-7), 6 chase (slots 8-13), 1 arrival (slot 14)
 CLIP_POSITIONS = {
     # Cruising Scene (7 slots)
-    1: {"track": 3, "start_frame": 86485},    # Cruising front view, 21 frames (0.876s)
+    1: {"track": 3, "start_frame": 86485},    # Cruising front view, 22 frames (0.918s)
     2: {"track": 3, "start_frame": 86549},    # Cruising front view, 29 frames (1.210s) → seamless to 3
     3: {"track": 3, "start_frame": 86578},    # Cruising side view, 31 frames (1.293s)
     4: {"track": 3, "start_frame": 86631},    # Cruising front view, 23 frames (0.959s) → seamless to 5
-    5: {"track": 3, "start_frame": 86654},    # Cruising side view, 36 frames (1.502s)
+    5: {"track": 3, "start_frame": 86654},    # Cruising side view, 37 frames (1.543s)
     6: {"track": 3, "start_frame": 86790},    # Cruising front view, 16 frames (0.667s)
-    7: {"track": 3, "start_frame": 86844},    # Cruising side view, 19 frames (0.793s)
+    7: {"track": 3, "start_frame": 86844},    # Cruising side view, 19 frames (0.792s)
 
     # Chase Scene (6 slots)
-    8: {"track": 3, "start_frame": 86905},    # Chase front view, 21 frames (0.876s) → seamless to 9
-    9: {"track": 3, "start_frame": 86926},    # Chase side view, 34 frames (1.418s)
-    10: {"track": 3, "start_frame": 87035},   # Chase front view, 13 frames (0.542s)
-    11: {"track": 3, "start_frame": 87105},   # Chase front view, 35 frames (1.460s) → seamless to 12
-    12: {"track": 3, "start_frame": 87140},   # Chase side view, 37 frames (1.543s)
+    8: {"track": 3, "start_frame": 86905},    # Chase front view, 22 frames (0.918s) → seamless to 9
+    9: {"track": 3, "start_frame": 86927},    # Chase side view, 33 frames (1.376s)
+    10: {"track": 3, "start_frame": 87035},   # Chase front view, 14 frames (0.584s)
+    11: {"track": 3, "start_frame": 87106},   # Chase front view, 36 frames (1.502s) → seamless to 12
+    12: {"track": 3, "start_frame": 87142},   # Chase side view, 34 frames (1.418s)
     13: {"track": 3, "start_frame": 87216},   # Chase side view, 13 frames (0.542s)
 
     # Arrival Scene (1 slot)
-    14: {"track": 3, "start_frame": 87352},   # Arrival side view, 77 frames (3.212s)
+    14: {"track": 3, "start_frame": 87353},   # Arrival side view, 77 frames (3.212s)
 }
 
 # Logging Configuration
