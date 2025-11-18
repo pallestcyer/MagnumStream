@@ -101,7 +101,7 @@ CLIP_TRACKS = {
 # 14 slots total: 7 cruising (slots 1-7), 6 chase (slots 8-13), 1 arrival (slot 14)
 CLIP_POSITIONS = {
     # Cruising Scene (7 slots)
-    1: {"track": 3, "start_frame": 86485},    # Cruising front view, 22 frames (0.918s)
+    1: {"track": 3, "start_frame": 86485},    # Cruising front view, 21 frames (0.876s)
     2: {"track": 3, "start_frame": 86549},    # Cruising front view, 29 frames (1.210s) → seamless to 3
     3: {"track": 3, "start_frame": 86578},    # Cruising side view, 31 frames (1.293s)
     4: {"track": 3, "start_frame": 86631},    # Cruising front view, 23 frames (0.959s) → seamless to 5

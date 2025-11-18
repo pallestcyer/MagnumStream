@@ -125,7 +125,7 @@ export interface SlotConfig {
 
 export const SLOT_TEMPLATE: SlotConfig[] = [
   // Cruising Scene (7 slots) - matches DaVinci template positions 1-7
-  { slotNumber: 1, sceneType: 'cruising', cameraAngle: 2, color: '#FF6B35', duration: 0.918, seamlessCut: false }, // Front view (22 frames @ 23.976fps)
+  { slotNumber: 1, sceneType: 'cruising', cameraAngle: 2, color: '#FF6B35', duration: 0.876, seamlessCut: false }, // Front view (21 frames @ 23.976fps)
   { slotNumber: 2, sceneType: 'cruising', cameraAngle: 2, color: '#F7931E', duration: 1.210, seamlessCut: true },  // Front view (29 frames) → seamless to Slot 3
   { slotNumber: 3, sceneType: 'cruising', cameraAngle: 1, color: '#FFA500', duration: 1.293, seamlessCut: false }, // Side view (31 frames) - follows Slot 2
   { slotNumber: 4, sceneType: 'cruising', cameraAngle: 2, color: '#FF9E3D', duration: 0.959, seamlessCut: true },  // Front view (23 frames) → seamless to Slot 5
