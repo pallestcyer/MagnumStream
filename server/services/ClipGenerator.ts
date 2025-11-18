@@ -269,29 +269,34 @@ export class ClipGenerator {
 
     console.log(`🎬 Generating clip: ${exactFrames} frames (${exactDuration.toFixed(3)}s) at ${fps} fps`);
 
-    // FRAME-ACCURATE SEEKING STRATEGY:
-    // Use -ss AFTER -i for precision (slower but accurate)
-    // Add -start_at_zero to ensure timestamps start from 0
-    // Use -frames:v for exact frame count instead of -t duration
+    // TWO-STAGE SEEKING STRATEGY (eliminates black frame at start):
+    // 1. Fast seek BEFORE -i to nearest keyframe (~0.5s before target)
+    // 2. Precise seek AFTER -i for the remaining distance (frame-accurate)
+    // This combines speed with accuracy and ensures first frame is complete
+    const SEEK_BUFFER = 0.5;
+    const fastSeekTime = Math.max(0, startTime - SEEK_BUFFER);
+    const preciseSeekTime = startTime - fastSeekTime;
+
+    console.log(`📍 Two-stage seek: fast=${fastSeekTime.toFixed(3)}s, precise=${preciseSeekTime.toFixed(3)}s`);
+
     const ffmpegCommand = [
       'ffmpeg', '-y',
-      '-accurate_seek',                     // Enable accurate seeking
+      '-ss', fastSeekTime.toString(),       // Stage 1: Fast seek to keyframe BEFORE input
       '-i', `"${sourceVideoPath}"`,
-      '-ss', startTime.toString(),          // Seek AFTER input for frame accuracy
+      '-ss', preciseSeekTime.toString(),    // Stage 2: Precise seek AFTER input
       '-frames:v', exactFrames.toString(),  // Extract exact number of frames
-      '-vf', `fps=${fps}`,                  // Force exact frame rate with filter
+      '-vf', `setpts=PTS-STARTPTS,fps=${fps}`, // Reset timestamps + force exact frame rate
       '-c:v', 'libx264',
       '-preset', 'fast',                    // Balance speed and quality
       '-crf', '18',                         // High quality (visually lossless)
       '-g', '1',                            // Keyframe every frame (GOP=1) for frame accuracy
       '-vsync', 'cfr',                      // Constant frame rate - no dropped frames
       '-video_track_timescale', '24000',    // Match DaVinci timeline timescale
-      '-start_at_zero',                     // Ensure output starts at timestamp 0
       '-c:a', 'aac',
       '-b:a', '192k',
       '-ar', '48000',
       '-ac', '2',                           // Stereo audio
-      '-avoid_negative_ts', 'make_zero',   // Fix timestamp issues
+      '-async', '1',                        // Ensure A/V sync after seeking
       '-movflags', '+faststart',            // Optimize for playback
       '-pix_fmt', 'yuv420p',               // Ensure compatible pixel format
       `"${outputPath}"`
