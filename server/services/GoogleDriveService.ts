@@ -62,7 +62,6 @@ export class GoogleDriveService {
     }
 
     try {
-      console.log(`📤 Uploading final video for ${customerName}`);
 
       // Create or find customer folder
       const customerFolder = await this.createCustomerFolder(customerName, recordingId);
@@ -88,7 +87,7 @@ export class GoogleDriveService {
         fields: 'id,name,webViewLink,webContentLink,thumbnailLink,videoMediaMetadata'
       });
 
-      console.log(`✅ Video uploaded to Drive: ${file.data.name} (${file.data.id})`);
+      console.log(`✅ Video uploaded to Drive: ${file.data.name}`);
 
       // Make file accessible to customer
       await this.shareFileWithCustomer(file.data.id, customerEmail);
@@ -140,8 +139,6 @@ export class GoogleDriveService {
       const dayFolder = await this.getOrCreateFolder(day, monthFolder.id);
       const customerFolder = await this.getOrCreateFolder(folderName, dayFolder.id);
 
-      console.log(`📁 Created organized folder structure: MagnumStream/${year}/${month}/${day}/${folderName}`);
-      
       return customerFolder;
 
     } catch (error) {
@@ -212,7 +209,7 @@ export class GoogleDriveService {
         emailMessage: `Your flight video is ready! You now have access to view and download your personalized flight experience.`
       });
 
-      console.log(`🔗 Shared file ${fileId} with ${customerEmail}`);
+      console.log(`✅ File shared with ${customerEmail}`);
     } catch (error) {
       console.error(`❌ Failed to share file with ${customerEmail}:`, error);
       throw error;
@@ -242,15 +239,7 @@ export class GoogleDriveService {
       if (file.data.parents && file.data.parents.length > 0) {
         const folderId = file.data.parents[0];
         await this.shareFileWithCustomer(folderId, customerEmail);
-        console.log(`🔗 Added ${customerEmail} as collaborator to folder and video`);
-      }
-
-      // Update sale record to mark drive as shared
-      const sales = await storage.getAllSales();
-      const sale = sales.find(s => s.recordingId === recordingId);
-      if (sale) {
-        // Would need to add update sale method to storage
-        console.log(`📊 Sale marked as drive shared for ${customerEmail}`);
+        console.log(`✅ Folder and video shared with ${customerEmail}`);
       }
 
     } catch (error) {
@@ -343,8 +332,6 @@ export class GoogleDriveService {
           webViewLink: uploadedFile.data.webViewLink,
           webContentLink: uploadedFile.data.webContentLink
         });
-
-        console.log(`📎 Uploaded additional content: ${file.name}`);
       }
 
       return uploadedFiles;

@@ -14,8 +14,6 @@ declare module 'express-session' {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  console.log('🔧 Starting route registration...');
-  
   // Health check endpoint
   app.get("/api/health", async (req, res) => {
     try {
@@ -43,8 +41,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           label: "Camera 2 (Front View)"
         }
       };
-      
-      console.log('📹 Camera configuration requested:', cameraConfig);
+
       res.json(cameraConfig);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -136,7 +133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           res.setHeader('Content-Type', 'application/json');
           res.json(validSlots);
         } catch (storageError: any) {
-          console.error('❌ API: Storage error:', storageError.message);
+          console.error('❌ Storage error:', storageError.message);
           // Return empty array instead of error to avoid breaking the UI
           res.setHeader('Content-Type', 'application/json');
           res.json([]);
@@ -146,7 +143,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json([]);
       }
     } catch (error: any) {
-      console.error('❌ API: Error getting video slots:', error.message);
+      console.error('❌ Error getting video slots:', error.message);
       res.status(500).json({ error: error.message });
     }
   });
@@ -269,7 +266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         console.log(`🔗 Google Drive access granted to ${validated.customerEmail}`);
       } catch (driveError) {
-        console.warn('⚠️ Failed to share Google Drive access:', driveError);
+        console.warn('⚠️ Failed to share Google Drive access');
         // Don't fail the sale if Drive sharing fails
       }
       
@@ -362,12 +359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description,
       });
 
-      console.log('📝 Issue reported:', {
-        id: issue.id,
-        staffName,
-        issueType,
-        priority: priority || 'not specified',
-      });
+      console.log(`📝 Issue reported: ${issueType} by ${staffName}`);
 
       res.json(issue);
     } catch (error: any) {
@@ -443,18 +435,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (storage.deleteFlightRecording) {
             const success = await storage.deleteFlightRecording(recording.id);
             if (success) {
-              console.log(`🗑️ Deleted sample record: ${recording.projectName} (${recording.id})`);
               deletedCount++;
               deletedRecords.push({
                 id: recording.id,
                 projectName: recording.projectName,
                 pilotName: recording.pilotName
               });
-            } else {
-              console.log(`❌ Failed to delete: ${recording.projectName} (${recording.id})`);
             }
           } else {
-            console.log(`🗑️ Would delete sample record: ${recording.projectName}`);
             deletedCount++;
           }
         }
@@ -487,17 +475,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
   // VIDEO UPLOAD ENDPOINTS
   // ============================================================================
-  
-  console.log('🔧 Setting up video upload endpoints...');
-  
+
   try {
-    console.log('🔧 Importing multer...');
     const multer = (await import('multer')).default;
-    console.log('🔧 Importing fs...');
     const fs = (await import('fs')).promises;
-    console.log('🔧 Importing path...');
     const path = await import('path');
-    console.log('✅ All imports successful for video upload endpoints');
   
   const multerStorage = multer.memoryStorage();
   const upload = multer({ 
@@ -521,7 +503,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (new Date(metadata.expiresAt) < new Date()) {
             const folderPath = path.join(projectsDir, folder);
             await fs.rm(folderPath, { recursive: true, force: true });
-            console.log(`🗑️ Cleaned up expired folder: ${folder}`);
             cleanedCount++;
           }
         } catch {
@@ -667,8 +648,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { recordingId } = req.params;
       const { projectName, googleTokens } = req.body;
-      
-      console.log(`🎬 Starting DaVinci render for recording ${recordingId}`);
+
+      console.log(`🎬 Starting DaVinci render for ${recordingId}`);
       
       // First ensure clips and job file exist
       const clips = await clipGenerator.getProjectClips(recordingId);
@@ -680,9 +661,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let jobFilePath;
       try {
         jobFilePath = await clipGenerator.createDaVinciJobFile(recordingId);
-        console.log(`📄 Using DaVinci job file: ${jobFilePath}`);
       } catch (error) {
-        console.error('Failed to create job file:', error);
+        console.error('❌ Failed to create job file:', error);
         return res.status(500).json({ error: "Failed to create DaVinci job file" });
       }
       
@@ -704,20 +684,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       const davinciCommand = `python3 "${davinciScriptPath}" --job-file "${jobFilePath}"`;
-      
-      console.log(`🔧 Executing DaVinci command: ${davinciCommand}`);
-      console.log(`🔧 DaVinci environment: RESOLVE_SCRIPT_API=${davinciEnv.RESOLVE_SCRIPT_API}`);
-      
+
       // Execute with timeout and proper environment (DaVinci rendering can take a while)
-      const { stdout, stderr } = await execAsync(davinciCommand, { 
+      const { stdout, stderr } = await execAsync(davinciCommand, {
         timeout: 30 * 60 * 1000, // 30 minutes timeout
         env: davinciEnv
       });
-      
-      console.log(`🎬 DaVinci stdout: ${stdout}`);
-      if (stderr) {
-        console.warn(`🎬 DaVinci stderr: ${stderr}`);
-      }
       
       // Parse output to get result
       if (stdout.includes('SUCCESS:')) {
@@ -726,31 +698,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // IMPORTANT: Always update status to completed when render succeeds
         // This ensures the recording appears in History as complete even if Drive upload fails
-        console.log(`📊 Updating recording ${recordingId} status to completed...`);
         try {
           await storage.updateFlightRecording(recordingId, {
             exportStatus: "completed",
             localVideoPath: outputPath
           });
           console.log(`✅ Recording ${recordingId} marked as completed`);
-
-          // VERIFY the update actually worked
-          const verifyRecording = await storage.getFlightRecording(recordingId);
-          if (verifyRecording) {
-            console.log(`✅ VERIFIED: Recording ${recordingId} status is now: ${verifyRecording.exportStatus}`);
-            if (verifyRecording.exportStatus !== 'completed') {
-              console.error(`❌ STATUS UPDATE FAILED! Expected 'completed', got '${verifyRecording.exportStatus}'`);
-            }
-          } else {
-            console.error(`❌ Could not verify recording ${recordingId} - recording not found after update`);
-          }
         } catch (statusUpdateError) {
-          console.error(`❌ CRITICAL: Failed to update recording ${recordingId} status to completed:`, statusUpdateError);
+          console.error(`❌ Failed to update recording status:`, statusUpdateError);
           // Continue with thumbnail generation and Drive upload even if status update fails
         }
 
         // Generate thumbnail from the rendered video and upload to Supabase
-        console.log(`📸 Generating thumbnail for recording ${recordingId}...`);
         try {
           const { thumbnailGenerator } = await import('./services/ThumbnailGenerator');
 
@@ -767,9 +726,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             thumbnailUrl
           });
 
-          console.log(`✅ Thumbnail generated and uploaded to Supabase: ${thumbnailUrl}`);
+          console.log(`✅ Thumbnail generated and uploaded`);
         } catch (thumbnailError) {
-          console.error(`⚠️  Failed to generate thumbnail (non-critical):`, thumbnailError);
+          console.error(`⚠️  Failed to generate thumbnail:`, thumbnailError);
           // Don't fail the whole render if thumbnail generation fails
         }
 
@@ -783,11 +742,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Check if the rendered file exists
           if (!fs.existsSync(outputPath)) {
-            console.error(`❌ Rendered file not found at: ${outputPath}`);
+            console.error(`❌ Rendered file not found: ${outputPath}`);
             throw new Error(`Rendered file not found: ${outputPath}`);
           }
 
-          console.log(`📤 Syncing rendered video to Google Drive...`);
+          console.log(`📤 Syncing to Google Drive...`);
 
           // Use local Google Drive sync instead of API
           const { googleDriveLinkGenerator } = await import('./services/GoogleDriveLinkGenerator');
@@ -797,11 +756,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let recording = await storage.getFlightRecording(recordingId);
 
           if (!recording) {
-            console.error(`❌ Recording not found by ID ${recordingId}`);
-            throw new Error(`Recording not found: ${recordingId}. Cannot update status for a different recording.`);
+            console.error(`❌ Recording not found: ${recordingId}`);
+            throw new Error(`Recording not found: ${recordingId}`);
           }
 
-          console.log(`✅ Found recording: ${recording.id} (${recording.pilotName}, status: ${recording.exportStatus})`);
           actualRecordingId = recording.id;
 
           const customerName = recording.pilotName || 'Customer';
@@ -810,10 +768,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Check if Google Drive for Desktop is available
           if (!googleDriveLinkGenerator.isAvailable()) {
             console.warn('⚠️ Google Drive for Desktop not found - skipping sync');
-            console.warn('⚠️ Video file saved locally at: ' + outputPath);
-
-            // Status already updated above, just log
-            console.log(`✅ Recording ${actualRecordingId} completed (Drive sync skipped)`);
 
             res.json({
               success: true,
@@ -831,39 +785,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // Copy file to Google Drive local folder (will auto-sync to cloud)
-          console.log(`📂 Copying to Google Drive folder...`);
           const driveFilePath = await googleDriveLinkGenerator.copyToGoogleDrive(outputPath, actualRecordingId);
 
           // Generate link info
           const linkInfo = await googleDriveLinkGenerator.generateShareableLink(driveFilePath);
 
-          console.log(`✅ Video synced to Google Drive:`);
-          console.log(`   Path: ${linkInfo.relativePath}`);
-          console.log(`   Web URL: ${linkInfo.webUrl}`);
-          console.log(`   ${linkInfo.instructions}`);
+          console.log(`✅ Video synced to Google Drive`);
 
           // Get folder URL using OAuth - this provides direct link to folder
           let driveFolderUrl = null;
           try {
             const { googleDriveOAuth } = await import('./services/GoogleDriveOAuth');
-            console.log(`🔍 OAuth ready status: ${googleDriveOAuth.isReady()}`);
 
             if (googleDriveOAuth.isReady()) {
               // Get the folder path (everything except the filename)
               const path = await import('path');
               const folderPath = path.dirname(linkInfo.relativePath);
-              console.log(`🔍 Looking up folder path in Drive: ${folderPath}`);
 
               const folderInfo = await googleDriveOAuth.getFolderInfoByPath(folderPath);
               if (folderInfo) {
                 driveFolderUrl = folderInfo.webUrl;
-                console.log(`✅ Got Drive folder URL: ${driveFolderUrl}`);
-              } else {
-                console.warn(`⚠️  Folder not found in Google Drive: ${folderPath}`);
+                console.log(`✅ Drive folder URL obtained`);
               }
             } else {
-              console.warn('⚠️  Google Drive OAuth not ready - folder URL will not be available');
-              console.warn('   To fix: Ensure google-drive-tokens.json exists or GOOGLE_REFRESH_TOKEN env var is set');
+              console.warn('⚠️  Google Drive OAuth not ready');
             }
           } catch (error) {
             console.error('❌ Error getting folder URL:', error);
@@ -876,7 +821,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             driveFolderUrl: driveFolderUrl // Store folder URL if available
           });
 
-          console.log(`✅ Recording ${actualRecordingId} Drive info updated and ready for sale`);
+          console.log(`✅ Drive info updated - ready for sale`);
 
           res.json({
             success: true,
@@ -900,9 +845,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         } catch (uploadError: any) {
           console.error('❌ Failed to upload to Google Drive:', uploadError);
-
-          // Status already marked as completed above - just log the error
-          console.log(`✅ Recording ${actualRecordingId} completed locally (Drive upload failed)`);
 
           res.json({
             success: true,
@@ -952,7 +894,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if file exists
       if (!fs.existsSync(videoPath)) {
-        console.error(`Video file not found at: ${videoPath}`);
+        console.error(`❌ Video file not found: ${videoPath}`);
         return res.status(404).json({ error: "Video file not found" });
       }
 
@@ -1025,7 +967,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         thumbnailUrl
       });
 
-      console.log(`✅ Thumbnail generated and uploaded for ${recordingId}: ${thumbnailUrl}`);
+      console.log(`✅ Thumbnail generated for ${recordingId}`);
 
       res.json({
         success: true,
@@ -1151,8 +1093,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Open the video file with default application (usually QuickTime on Mac)
       await execAsync(`open "${fullPath}"`);
 
-      console.log(`📹 Opened video file: ${fullPath}`);
-
       res.json({
         success: true,
         message: "Video file opened successfully",
@@ -1170,8 +1110,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { recordingId } = req.params;
       const { exportStatus, localVideoPath } = req.body;
-
-      console.log(`🔧 Fixing recording ${recordingId} - status: ${exportStatus}, path: ${localVideoPath}`);
 
       const updates: any = {};
       if (exportStatus) updates.exportStatus = exportStatus;
@@ -1369,16 +1307,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  console.log('✅ Video upload endpoints registered successfully');
-  
   } catch (error) {
     console.error('❌ Error setting up video upload endpoints:', error);
-    console.error('❌ Full error details:', error);
     throw error;
   }
 
-  console.log('🔧 Setting up error handling middleware...');
-  
   // Google Drive OAuth endpoints
   app.get("/api/drive/auth/url", async (req, res) => {
     try {
@@ -1477,7 +1410,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             if (matchingSale && storage.updateSale) {
               await storage.updateSale(matchingSale.id, { driveShared: true });
-              console.log(`✅ Updated sale ${matchingSale.id} - marked Drive as shared`);
+              console.log(`✅ Sale marked as Drive shared`);
             }
           }
         } catch (updateError) {
@@ -1499,9 +1432,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(notFoundHandler);
   app.use(errorHandler);
 
-  console.log('🔧 Creating HTTP server...');
   const httpServer = createServer(app);
-
-  console.log('✅ Route registration completed successfully');
   return httpServer;
 }

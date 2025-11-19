@@ -82,8 +82,6 @@ export class ClipGenerator {
           const metadata = JSON.parse(metadataContent);
 
           if (metadata.recordingId === recordingId || metadata.sessionId === recordingId) {
-            console.log(`🎬 Found project directory: ${projectPath}`);
-            
             // Create subdirectories
             const clipsDir = path.join(projectPath, 'clips');
             const davinciDir = path.join(projectPath, 'davinci');
@@ -102,7 +100,7 @@ export class ClipGenerator {
       }
       
       // Fallback: use the most recent project directory if no exact match found
-      console.log(`⚠️ No exact match found for recording ${recordingId}, using most recent project`);
+      console.warn(`⚠️ No exact match for ${recordingId}, using most recent project`);
       const sortedDirs = projectDirs.sort((a, b) => {
         const statA = require('fs').statSync(path.join(this.baseDir, a));
         const statB = require('fs').statSync(path.join(this.baseDir, b));
@@ -111,8 +109,7 @@ export class ClipGenerator {
       
       if (sortedDirs.length > 0) {
         const fallbackPath = path.join(this.baseDir, sortedDirs[0]);
-        console.log(`🎬 Using fallback project directory: ${fallbackPath}`);
-        
+
         // Create subdirectories
         const clipsDir = path.join(fallbackPath, 'clips');
         const davinciDir = path.join(fallbackPath, 'davinci');
@@ -125,10 +122,10 @@ export class ClipGenerator {
         return fallbackPath;
       }
       
-      throw new Error(`No project directory found for recording ${recordingId}`);
+      throw new Error(`No project directory found for ${recordingId}`);
     } catch (error) {
-      console.error(`🎬 Error finding project directory:`, error);
-      throw new Error(`Failed to locate project directory for recording ${recordingId}`);
+      console.error(`❌ Error finding project directory:`, error);
+      throw new Error(`Failed to locate project directory for ${recordingId}`);
     }
   }
 
@@ -137,14 +134,12 @@ export class ClipGenerator {
     const projectDir = await this.getProjectDirectory(recordingId);
     const clipsDir = path.join(projectDir, 'clips');
     const sourceDir = path.join(projectDir, 'source');
-    
-    console.log(`🎬 Generating clips for recording ${recordingId}`);
-    console.log(`📁 Project directory: ${projectDir}`);
+
+    console.log(`🎬 Generating clips for ${recordingId}`);
     
     // If no slot selections provided, get them from the database
     let slotsToProcess = slotSelections;
     if (!slotsToProcess && storage.getVideoSlotsByRecordingId) {
-      console.log(`📊 Fetching saved video slots from database...`);
       const savedSlots = await storage.getVideoSlotsByRecordingId(recordingId);
       slotsToProcess = savedSlots.map(slot => ({
         slotNumber: slot.slot_number,
@@ -162,9 +157,8 @@ export class ClipGenerator {
     
     // Group slots by scene type for efficient processing
     const slotsByScene = this.groupSlotsByScene(slotsToProcess);
-    
+
     for (const [sceneType, sceneSlots] of Object.entries(slotsByScene)) {
-      console.log(`🎬 Processing ${sceneSlots.length} slots for ${sceneType} scene`);
       
       // Extract scene videos from storage to temporary files
       const sceneVideos = await this.extractSceneVideos(recordingId, sceneType, sourceDir);
@@ -199,8 +193,7 @@ export class ClipGenerator {
           };
           
           clipFiles.push(clipFile);
-          console.log(`✅ Generated clip: ${outputFilename} (${slot.windowStart}s - ${slot.windowStart + clipDuration}s, duration: ${clipDuration}s)`);
-          
+
         } catch (error) {
           console.error(`❌ Failed to generate clip for slot ${slot.slotNumber}:`, error);
         }
@@ -232,29 +225,25 @@ export class ClipGenerator {
   
   private async extractSceneVideos(recordingId: string, sceneType: string, sourceDir: string): Promise<Record<string, string>> {
     const videos: Record<string, string> = {};
-    
-    console.log(`📹 Looking for uploaded ${sceneType} scene videos for recording ${recordingId} in ${sourceDir}`);
-    
+
     const camera1Path = path.join(sourceDir, `${sceneType}_camera1.mp4`);
     const camera2Path = path.join(sourceDir, `${sceneType}_camera2.mp4`);
-    
+
     // Check if uploaded files exist
     try {
       await fs.access(camera1Path);
       videos.camera1 = camera1Path;
-      console.log(`📹 Found uploaded camera 1 file: ${camera1Path}`);
     } catch {
-      console.log(`📹 Camera 1 file not found for ${sceneType}, skipping`);
+      // Camera 1 not found
     }
-    
+
     try {
       await fs.access(camera2Path);
       videos.camera2 = camera2Path;
-      console.log(`📹 Found uploaded camera 2 file: ${camera2Path}`);
     } catch {
-      console.log(`📹 Camera 2 file not found for ${sceneType}, skipping`);
+      // Camera 2 not found
     }
-    
+
     return videos;
   }
   
@@ -267,8 +256,6 @@ export class ClipGenerator {
     const exactFrames = Math.round(duration * fps);
     const exactDuration = exactFrames / fps;
 
-    console.log(`🎬 Generating clip: ${exactFrames} frames (${exactDuration.toFixed(3)}s) at ${fps} fps`);
-
     // TWO-STAGE SEEKING STRATEGY (eliminates black frame at start):
     // 1. Fast seek BEFORE -i to nearest keyframe (~0.5s before target)
     // 2. Precise seek AFTER -i for the remaining distance (frame-accurate)
@@ -276,8 +263,6 @@ export class ClipGenerator {
     const SEEK_BUFFER = 0.5;
     const fastSeekTime = Math.max(0, startTime - SEEK_BUFFER);
     const preciseSeekTime = startTime - fastSeekTime;
-
-    console.log(`📍 Two-stage seek: fast=${fastSeekTime.toFixed(3)}s, precise=${preciseSeekTime.toFixed(3)}s`);
 
     const ffmpegCommand = [
       'ffmpeg', '-y',
@@ -301,8 +286,6 @@ export class ClipGenerator {
       '-pix_fmt', 'yuv420p',               // Ensure compatible pixel format
       `"${outputPath}"`
     ].join(' ');
-
-    console.log(`🔧 FFmpeg command: ${ffmpegCommand}`);
 
     try {
       const { stderr } = await execAsync(ffmpegCommand);
@@ -380,13 +363,12 @@ export class ClipGenerator {
     // For Mac service: Get project info from metadata instead of database lookup
     const metadataPath = path.join(projectDir, '.expiration');
     let projectMetadata: any = {};
-    
+
     try {
       const metadataContent = await fs.readFile(metadataPath, 'utf8');
       projectMetadata = JSON.parse(metadataContent);
-      console.log('📄 Using project metadata for DaVinci job:', projectMetadata);
     } catch (error) {
-      console.warn('📄 No project metadata found, using defaults');
+      console.warn('⚠️ No project metadata found, using defaults');
     }
     
     const currentDate = new Date().toISOString().split('T')[0];
@@ -424,10 +406,9 @@ export class ClipGenerator {
     
     const jobFilePath = path.join(davinciDir, `job_${jobData.jobId}.json`);
     await fs.writeFile(jobFilePath, JSON.stringify(jobData, null, 2));
-    
-    console.log(`📄 Created DaVinci job file: ${jobFilePath}`);
-    console.log(`📊 Job includes ${clips.length} clips for ${Object.keys(jobData.clips).length} slots`);
-    
+
+    console.log(`✅ DaVinci job file created with ${clips.length} clips`);
+
     return jobFilePath;
   }
 }

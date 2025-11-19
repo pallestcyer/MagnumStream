@@ -218,15 +218,6 @@ export class GoogleDriveOAuth {
       console.log(`🔍 Searching for folder path in Drive: ${relativePath}`);
       console.log(`   Path parts: ${pathParts.join(' > ')}`);
 
-      // First, list what's actually at the root to help debugging
-      console.log(`   Listing folders at root to help debugging...`);
-      const rootFolders = await drive.files.list({
-        q: "'root' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
-        fields: 'files(id, name)',
-        pageSize: 20
-      });
-      console.log(`   Found ${rootFolders.data.files?.length || 0} folders at root:`);
-      rootFolders.data.files?.forEach(f => console.log(`      - ${f.name}`));
 
       let parentId = 'root';
 
@@ -235,8 +226,6 @@ export class GoogleDriveOAuth {
         const folderName = pathParts[i];
         const query = `name='${folderName}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
 
-        console.log(`   [${i + 1}/${pathParts.length}] Looking for: "${folderName}" under parent ${parentId}`);
-
         const result = await drive.files.list({
           q: query,
           fields: 'files(id, name)',
@@ -244,11 +233,9 @@ export class GoogleDriveOAuth {
         });
 
         if (!result.data.files || result.data.files.length === 0) {
-          console.warn(`❌ Folder not found: "${folderName}" (part ${i + 1} of ${pathParts.length})`);
-          console.warn(`   Full path attempted: ${relativePath}`);
+          console.warn(`❌ Folder not found: "${folderName}"`);
 
           // Try searching for the entire folder path as a fallback
-          console.log(`   🔄 Trying fallback: searching for "${pathParts[pathParts.length - 1]}" anywhere in Drive...`);
           const finalFolderName = pathParts[pathParts.length - 1];
           const searchResult = await drive.files.list({
             q: `name='${finalFolderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
@@ -257,19 +244,15 @@ export class GoogleDriveOAuth {
           });
 
           if (searchResult.data.files && searchResult.data.files.length > 0) {
-            console.log(`   ✅ Found folder "${finalFolderName}" via search! Using ID: ${searchResult.data.files[0].id}`);
             return searchResult.data.files[0].id!;
           }
 
-          console.warn(`   ❌ Fallback search also failed. Folder structure doesn't match.`);
           return null;
         }
 
         parentId = result.data.files[0].id!;
-        console.log(`   ✅ Found: ${result.data.files[0].name} (ID: ${parentId})`);
       }
 
-      console.log(`✅ Successfully found folder! Final ID: ${parentId}`);
       return parentId;
     } catch (error) {
       console.error('Error finding folder by path:', error);
@@ -307,10 +290,10 @@ export class GoogleDriveOAuth {
         emailMessage: `Your MagnumStream flight video is ready! You now have access to view and download your personalized flight experience.`
       });
 
-      console.log(`✅ Shared folder ${folderId} with ${customerEmail}`);
+      console.log(`✅ Folder shared with ${customerEmail}`);
       return true;
     } catch (error) {
-      console.error(`Failed to share folder with ${customerEmail}:`, error);
+      console.error(`❌ Failed to share folder:`, error);
       return false;
     }
   }
