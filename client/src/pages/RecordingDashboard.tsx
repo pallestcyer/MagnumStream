@@ -481,10 +481,10 @@ export default function RecordingDashboard() {
     });
 
     // Check minimum duration
-    if (elapsedTime < 5) {
+    if (elapsedTime < 10) {
       toast({
         title: "Recording Too Short",
-        description: "Please record at least 5 seconds for each scene.",
+        description: "Please record at least 10 seconds for each scene.",
         variant: "destructive",
       });
       return;
