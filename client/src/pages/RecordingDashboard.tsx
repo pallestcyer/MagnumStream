@@ -979,9 +979,9 @@ export default function RecordingDashboard() {
                 </div>
                 <div className="flex items-center gap-2 justify-end mt-1">
                   {(recordingState === "recording" || recordingState === "paused") && (
-                    <div className={`flex items-center gap-1 text-sm ${elapsedTime >= 5 ? "text-green-500" : "text-yellow-500"}`}>
+                    <div className={`flex items-center gap-1 text-sm ${elapsedTime >= 10 ? "text-green-500" : "text-yellow-500"}`}>
                       <Target className="w-4 h-4" />
-                      <span>Min: 5s</span>
+                      <span>Min: 10s</span>
                     </div>
                   )}
                   <div className="text-sm text-muted-foreground">
