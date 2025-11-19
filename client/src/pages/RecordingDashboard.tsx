@@ -853,22 +853,12 @@ export default function RecordingDashboard() {
       <main className="flex-1 overflow-auto p-8">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Header with Pilot Info */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Video Recording</h1>
-              <p className="text-muted-foreground mt-1">
-                Customers: <span className="font-semibold text-foreground">{pilotInfo.name || "Not set"}</span>
-                {pilotInfo.email && <span className="ml-4 text-sm">({pilotInfo.email})</span>}
-              </p>
-            </div>
-            <Button
-              onClick={() => setLocation("/editor/cruising")}
-              variant="outline"
-              data-testid="button-skip-to-editor"
-            >
-              Skip to Editing
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Video Recording</h1>
+            <p className="text-muted-foreground mt-1">
+              Customers: <span className="font-semibold text-foreground">{pilotInfo.name || "Not set"}</span>
+              {pilotInfo.email && <span className="ml-4 text-sm">({pilotInfo.email})</span>}
+            </p>
           </div>
 
           {/* Scene Progress */}
