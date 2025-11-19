@@ -725,14 +725,9 @@ export default function RecordingDashboard() {
         return updated;
       });
 
-      
+
       console.log(`🎯 Scene completion process finished for ${currentSceneType}`);
-      
-      toast({
-        title: "Scene Recorded",
-        description: `${currentSceneType} scene saved successfully`,
-      });
-      
+
     } catch (error) {
       console.error('❌ Failed to save recorded videos:', error);
       console.error('❌ Error details:', {
