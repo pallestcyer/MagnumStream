@@ -473,7 +473,7 @@ export default function EditorCruising() {
                 (Click a slot to activate and preview)
               </span>
             </div>
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid md:grid-cols-4 gap-4">
               {cruisingSlots.map(slot => {
                 const selection = slotSelections.find(s => s.slotNumber === slot.slotNumber);
                 const isActive = activeSlot === slot.slotNumber;
