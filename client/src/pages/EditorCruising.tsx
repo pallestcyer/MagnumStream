@@ -473,8 +473,34 @@ export default function EditorCruising() {
                 (Click a slot to activate and preview)
               </span>
             </div>
+            {/* First row: 3 slots */}
+            <div className="grid md:grid-cols-3 gap-4">
+              {cruisingSlots.slice(0, 3).map(slot => {
+                const selection = slotSelections.find(s => s.slotNumber === slot.slotNumber);
+                const isActive = activeSlot === slot.slotNumber;
+                return (
+                  <div
+                    key={slot.slotNumber}
+                    onClick={() => handleSlotClick(slot.slotNumber)}
+                    className={`cursor-pointer transition-all ${isActive ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}
+                    data-testid={`slot-card-${slot.slotNumber}`}
+                  >
+                    <SlotSelector
+                      slotNumber={slot.slotNumber}
+                      sceneDuration={sceneVideos.duration || 60}
+                      windowStart={selection?.windowStart || 0}
+                      onWindowStartChange={(newStart) => handleWindowStartChange(slot.slotNumber, newStart)}
+                      color={slot.color}
+                      sceneType={slot.sceneType}
+                      cameraAngle={slot.cameraAngle}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            {/* Second row: 4 slots */}
             <div className="grid md:grid-cols-4 gap-4">
-              {cruisingSlots.map(slot => {
+              {cruisingSlots.slice(3).map(slot => {
                 const selection = slotSelections.find(s => s.slotNumber === slot.slotNumber);
                 const isActive = activeSlot === slot.slotNumber;
                 return (
