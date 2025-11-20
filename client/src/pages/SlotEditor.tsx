@@ -280,7 +280,7 @@ export default function SlotEditor() {
                     ({cruisingSlots.length} slots)
                   </span>
                 </div>
-                <div className="grid md:grid-cols-3 gap-4">
+                <div className="grid md:grid-cols-4 gap-4">
                   {cruisingSlots.map(slot => {
                     const sceneData = getSceneData('cruising');
                     const selection = slotSelections.find(s => s.slotNumber === slot.slotNumber);
