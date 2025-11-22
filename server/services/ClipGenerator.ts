@@ -259,26 +259,25 @@ export class ClipGenerator {
     // The black frame issue occurs because seeking to non-keyframe positions
     // can produce an incomplete first frame during decoding.
     //
-    // Solution: Seek 1 frame earlier, extract exactFrames+1, then use trim filter
-    // to drop the first frame (which may be black/incomplete) and keep exactly
-    // the frames we need.
+    // Solution: Use trim filter with start time to skip the potentially-black first frame,
+    // then use select filter to output exactly the frames we need.
     //
     // This guarantees:
-    // - No black frames at start (first potentially-bad frame is dropped)
+    // - No black frames at start (trim skips the incomplete decode region)
     // - Exact frame count matching DaVinci template
-    // - Correct starting position (we seek 1 frame early, drop it, land on target)
+    // - Correct starting position
 
     // Calculate time offset for 1 frame at 23.976fps
     const oneFrameTime = 1 / fps;
-    const adjustedStartTime = Math.max(0, startTime - oneFrameTime);
 
-    // Request 1 extra frame, then trim filter drops first frame and keeps exactFrames
+    // We'll use the trim filter to start slightly after the seek point,
+    // skipping any potential black frame from decoding
     const ffmpegCommand = [
       'ffmpeg', '-y',
       '-i', `"${sourceVideoPath}"`,
-      '-ss', adjustedStartTime.toString(),      // Seek 1 frame before target
-      '-frames:v', (exactFrames + 1).toString(), // Extract 1 extra frame
-      '-vf', `select='gte(n\\,1)',setpts=PTS-STARTPTS`,  // Drop first frame (n>=1), reset timestamps
+      '-ss', startTime.toString(),              // Seek to target time
+      // Use trim to skip first frame worth of time, then select exact frame count
+      '-vf', `trim=start=${oneFrameTime},setpts=PTS-STARTPTS,select='lt(n\\,${exactFrames})',setpts=N/${fps}/TB`,
       '-r', fps.toString(),                     // Output frame rate (23.976)
       '-c:v', 'libx264',
       '-preset', 'fast',                        // Balance speed and quality
@@ -292,7 +291,7 @@ export class ClipGenerator {
       '-b:a', '192k',
       '-ar', '48000',
       '-ac', '2',                               // Stereo audio
-      '-af', `atrim=start=${oneFrameTime}:end=${duration + oneFrameTime},asetpts=PTS-STARTPTS`,  // Match audio trim (skip first frame duration)
+      '-af', `atrim=start=${oneFrameTime}:end=${duration + oneFrameTime},asetpts=PTS-STARTPTS`,  // Match audio trim
       '-movflags', '+faststart',                // Optimize for playback
       '-pix_fmt', 'yuv420p',                    // Ensure compatible pixel format
       `"${outputPath}"`
