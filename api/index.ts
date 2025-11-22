@@ -53,12 +53,16 @@ if (supabaseUrl && supabaseServiceKey) {
 // Database operations (handled by Vercel)
 class DatabaseStorage {
   async createFlightRecording(data: any) {
+    // Generate project name from pilot name
+    const projectName = data.projectName || `${data.pilotName} Flight`;
+
     const { data: result, error } = await (supabase as any)
       .from('flight_recordings')
       .insert({
-        project_name: data.projectName,
+        project_name: projectName,
         pilot_name: data.pilotName,
-        pilot_email: data.pilotEmail,
+        pilot_email: data.pilotEmail || '',
+        flight_pilot: data.flightPilot,
         staff_member: data.staffMember,
         flight_date: data.flightDate,
         flight_time: data.flightTime,
@@ -66,7 +70,7 @@ class DatabaseStorage {
       })
       .select()
       .single();
-      
+
     if (error) throw error;
 
     // Transform the result to match the client expectations
@@ -75,6 +79,7 @@ class DatabaseStorage {
       projectName: result.project_name,
       pilotName: result.pilot_name,
       pilotEmail: result.pilot_email,
+      flightPilot: result.flight_pilot,
       staffMember: result.staff_member,
       flightDate: result.flight_date,
       flightTime: result.flight_time,
@@ -82,10 +87,14 @@ class DatabaseStorage {
       driveFileId: result.drive_file_id,
       driveFileUrl: result.drive_file_url,
       driveFolderUrl: result.drive_folder_url,
+      driveFolderId: result.drive_folder_id,
+      videoFolderId: result.video_folder_id,
+      photosFolderId: result.photos_folder_id,
       localVideoPath: result.local_video_path,
       thumbnailUrl: result.thumbnail_url,
       smsPhoneNumber: result.sms_phone_number,
       sold: result.sold,
+      photosUploaded: result.photos_uploaded,
       createdAt: new Date(result.created_at)
     };
   }
@@ -93,19 +102,24 @@ class DatabaseStorage {
   async updateFlightRecording(id: string, data: any) {
     const updateData: any = {};
 
-    if (data.pilotName) updateData.pilot_name = data.pilotName;
-    if (data.pilotEmail) updateData.pilot_email = data.pilotEmail;
-    if (data.staffMember) updateData.staff_member = data.staffMember;
-    if (data.flightDate) updateData.flight_date = data.flightDate;
-    if (data.flightTime) updateData.flight_time = data.flightTime;
-    if (data.exportStatus) updateData.export_status = data.exportStatus;
-    if (data.driveFileId) updateData.drive_file_id = data.driveFileId;
-    if (data.driveFileUrl) updateData.drive_file_url = data.driveFileUrl;
-    if (data.driveFolderUrl) updateData.drive_folder_url = data.driveFolderUrl;
-    if (data.localVideoPath) updateData.local_video_path = data.localVideoPath;
-    if (data.thumbnailUrl) updateData.thumbnail_url = data.thumbnailUrl;
-    if (data.smsPhoneNumber) updateData.sms_phone_number = data.smsPhoneNumber;
+    if (data.pilotName !== undefined) updateData.pilot_name = data.pilotName;
+    if (data.pilotEmail !== undefined) updateData.pilot_email = data.pilotEmail;
+    if (data.flightPilot !== undefined) updateData.flight_pilot = data.flightPilot;
+    if (data.staffMember !== undefined) updateData.staff_member = data.staffMember;
+    if (data.flightDate !== undefined) updateData.flight_date = data.flightDate;
+    if (data.flightTime !== undefined) updateData.flight_time = data.flightTime;
+    if (data.exportStatus !== undefined) updateData.export_status = data.exportStatus;
+    if (data.driveFileId !== undefined) updateData.drive_file_id = data.driveFileId;
+    if (data.driveFileUrl !== undefined) updateData.drive_file_url = data.driveFileUrl;
+    if (data.driveFolderUrl !== undefined) updateData.drive_folder_url = data.driveFolderUrl;
+    if (data.driveFolderId !== undefined) updateData.drive_folder_id = data.driveFolderId;
+    if (data.videoFolderId !== undefined) updateData.video_folder_id = data.videoFolderId;
+    if (data.photosFolderId !== undefined) updateData.photos_folder_id = data.photosFolderId;
+    if (data.localVideoPath !== undefined) updateData.local_video_path = data.localVideoPath;
+    if (data.thumbnailUrl !== undefined) updateData.thumbnail_url = data.thumbnailUrl;
+    if (data.smsPhoneNumber !== undefined) updateData.sms_phone_number = data.smsPhoneNumber;
     if (data.sold !== undefined) updateData.sold = data.sold;
+    if (data.photosUploaded !== undefined) updateData.photos_uploaded = data.photosUploaded;
 
     const { data: result, error } = await (supabase as any)
       .from('flight_recordings')
@@ -113,15 +127,16 @@ class DatabaseStorage {
       .eq('id', id)
       .select()
       .single();
-      
+
     if (error) throw error;
-    
+
     // Transform the result to match the client expectations
     return {
       id: result.id,
       projectName: result.project_name,
       pilotName: result.pilot_name,
       pilotEmail: result.pilot_email,
+      flightPilot: result.flight_pilot,
       staffMember: result.staff_member,
       flightDate: result.flight_date,
       flightTime: result.flight_time,
@@ -129,10 +144,14 @@ class DatabaseStorage {
       driveFileId: result.drive_file_id,
       driveFileUrl: result.drive_file_url,
       driveFolderUrl: result.drive_folder_url,
+      driveFolderId: result.drive_folder_id,
+      videoFolderId: result.video_folder_id,
+      photosFolderId: result.photos_folder_id,
       localVideoPath: result.local_video_path,
       thumbnailUrl: result.thumbnail_url,
       smsPhoneNumber: result.sms_phone_number,
       sold: result.sold,
+      photosUploaded: result.photos_uploaded,
       createdAt: new Date(result.created_at)
     };
   }
@@ -142,13 +161,14 @@ class DatabaseStorage {
       .from('flight_recordings')
       .select('*')
       .order('created_at', { ascending: false });
-      
+
     if (error) throw error;
     return data?.map((record: any) => ({
       id: record.id,
       projectName: record.project_name,
       pilotName: record.pilot_name,
       pilotEmail: record.pilot_email,
+      flightPilot: record.flight_pilot,
       staffMember: record.staff_member,
       flightDate: record.flight_date,
       flightTime: record.flight_time,
@@ -156,10 +176,14 @@ class DatabaseStorage {
       driveFileId: record.drive_file_id,
       driveFileUrl: record.drive_file_url,
       driveFolderUrl: record.drive_folder_url,
+      driveFolderId: record.drive_folder_id,
+      videoFolderId: record.video_folder_id,
+      photosFolderId: record.photos_folder_id,
       localVideoPath: record.local_video_path,
       thumbnailUrl: record.thumbnail_url,
       smsPhoneNumber: record.sms_phone_number,
       sold: record.sold,
+      photosUploaded: record.photos_uploaded,
       createdAt: new Date(record.created_at)
     })) || [];
   }
