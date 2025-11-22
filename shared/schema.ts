@@ -146,7 +146,7 @@ export const SLOT_TEMPLATE: SlotConfig[] = [
   { slotNumber: 13, sceneType: 'chase', cameraAngle: 1, color: '#FF7F50', duration: 0.542, seamlessCut: false }, // Side view (13 frames)
 
   // Arrival Scene (1 slot) - matches DaVinci template position 14
-  { slotNumber: 14, sceneType: 'arrival', cameraAngle: 1, color: '#FF6347', duration: 3.212, seamlessCut: false }, // Side view (77 frames)
+  { slotNumber: 14, sceneType: 'arrival', cameraAngle: 1, color: '#FF6347', duration: 3.754, seamlessCut: false }, // Side view (90 frames)
 ];
 
 // Seamless cut pairs - slots that should auto-position to continue from previous slot
