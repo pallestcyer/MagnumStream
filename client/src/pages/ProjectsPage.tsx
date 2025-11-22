@@ -160,6 +160,26 @@ export default function ProjectsPage() {
     },
   });
 
+  const createDriveFolderMutation = useMutation({
+    mutationFn: async (recordingId: string) => {
+      return await apiRequest("POST", "/api/drive/create-folder", { recordingId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/recordings"] });
+      toast({
+        title: "Drive Folder Created",
+        description: "Google Drive folder has been created for this project.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create Drive folder. Make sure Google Drive is authenticated on the local Mac.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const createSaleMutation = useMutation({
     mutationFn: async (saleData: {
       recordingId: string;
@@ -563,7 +583,7 @@ export default function ProjectsPage() {
           <h3 className="text-lg font-semibold text-foreground truncate flex-1 mr-2">
             {project.pilotName}
           </h3>
-          {project.driveFolderUrl && (
+          {project.driveFolderUrl ? (
             <Button
               variant="ghost"
               size="icon"
@@ -575,7 +595,21 @@ export default function ProjectsPage() {
             >
               <ExternalLink className="w-4 h-4" />
             </Button>
-          )}
+          ) : project.flightPilot && project.flightTime ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+              disabled={createDriveFolderMutation.isPending}
+              onClick={(e) => {
+                e.stopPropagation();
+                createDriveFolderMutation.mutate(project.id);
+              }}
+              title="Create Drive Folder"
+            >
+              <Plus className="w-4 h-4" />
+            </Button>
+          ) : null}
         </div>
 
         <div className="space-y-1 text-sm">

@@ -94,8 +94,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recording = await storage.updateFlightRecording(recording.id, {
           exportStatus: exportStatus || recording.exportStatus,
           flightDate: flightDate || recording.flightDate,
-          flightTime: flightTime || recording.flightTime
+          flightTime: flightTime || recording.flightTime,
+          flightPilot: flightPilot || recording.flightPilot
         });
+
+        // If Drive folder doesn't exist yet, create it now (for projects created via Vercel)
+        if (!recording.driveFolderUrl) {
+          try {
+            const { googleDriveOAuth } = await import('./services/GoogleDriveOAuth');
+            const pilotForFolder = flightPilot || recording.flightPilot;
+            const timeForFolder = flightTime || recording.flightTime;
+
+            if (googleDriveOAuth.isReady() && pilotForFolder && timeForFolder) {
+              console.log(`📁 Creating Google Drive folder for existing project: ${recording.pilotName}`);
+
+              const folderResult = await googleDriveOAuth.createProjectFolderStructure(
+                recording.pilotName,
+                pilotForFolder,
+                timeForFolder
+              );
+
+              if (folderResult) {
+                recording = await storage.updateFlightRecording(recording.id, {
+                  driveFolderUrl: folderResult.folderUrl,
+                  driveFolderId: folderResult.folderId,
+                  videoFolderId: folderResult.videoFolderId,
+                  photosFolderId: folderResult.photosFolderId
+                });
+                console.log(`✅ Google Drive folder created for existing project: ${folderResult.folderUrl}`);
+              }
+            } else if (!googleDriveOAuth.isReady()) {
+              console.log(`⚠️ Google Drive not authenticated - skipping folder creation for existing project`);
+            }
+          } catch (driveError: any) {
+            console.error(`⚠️ Failed to create Google Drive folder for existing project (non-fatal):`, driveError.message);
+          }
+        }
       } else {
         // Create new recording
         recording = await storage.createFlightRecording({
@@ -1462,6 +1496,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isReady = googleDriveOAuth.isReady();
       res.json({ authenticated: isReady });
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Create Drive folder for existing project (for projects created via Vercel that don't have folders)
+  app.post("/api/drive/create-folder", async (req, res) => {
+    try {
+      const { recordingId } = req.body;
+
+      if (!recordingId) {
+        return res.status(400).json({ error: 'recordingId is required' });
+      }
+
+      const { googleDriveOAuth } = await import('./services/GoogleDriveOAuth');
+
+      if (!googleDriveOAuth.isReady()) {
+        return res.status(503).json({ error: 'Google Drive not authenticated. Please authenticate first.' });
+      }
+
+      // Get recording
+      const recording = await storage.getFlightRecording(recordingId);
+      if (!recording) {
+        return res.status(404).json({ error: 'Recording not found' });
+      }
+
+      // Check if folder already exists
+      if (recording.driveFolderUrl) {
+        return res.json({
+          success: true,
+          message: 'Folder already exists',
+          folderUrl: recording.driveFolderUrl
+        });
+      }
+
+      // Need flightPilot and flightTime to create folder
+      if (!recording.flightPilot || !recording.flightTime) {
+        return res.status(400).json({
+          error: 'Recording is missing flightPilot or flightTime required for folder creation'
+        });
+      }
+
+      console.log(`📁 Creating Google Drive folder for project: ${recording.pilotName}`);
+
+      const folderResult = await googleDriveOAuth.createProjectFolderStructure(
+        recording.pilotName,
+        recording.flightPilot,
+        recording.flightTime
+      );
+
+      if (folderResult) {
+        // Update recording with folder info
+        const updated = await storage.updateFlightRecording(recording.id, {
+          driveFolderUrl: folderResult.folderUrl,
+          driveFolderId: folderResult.folderId,
+          videoFolderId: folderResult.videoFolderId,
+          photosFolderId: folderResult.photosFolderId
+        });
+
+        console.log(`✅ Google Drive folder created: ${folderResult.folderUrl}`);
+
+        res.json({
+          success: true,
+          folderUrl: folderResult.folderUrl,
+          recording: updated
+        });
+      } else {
+        res.status(500).json({ error: 'Failed to create folder' });
+      }
+    } catch (error: any) {
+      console.error('Error creating Drive folder:', error);
       res.status(500).json({ error: error.message });
     }
   });
