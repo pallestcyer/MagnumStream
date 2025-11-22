@@ -31,10 +31,14 @@ export const flightRecordings = pgTable("flight_recordings", {
   driveFileId: text("drive_file_id"),
   driveFileUrl: text("drive_file_url"),
   driveFolderUrl: text("drive_folder_url"),
+  driveFolderId: text("drive_folder_id"), // Google Drive customer folder ID (parent of Video/Photos)
+  videoFolderId: text("video_folder_id"), // Google Drive Video subfolder ID for direct upload
+  photosFolderId: text("photos_folder_id"), // Google Drive Photos subfolder ID for direct upload
   localVideoPath: text("local_video_path"), // Local file path on Mac for direct playback
   thumbnailUrl: text("thumbnail_url"), // Thumbnail image path or URL
   smsPhoneNumber: text("sms_phone_number"),
   sold: boolean("sold").notNull().default(false),
+  photosUploaded: boolean("photos_uploaded").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -70,7 +74,7 @@ export type Sale = typeof sales.$inferSelect;
 export const BUNDLE_OPTIONS = [
   { value: 'video_photos', label: 'Video + Photos', price: 49.99 },
   { value: 'video_only', label: 'Video Only', price: 39.99 },
-  { value: 'video_airtour_photos', label: 'Video + Air Tour + Photos', price: 79.99 },
+  { value: 'photos_only', label: 'Photos Only', price: 19.99 },
 ] as const;
 
 // Scene recordings (3 scenes per project)

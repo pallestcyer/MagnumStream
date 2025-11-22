@@ -254,7 +254,6 @@ export class ClipGenerator {
     // Calculate exact frame count at 23.976 fps (DaVinci template frame rate)
     const fps = 23.976;
     const exactFrames = Math.round(duration * fps);
-    const exactDuration = exactFrames / fps;
 
     // TWO-STAGE SEEKING STRATEGY (eliminates black frame at start):
     // 1. Fast seek BEFORE -i to nearest keyframe (~0.5s before target)
@@ -264,26 +263,33 @@ export class ClipGenerator {
     const fastSeekTime = Math.max(0, startTime - SEEK_BUFFER);
     const preciseSeekTime = startTime - fastSeekTime;
 
+    // FRAME-ACCURATE EXTRACTION STRATEGY:
+    // - Use trim filter for precise frame-based cutting (more accurate than -frames:v)
+    // - trim=start_frame=0:end_frame=N extracts exactly N frames from the seeked position
+    // - This avoids the fps filter duplicating frames at the end
+    // - setpts resets timestamps so clip starts at 0
     const ffmpegCommand = [
       'ffmpeg', '-y',
-      '-ss', fastSeekTime.toString(),       // Stage 1: Fast seek to keyframe BEFORE input
+      '-ss', fastSeekTime.toString(),           // Stage 1: Fast seek to keyframe BEFORE input
       '-i', `"${sourceVideoPath}"`,
-      '-ss', preciseSeekTime.toString(),    // Stage 2: Precise seek AFTER input
-      '-frames:v', exactFrames.toString(),  // Extract exact number of frames
-      '-vf', `setpts=PTS-STARTPTS,fps=${fps}`, // Reset timestamps + force exact frame rate
+      '-ss', preciseSeekTime.toString(),        // Stage 2: Precise seek AFTER input
+      '-vf', `trim=start_frame=0:end_frame=${exactFrames},setpts=PTS-STARTPTS`,  // Exact frame extraction + reset timestamps
+      '-r', fps.toString(),                     // Output frame rate (23.976)
       '-c:v', 'libx264',
-      '-preset', 'fast',                    // Balance speed and quality
-      '-crf', '18',                         // High quality (visually lossless)
-      '-g', '1',                            // Keyframe every frame (GOP=1) for frame accuracy
-      '-vsync', 'cfr',                      // Constant frame rate - no dropped frames
-      '-video_track_timescale', '24000',    // Match DaVinci timeline timescale
+      '-preset', 'fast',                        // Balance speed and quality
+      '-crf', '18',                             // High quality (visually lossless)
+      '-g', '1',                                // Keyframe every frame (GOP=1) for frame accuracy
+      '-bf', '0',                               // No B-frames (ensures clean cutting)
+      '-vsync', 'cfr',                          // Constant frame rate - no dropped frames
+      '-video_track_timescale', '24000',        // Match DaVinci timeline timescale
+      '-avoid_negative_ts', 'make_zero',        // Prevent timestamp issues at boundaries
       '-c:a', 'aac',
       '-b:a', '192k',
       '-ar', '48000',
-      '-ac', '2',                           // Stereo audio
-      '-async', '1',                        // Ensure A/V sync after seeking
-      '-movflags', '+faststart',            // Optimize for playback
-      '-pix_fmt', 'yuv420p',               // Ensure compatible pixel format
+      '-ac', '2',                               // Stereo audio
+      '-af', `atrim=start=0:end=${duration},asetpts=PTS-STARTPTS`,  // Matching audio trim
+      '-movflags', '+faststart',                // Optimize for playback
+      '-pix_fmt', 'yuv420p',                    // Ensure compatible pixel format
       `"${outputPath}"`
     ].join(' ');
 

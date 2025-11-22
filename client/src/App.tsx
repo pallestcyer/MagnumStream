@@ -18,6 +18,7 @@ import HistoryPage from "@/pages/HistoryPage";
 import ManualPage from "@/pages/ManualPage";
 import ChatPage from "@/pages/ChatPage";
 import IssuesPage from "@/pages/IssuesPage";
+import ProjectsPage from "@/pages/ProjectsPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -35,6 +36,7 @@ function Router() {
       <Route path="/manual" component={ManualPage} />
       <Route path="/chat" component={ChatPage} />
       <Route path="/issues" component={IssuesPage} />
+      <Route path="/projects" component={ProjectsPage} />
       <Route component={NotFound} />
     </Switch>
   );

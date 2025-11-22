@@ -80,6 +80,7 @@ export class SupabaseStorage implements IStorage {
         project_name: recording.projectName,
         pilot_name: recording.pilotName,
         pilot_email: recording.pilotEmail,
+        flight_pilot: recording.flightPilot,
         staff_member: recording.staffMember,
         flight_date: recording.flightDate,
         flight_time: recording.flightTime,
@@ -107,6 +108,9 @@ export class SupabaseStorage implements IStorage {
       driveFileId: data.drive_file_id,
       driveFileUrl: data.drive_file_url,
       driveFolderUrl: data.drive_folder_url,
+      driveFolderId: data.drive_folder_id,
+      videoFolderId: data.video_folder_id,
+      photosFolderId: data.photos_folder_id,
       localVideoPath: data.local_video_path,
       thumbnailUrl: data.thumbnail_url,
       smsPhoneNumber: data.sms_phone_number,
@@ -139,6 +143,9 @@ export class SupabaseStorage implements IStorage {
       driveFileId: data.drive_file_id,
       driveFileUrl: data.drive_file_url,
       driveFolderUrl: data.drive_folder_url,
+      driveFolderId: data.drive_folder_id,
+      videoFolderId: data.video_folder_id,
+      photosFolderId: data.photos_folder_id,
       localVideoPath: data.local_video_path,
       thumbnailUrl: data.thumbnail_url,
       smsPhoneNumber: data.sms_phone_number,
@@ -161,10 +168,14 @@ export class SupabaseStorage implements IStorage {
     if (updates.driveFileId !== undefined) dbUpdates.drive_file_id = updates.driveFileId;
     if (updates.driveFileUrl !== undefined) dbUpdates.drive_file_url = updates.driveFileUrl;
     if (updates.driveFolderUrl !== undefined) dbUpdates.drive_folder_url = updates.driveFolderUrl;
+    if (updates.driveFolderId !== undefined) dbUpdates.drive_folder_id = updates.driveFolderId;
+    if (updates.videoFolderId !== undefined) dbUpdates.video_folder_id = updates.videoFolderId;
+    if (updates.photosFolderId !== undefined) dbUpdates.photos_folder_id = updates.photosFolderId;
     if (updates.localVideoPath !== undefined) dbUpdates.local_video_path = updates.localVideoPath;
     if (updates.thumbnailUrl !== undefined) dbUpdates.thumbnail_url = updates.thumbnailUrl;
     if (updates.smsPhoneNumber !== undefined) dbUpdates.sms_phone_number = updates.smsPhoneNumber;
     if (updates.sold !== undefined) dbUpdates.sold = updates.sold;
+    if (updates.photosUploaded !== undefined) dbUpdates.photos_uploaded = updates.photosUploaded;
 
     console.log(`🔍 SUPABASE UPDATE: Recording ${id}`);
     console.log(`   Updates requested:`, updates);
@@ -198,6 +209,9 @@ export class SupabaseStorage implements IStorage {
       driveFileId: data.drive_file_id,
       driveFileUrl: data.drive_file_url,
       driveFolderUrl: data.drive_folder_url,
+      driveFolderId: data.drive_folder_id,
+      videoFolderId: data.video_folder_id,
+      photosFolderId: data.photos_folder_id,
       localVideoPath: data.local_video_path,
       thumbnailUrl: data.thumbnail_url,
       smsPhoneNumber: data.sms_phone_number,
@@ -235,6 +249,7 @@ export class SupabaseStorage implements IStorage {
       projectName: record.project_name,
       pilotName: record.pilot_name,
       pilotEmail: record.pilot_email,
+      flightPilot: record.flight_pilot,
       staffMember: record.staff_member,
       flightDate: record.flight_date,
       flightTime: record.flight_time,
@@ -242,8 +257,14 @@ export class SupabaseStorage implements IStorage {
       driveFileId: record.drive_file_id,
       driveFileUrl: record.drive_file_url,
       driveFolderUrl: record.drive_folder_url,
+      driveFolderId: record.drive_folder_id,
+      videoFolderId: record.video_folder_id,
+      photosFolderId: record.photos_folder_id,
+      localVideoPath: record.local_video_path,
+      thumbnailUrl: record.thumbnail_url,
       smsPhoneNumber: record.sms_phone_number,
       sold: record.sold,
+      photosUploaded: record.photos_uploaded,
       createdAt: new Date(record.created_at)
     }));
   }

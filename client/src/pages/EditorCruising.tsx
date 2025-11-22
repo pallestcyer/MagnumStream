@@ -347,7 +347,7 @@ export default function EditorCruising() {
     }
   };
 
-  // Stop video after slot duration
+  // Loop video after slot duration (like the template video)
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -358,9 +358,9 @@ export default function EditorCruising() {
         // Get the duration for this slot from SLOT_TEMPLATE
         const slotConfig = SLOT_TEMPLATE.find(config => config.slotNumber === selection.slotNumber);
         const slotDuration = slotConfig?.duration || 3; // Fallback to 3 seconds if not found
-        
+
         if (video.currentTime >= selection.windowStart + slotDuration) {
-          video.pause();
+          // Loop back to the start of the slot window instead of pausing
           video.currentTime = selection.windowStart;
         }
       }

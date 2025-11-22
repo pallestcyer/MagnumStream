@@ -119,7 +119,7 @@ export type Sale = typeof sales.$inferSelect;
 export const BUNDLE_OPTIONS = [
   { value: 'video_photos', label: 'Video + Photos', price: 49.99 },
   { value: 'video_only', label: 'Video Only', price: 39.99 },
-  { value: 'video_airtour_photos', label: 'Video + Air Tour + Photos', price: 79.99 },
+  { value: 'photos_only', label: 'Photos Only', price: 19.99 },
 ] as const;
 
 // Scene configuration (defines the 5-slot template structure matching DaVinci template)

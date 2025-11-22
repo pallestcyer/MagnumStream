@@ -68,8 +68,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create or update flight recording (for session-based projects)
   app.post("/api/recordings", async (req, res) => {
     try {
-      const { projectName, pilotName, pilotEmail, staffMember, flightDate, flightTime, exportStatus, sessionId } = req.body;
-      
+      const { projectName, pilotName, pilotEmail, staffMember, flightDate, flightTime, flightPilot, exportStatus, sessionId } = req.body;
+
       // Check if recording already exists for this session/pilot
       let recording;
 
@@ -88,7 +88,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           new Date(r.createdAt) > oneDayAgo
         );
       }
-      
+
       if (recording) {
         // Update existing recording
         recording = await storage.updateFlightRecording(recording.id, {
@@ -102,13 +102,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
           projectName: projectName || `${pilotName} Flight`,
           pilotName,
           pilotEmail,
+          flightPilot,
           staffMember,
           flightDate,
           flightTime,
           exportStatus: exportStatus || 'pending'
         });
+
+        // Try to create Google Drive folder structure for the new project
+        try {
+          const { googleDriveOAuth } = await import('./services/GoogleDriveOAuth');
+
+          if (googleDriveOAuth.isReady() && flightPilot && flightTime) {
+            console.log(`📁 Creating Google Drive folder for project: ${pilotName}`);
+
+            const folderResult = await googleDriveOAuth.createProjectFolderStructure(
+              pilotName,
+              flightPilot,
+              flightTime
+            );
+
+            if (folderResult) {
+              // Update recording with the folder URL and all folder IDs
+              recording = await storage.updateFlightRecording(recording.id, {
+                driveFolderUrl: folderResult.folderUrl,
+                driveFolderId: folderResult.folderId,
+                videoFolderId: folderResult.videoFolderId,
+                photosFolderId: folderResult.photosFolderId
+              });
+              console.log(`✅ Google Drive folder created: ${folderResult.folderUrl}`);
+              console.log(`   Customer folder ID: ${folderResult.folderId}`);
+              console.log(`   Video folder ID: ${folderResult.videoFolderId}`);
+              console.log(`   Photos folder ID: ${folderResult.photosFolderId}`);
+            }
+          } else if (!googleDriveOAuth.isReady()) {
+            console.log(`⚠️ Google Drive not authenticated - skipping folder creation`);
+          }
+        } catch (driveError: any) {
+          // Don't fail the recording creation if Drive folder creation fails
+          console.error(`⚠️ Failed to create Google Drive folder (non-fatal):`, driveError.message);
+        }
       }
-      
+
       res.json(recording);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -531,6 +566,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Upload photos to Google Drive Photos folder
+  app.post("/api/recordings/:recordingId/upload-photos", upload.array('photos', 50), async (req: any, res) => {
+    try {
+      const { recordingId } = req.params;
+      const files = req.files as Express.Multer.File[];
+
+      if (!files || files.length === 0) {
+        return res.status(400).json({ error: "No photos provided" });
+      }
+
+      // Get the recording to find the drive folder URL
+      const recording = await storage.getFlightRecording(recordingId);
+      if (!recording) {
+        return res.status(404).json({ error: "Recording not found" });
+      }
+
+      if (!recording.driveFolderUrl) {
+        return res.status(400).json({ error: "No Google Drive folder associated with this project" });
+      }
+
+      const { googleDriveOAuth } = await import('./services/GoogleDriveOAuth');
+
+      if (!googleDriveOAuth.isReady()) {
+        return res.status(503).json({ error: "Google Drive not authenticated" });
+      }
+
+      // Extract the customer folder ID from the URL
+      const customerFolderId = googleDriveOAuth.extractFolderIdFromUrl(recording.driveFolderUrl);
+      if (!customerFolderId) {
+        return res.status(400).json({ error: "Invalid Drive folder URL" });
+      }
+
+      // Get the Photos subfolder ID
+      const photosFolderId = await googleDriveOAuth.getPhotosFolderId(customerFolderId);
+      if (!photosFolderId) {
+        return res.status(400).json({ error: "Photos folder not found in Drive" });
+      }
+
+      console.log(`📸 Uploading ${files.length} photos for recording ${recordingId}`);
+
+      // Upload each photo
+      const uploadResults = [];
+      for (const file of files) {
+        const result = await googleDriveOAuth.uploadFileToFolder(
+          photosFolderId,
+          file.originalname,
+          file.buffer,
+          file.mimetype
+        );
+        if (result) {
+          uploadResults.push(result);
+        }
+      }
+
+      // Mark photos as uploaded in the database
+      await storage.updateFlightRecording(recordingId, {
+        photosUploaded: true
+      });
+
+      console.log(`✅ Uploaded ${uploadResults.length}/${files.length} photos`);
+
+      res.json({
+        success: true,
+        uploaded: uploadResults.length,
+        total: files.length,
+        files: uploadResults
+      });
+
+    } catch (error: any) {
+      console.error('❌ Photo upload error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Upload scene video from browser IndexedDB to server file system
   app.post("/api/recordings/:recordingId/upload-scene-video", upload.single('video'), async (req: any, res) => {
     try {
@@ -732,8 +841,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Don't fail the whole render if thumbnail generation fails
         }
 
-        // Copy the rendered video to Google Drive (local sync)
-        // Declare actualRecordingId at outer scope so it's available in catch block
+        // Upload the rendered video to Google Drive using the project's Video folder
         let actualRecordingId = recordingId;
 
         try {
@@ -746,13 +854,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             throw new Error(`Rendered file not found: ${outputPath}`);
           }
 
-          console.log(`📤 Syncing to Google Drive...`);
-
-          // Use local Google Drive sync instead of API
-          const { googleDriveLinkGenerator } = await import('./services/GoogleDriveLinkGenerator');
-
-          // Get the recording to extract customer info
-          // IMPORTANT: Use the exact recording ID provided - do NOT fall back to latest
+          // Get the recording to check for Video folder ID
           let recording = await storage.getFlightRecording(recordingId);
 
           if (!recording) {
@@ -761,17 +863,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           actualRecordingId = recording.id;
-
-          const customerName = recording.pilotName || 'Customer';
           const fileName = path.basename(outputPath);
 
-          // Check if Google Drive for Desktop is available
-          if (!googleDriveLinkGenerator.isAvailable()) {
-            console.warn('⚠️ Google Drive for Desktop not found - skipping sync');
+          // Check if the project has a Video folder ID from when the project was created
+          if (!recording.videoFolderId) {
+            console.warn('⚠️ No Video folder ID found for this project - skipping Drive upload');
+            console.log('   Project may have been created before folder structure feature');
 
             res.json({
               success: true,
-              message: "DaVinci render completed successfully (Drive sync skipped - not available)",
+              message: "DaVinci render completed successfully (Drive upload skipped - no Video folder)",
               outputPath,
               renderInfo: {
                 recordingId,
@@ -779,61 +880,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 clipCount: clips.length,
                 completedAt: new Date().toISOString()
               },
-              warning: "Google Drive for Desktop not installed - video saved locally only"
+              warning: "No Video folder ID - project was created before folder structure feature"
             });
             return;
           }
 
-          // Copy file to Google Drive local folder (will auto-sync to cloud)
-          const driveFilePath = await googleDriveLinkGenerator.copyToGoogleDrive(outputPath, actualRecordingId);
+          console.log(`📤 Uploading video to Google Drive Video folder...`);
 
-          // Generate link info
-          const linkInfo = await googleDriveLinkGenerator.generateShareableLink(driveFilePath);
+          const { googleDriveOAuth } = await import('./services/GoogleDriveOAuth');
 
-          console.log(`✅ Video synced to Google Drive`);
+          if (!googleDriveOAuth.isReady()) {
+            console.warn('⚠️ Google Drive OAuth not ready - skipping upload');
 
-          // Get folder URL using OAuth - this provides direct link to folder
-          let driveFolderUrl = null;
-          try {
-            const { googleDriveOAuth } = await import('./services/GoogleDriveOAuth');
-
-            if (googleDriveOAuth.isReady()) {
-              // Get the folder path (everything except the filename)
-              const path = await import('path');
-              const folderPath = path.dirname(linkInfo.relativePath);
-
-              const folderInfo = await googleDriveOAuth.getFolderInfoByPath(folderPath);
-              if (folderInfo) {
-                driveFolderUrl = folderInfo.webUrl;
-                console.log(`✅ Drive folder URL obtained`);
-              }
-            } else {
-              console.warn('⚠️  Google Drive OAuth not ready');
-            }
-          } catch (error) {
-            console.error('❌ Error getting folder URL:', error);
+            res.json({
+              success: true,
+              message: "DaVinci render completed successfully (Drive upload skipped - OAuth not ready)",
+              outputPath,
+              renderInfo: {
+                recordingId,
+                projectName: projectName || `Project_${recordingId}`,
+                clipCount: clips.length,
+                completedAt: new Date().toISOString()
+              },
+              warning: "Google Drive OAuth not authenticated"
+            });
+            return;
           }
 
-          // Update the recording in the database with Drive path info (status already set to completed above)
+          // Upload video directly to the project's Video folder via Drive API
+          const uploadResult = await googleDriveOAuth.uploadVideoToFolder(
+            recording.videoFolderId,
+            outputPath,
+            fileName
+          );
+
+          if (!uploadResult) {
+            throw new Error('Failed to upload video to Google Drive');
+          }
+
+          console.log(`✅ Video uploaded to Google Drive`);
+
+          // Update the recording in the database with Drive file info
           await storage.updateFlightRecording(actualRecordingId, {
-            driveFileUrl: linkInfo.webUrl, // Store the web URL for opening in browser
-            driveFileId: linkInfo.relativePath, // Store relative path for reference
-            driveFolderUrl: driveFolderUrl // Store folder URL if available
+            driveFileUrl: uploadResult.webViewLink,
+            driveFileId: uploadResult.fileId
           });
 
           console.log(`✅ Drive info updated - ready for sale`);
 
           res.json({
             success: true,
-            message: "DaVinci render completed and synced to Google Drive",
+            message: "DaVinci render completed and uploaded to Google Drive",
             outputPath,
             driveInfo: {
-              filePath: driveFilePath,
-              relativePath: linkInfo.relativePath,
-              displayPath: googleDriveLinkGenerator.getDisplayPath(driveFilePath),
-              instructions: linkInfo.instructions,
-              fileUrl: linkInfo.webUrl,
-              folderUrl: driveFolderUrl  // Include folder URL in response
+              fileId: uploadResult.fileId,
+              fileUrl: uploadResult.webViewLink,
+              folderUrl: recording.driveFolderUrl
             },
             renderInfo: {
               recordingId,
@@ -1364,10 +1466,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Share Drive folder with customer email
+  // Share Drive folder with customer email based on bundle type
   app.post("/api/drive/share-folder", async (req, res) => {
     try {
-      const { recordingId, customerEmail } = req.body;
+      const { recordingId, customerEmail, bundle } = req.body;
 
       if (!recordingId || !customerEmail) {
         return res.status(400).json({ error: 'recordingId and customerEmail are required' });
@@ -1379,28 +1481,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(503).json({ error: 'Google Drive not authenticated. Please authenticate first.' });
       }
 
-      // Get recording to find folder path
+      // Get recording to find folder IDs
       const recording = await storage.getFlightRecording(recordingId);
-      if (!recording || !recording.driveFileId) {
-        return res.status(404).json({ error: 'Recording or Drive path not found' });
+      if (!recording) {
+        return res.status(404).json({ error: 'Recording not found' });
       }
 
-      // Get folder path (directory of the file)
-      const path = await import('path');
-      const folderPath = path.dirname(recording.driveFileId);
+      // Determine which folder(s) to share based on bundle type
+      // video_photos: share parent folder (contains both Video and Photos)
+      // video_only: share Video folder
+      // photos_only: share Photos folder
+      const foldersToShare: string[] = [];
+      let shareDescription = '';
 
-      // Find folder ID
-      const folderInfo = await googleDriveOAuth.getFolderInfoByPath(folderPath);
-      if (!folderInfo) {
-        return res.status(404).json({ error: 'Drive folder not found' });
+      if (bundle === 'video_only') {
+        if (recording.videoFolderId) {
+          foldersToShare.push(recording.videoFolderId);
+          shareDescription = 'Video folder';
+        } else {
+          return res.status(404).json({ error: 'Video folder not found for this project' });
+        }
+      } else if (bundle === 'photos_only') {
+        if (recording.photosFolderId) {
+          foldersToShare.push(recording.photosFolderId);
+          shareDescription = 'Photos folder';
+        } else {
+          return res.status(404).json({ error: 'Photos folder not found for this project' });
+        }
+      } else {
+        // video_photos or default: share parent folder (customer folder containing both)
+        if (recording.driveFolderId) {
+          foldersToShare.push(recording.driveFolderId);
+          shareDescription = 'Video + Photos folder';
+        } else {
+          return res.status(404).json({ error: 'Project folder not found' });
+        }
       }
 
-      // Share folder with customer
-      const shared = await googleDriveOAuth.shareFolderWithEmail(folderInfo.id, customerEmail);
+      // Share the folder(s) with customer
+      let allShared = true;
+      for (const folderId of foldersToShare) {
+        const shared = await googleDriveOAuth.shareFolderWithEmail(folderId, customerEmail);
+        if (!shared) {
+          allShared = false;
+          console.error(`❌ Failed to share folder ${folderId} with ${customerEmail}`);
+        }
+      }
 
-      if (shared) {
+      if (allShared) {
         // Update the sale record to mark Drive as shared
-        // Find the most recent sale for this recording and customer email
         try {
           const sales = await storage.getAllSales?.();
           if (sales) {
@@ -1415,10 +1544,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } catch (updateError) {
           console.warn('⚠️ Could not update sale drive_shared status:', updateError);
-          // Don't fail the sharing if sale update fails
         }
 
-        res.json({ success: true, message: `Folder shared with ${customerEmail}` });
+        console.log(`✅ ${shareDescription} shared with ${customerEmail}`);
+        res.json({ success: true, message: `${shareDescription} shared with ${customerEmail}` });
       } else {
         res.status(500).json({ error: 'Failed to share folder' });
       }

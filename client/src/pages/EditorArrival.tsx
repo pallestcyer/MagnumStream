@@ -278,7 +278,7 @@ export default function EditorArrival() {
         const slotDuration = slotConfig?.duration || 3; // Fallback to 3 seconds if not found
         
         if (video.currentTime >= selection.windowStart + slotDuration) {
-          video.pause();
+          // Loop back to the start of the slot window instead of pausing
           video.currentTime = selection.windowStart;
         }
       }

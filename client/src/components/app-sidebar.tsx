@@ -11,15 +11,16 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { 
-  Home, 
-  History, 
-  BookOpen, 
-  MessageSquare, 
+import {
+  Home,
+  History,
+  BookOpen,
+  MessageSquare,
   AlertCircle,
   Video,
   Plane,
-  DollarSign
+  DollarSign,
+  FolderKanban
 } from "lucide-react";
 
 const menuItems = [
@@ -27,6 +28,11 @@ const menuItems = [
     title: "Home",
     url: "/",
     icon: Home,
+  },
+  {
+    title: "Projects",
+    url: "/projects",
+    icon: FolderKanban,
   },
   {
     title: "Sales",
