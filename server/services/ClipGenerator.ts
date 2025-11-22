@@ -255,25 +255,25 @@ export class ClipGenerator {
     const fps = 23.976;
     const exactFrames = Math.round(duration * fps);
 
-    // TWO-STAGE SEEKING STRATEGY (eliminates black frame at start):
-    // 1. Fast seek BEFORE -i to nearest keyframe (~0.5s before target)
-    // 2. Precise seek AFTER -i for the remaining distance (frame-accurate)
-    // This combines speed with accuracy and ensures first frame is complete
-    const SEEK_BUFFER = 0.5;
+    // TWO-STAGE SEEKING + EXACT FRAMES STRATEGY:
+    // 1. Fast seek BEFORE -i: jumps to nearest keyframe (fast but imprecise)
+    // 2. Precise seek AFTER -i: decodes frame-by-frame to exact position (slow but accurate)
+    // 3. -frames:v ensures EXACT output frame count at encoder level
+    //
+    // This combination ensures:
+    // - No black frames at start (precise seek ensures we start at correct frame)
+    // - No frozen/duplicate frames at end (-frames:v enforces exact count)
+    // - Fast processing (bulk of seeking done at keyframe level)
+    const SEEK_BUFFER = 0.5; // Seek 0.5s before target for keyframe proximity
     const fastSeekTime = Math.max(0, startTime - SEEK_BUFFER);
     const preciseSeekTime = startTime - fastSeekTime;
 
-    // FRAME-ACCURATE EXTRACTION STRATEGY:
-    // - Use trim filter for precise frame-based cutting (more accurate than -frames:v)
-    // - trim=start_frame=0:end_frame=N extracts exactly N frames from the seeked position
-    // - This avoids the fps filter duplicating frames at the end
-    // - setpts resets timestamps so clip starts at 0
     const ffmpegCommand = [
       'ffmpeg', '-y',
       '-ss', fastSeekTime.toString(),           // Stage 1: Fast seek to keyframe BEFORE input
       '-i', `"${sourceVideoPath}"`,
-      '-ss', preciseSeekTime.toString(),        // Stage 2: Precise seek AFTER input
-      '-vf', `trim=start_frame=0:end_frame=${exactFrames},setpts=PTS-STARTPTS`,  // Exact frame extraction + reset timestamps
+      '-ss', preciseSeekTime.toString(),        // Stage 2: Precise seek AFTER input (frame-accurate)
+      '-frames:v', exactFrames.toString(),      // EXACT frame count output (no frozen frames)
       '-r', fps.toString(),                     // Output frame rate (23.976)
       '-c:v', 'libx264',
       '-preset', 'fast',                        // Balance speed and quality
