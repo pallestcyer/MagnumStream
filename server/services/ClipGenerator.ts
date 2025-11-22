@@ -255,24 +255,21 @@ export class ClipGenerator {
     const fps = 23.976;
     const exactFrames = Math.round(duration * fps);
 
-    // TWO-STAGE SEEKING + EXACT FRAMES STRATEGY:
-    // 1. Fast seek BEFORE -i: jumps to nearest keyframe (fast but imprecise)
-    // 2. Precise seek AFTER -i: decodes frame-by-frame to exact position (slow but accurate)
-    // 3. -frames:v ensures EXACT output frame count at encoder level
+    // PRECISE SEEK + EXACT FRAMES STRATEGY:
+    // Using -ss AFTER -i for frame-accurate seeking (slower but no black frames)
+    // Combined with -frames:v for exact output frame count
     //
-    // This combination ensures:
-    // - No black frames at start (precise seek ensures we start at correct frame)
+    // This guarantees:
+    // - No black frames at start (precise decode-based seeking)
     // - No frozen/duplicate frames at end (-frames:v enforces exact count)
-    // - Fast processing (bulk of seeking done at keyframe level)
-    const SEEK_BUFFER = 0.5; // Seek 0.5s before target for keyframe proximity
-    const fastSeekTime = Math.max(0, startTime - SEEK_BUFFER);
-    const preciseSeekTime = startTime - fastSeekTime;
+    // - Exact frame count matching DaVinci template
+    //
+    // Note: This is slower than pre-input seeking but eliminates black frame issues
 
     const ffmpegCommand = [
       'ffmpeg', '-y',
-      '-ss', fastSeekTime.toString(),           // Stage 1: Fast seek to keyframe BEFORE input
       '-i', `"${sourceVideoPath}"`,
-      '-ss', preciseSeekTime.toString(),        // Stage 2: Precise seek AFTER input (frame-accurate)
+      '-ss', startTime.toString(),              // Precise seek AFTER input (frame-accurate, no black frames)
       '-frames:v', exactFrames.toString(),      // EXACT frame count output (no frozen frames)
       '-r', fps.toString(),                     // Output frame rate (23.976)
       '-c:v', 'libx264',
