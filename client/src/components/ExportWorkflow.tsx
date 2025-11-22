@@ -14,27 +14,10 @@ import { Progress } from "@/components/ui/progress";
 import { CheckCircle2, Loader2 } from "lucide-react"; // MessageSquare removed - SMS feature disabled
 
 // Get the local device URL for Mac service
-const getLocalDeviceUrl = async (): Promise<string> => {
-  try {
-    // Try to get local device URL from health endpoint
-    const healthResponse = await fetch('/api/health');
-    
-    if (healthResponse.ok) {
-      const healthData = await healthResponse.json();
-      
-      if (healthData.services?.localDevice) {
-        console.log('📡 Found local device URL:', healthData.services.localDevice);
-        return healthData.services.localDevice;
-      }
-    }
-  } catch (error) {
-    console.warn('Could not get local device URL from health endpoint:', error);
-  }
-  
-  // Fallback to localhost in development (Mac service runs on port 3001)
-  const fallbackUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '';
-  console.log('📡 Using fallback URL:', fallbackUrl);
-  return fallbackUrl;
+// Since the Vercel frontend is accessed from the same Mac that runs the local server,
+// we always use localhost:3001 for FFmpeg/DaVinci operations
+const getLocalDeviceUrl = (): string => {
+  return 'http://localhost:3001';
 };
 
 interface ExportWorkflowProps {
@@ -119,7 +102,7 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
       console.log('🎬 Generating all 14 slots:', slotSelections.map(s => s.slotNumber));
       
       // Get local device URL for Mac service FFmpeg processing
-      const localDeviceUrl = await getLocalDeviceUrl();
+      const localDeviceUrl = getLocalDeviceUrl();
       console.log('🎬 Using Mac service for clip generation:', localDeviceUrl);
       
       const clipsResponse = await fetch(`${localDeviceUrl}/api/recordings/${recordingId}/generate-clips`, {

@@ -3,7 +3,6 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import PhaseNavigation from "@/components/PhaseNavigation";
-import FlightMetadataDialog from "@/components/FlightMetadataDialog";
 import ExportWorkflow from "@/components/ExportWorkflow";
 import SlotSelector from "@/components/SlotSelector";
 import { SLOT_TEMPLATE } from "@shared/schema";
@@ -21,9 +20,9 @@ export default function EditorArrival() {
   const { pilotInfo } = usePilot();
   const [activeSlot, setActiveSlot] = useState<number | null>(null);
   const [isMuted, setIsMuted] = useState(true);
-  const [showMetadataDialog, setShowMetadataDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [flightMetadata, setFlightMetadata] = useState({ date: "", time: "" });
+  const [isLoadingRecording, setIsLoadingRecording] = useState(false);
   const [sceneVideos, setSceneVideos] = useState<{camera1?: string, camera2?: string, duration?: number}>({});
   const videoRef = useRef<HTMLVideoElement>(null);
   const templateVideoRef = useRef<HTMLVideoElement>(null);
@@ -235,35 +234,43 @@ export default function EditorArrival() {
   };
 
 
-  const handleMetadataSubmit = (flightDate: string, flightTime: string, pilotName?: string) => {
-    setFlightMetadata({ date: flightDate, time: flightTime });
-
-    // Update the recording with actual pilot name if provided
-    if (pilotName) {
+  // Skip the metadata dialog and use existing project data
+  const handleProceedToRender = async () => {
+    setIsLoadingRecording(true);
+    try {
       const recordingId = localStorage.getItem('currentRecordingId');
-      if (recordingId) {
-        fetch(`/api/recordings/${recordingId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            flightPilot: pilotName, // Actual pilot who flew the aircraft
-            flightDate: flightDate,
-            flightTime: flightTime
-          })
-        }).then(response => {
-          if (response.ok) {
-            console.log('📊 Updated recording with flight pilot:', pilotName);
-          } else {
-            console.warn('⚠️ Failed to update recording with flight pilot');
-          }
-        }).catch(error => {
-          console.error('❌ Error updating recording:', error);
-        });
+      if (!recordingId) {
+        console.error('No recording ID found');
+        return;
       }
-    }
 
-    setShowMetadataDialog(false);
-    setShowExportDialog(true);
+      // Fetch the existing recording to get flight date/time
+      const response = await fetch(`/api/recordings/${recordingId}`);
+      if (response.ok) {
+        const recording = await response.json();
+        // Use existing data from project creation
+        const flightDate = recording.flightDate || new Date().toISOString().split('T')[0];
+        const flightTime = recording.flightTime || '12:00';
+
+        setFlightMetadata({ date: flightDate, time: flightTime });
+        setShowExportDialog(true);
+        console.log('📊 Using existing project data for render:', { flightDate, flightTime });
+      } else {
+        // Fallback to today's date if fetch fails
+        const today = new Date().toISOString().split('T')[0];
+        setFlightMetadata({ date: today, time: '12:00' });
+        setShowExportDialog(true);
+        console.warn('⚠️ Could not fetch recording, using defaults');
+      }
+    } catch (error) {
+      console.error('❌ Error fetching recording:', error);
+      // Fallback to defaults
+      const today = new Date().toISOString().split('T')[0];
+      setFlightMetadata({ date: today, time: '12:00' });
+      setShowExportDialog(true);
+    } finally {
+      setIsLoadingRecording(false);
+    }
   };
 
   useEffect(() => {
@@ -312,12 +319,13 @@ export default function EditorArrival() {
                 Back: Chase
               </Button>
               <Button
-                onClick={() => setShowMetadataDialog(true)}
+                onClick={handleProceedToRender}
+                disabled={isLoadingRecording}
                 className="bg-gradient-purple-blue"
                 data-testid="button-proceed-render"
               >
                 <Download className="w-4 h-4 mr-2" />
-                Proceed to Render
+                {isLoadingRecording ? 'Loading...' : 'Proceed to Render'}
               </Button>
             </div>
           </div>
@@ -426,12 +434,6 @@ export default function EditorArrival() {
           </div>
         </div>
       </main>
-
-      <FlightMetadataDialog
-        open={showMetadataDialog}
-        onOpenChange={setShowMetadataDialog}
-        onSubmit={handleMetadataSubmit}
-      />
 
       <ExportWorkflow
         open={showExportDialog}
