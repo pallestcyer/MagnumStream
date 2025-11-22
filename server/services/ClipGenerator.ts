@@ -256,44 +256,41 @@ export class ClipGenerator {
     const exactFrames = Math.round(duration * fps);
 
     // BLACK FRAME FIX + EXACT FRAMES STRATEGY:
-    // The black frame issue occurs because seeking to non-keyframe positions
-    // can produce an incomplete first frame during decoding.
+    // The black frame issue occurs because H.264/HEVC decoding requires starting from a keyframe.
+    // When seeking to a non-keyframe, the decoder may output black/incomplete frames.
     //
-    // Solution: Use trim filter with start time to skip the potentially-black first frame,
-    // then use select filter to output exactly the frames we need.
-    //
-    // This guarantees:
-    // - No black frames at start (trim skips the incomplete decode region)
-    // - Exact frame count matching DaVinci template
-    // - Correct starting position
+    // Solution: Force FFmpeg to fully decode from the previous keyframe before our target,
+    // then use the trim filter on the fully-decoded stream to get exact frames.
+    // The -accurate_seek flag (default) combined with post-input -ss ensures proper decoding.
 
-    // Calculate time offset for 1 frame at 23.976fps
-    const oneFrameTime = 1 / fps;
+    // Calculate time for exact duration needed
+    const exactDuration = exactFrames / fps;
 
-    // We'll use the trim filter to start slightly after the seek point,
-    // skipping any potential black frame from decoding
     const ffmpegCommand = [
       'ffmpeg', '-y',
+      // Force full decode by not using pre-input seek
       '-i', `"${sourceVideoPath}"`,
-      '-ss', startTime.toString(),              // Seek to target time
-      // Use trim to skip first frame worth of time, then select exact frame count
-      '-vf', `trim=start=${oneFrameTime},setpts=PTS-STARTPTS,select='lt(n\\,${exactFrames})',setpts=N/${fps}/TB`,
-      '-r', fps.toString(),                     // Output frame rate (23.976)
+      // Post-input seek - forces decode from keyframe to target
+      '-ss', startTime.toString(),
+      // Exact duration output
+      '-t', exactDuration.toString(),
+      // Force constant frame rate output matching our fps
+      '-r', fps.toString(),
       '-c:v', 'libx264',
-      '-preset', 'fast',                        // Balance speed and quality
-      '-crf', '18',                             // High quality (visually lossless)
-      '-g', '1',                                // Keyframe every frame (GOP=1) for frame accuracy
-      '-bf', '0',                               // No B-frames (ensures clean cutting)
-      '-vsync', 'cfr',                          // Constant frame rate - no dropped frames
-      '-video_track_timescale', '24000',        // Match DaVinci timeline timescale
-      '-avoid_negative_ts', 'make_zero',        // Prevent timestamp issues at boundaries
+      '-preset', 'fast',
+      '-crf', '18',
+      // All keyframes for clean editing
+      '-g', '1',
+      '-bf', '0',
+      '-vsync', 'cfr',
+      '-video_track_timescale', '24000',
+      // Audio processing
       '-c:a', 'aac',
       '-b:a', '192k',
       '-ar', '48000',
-      '-ac', '2',                               // Stereo audio
-      '-af', `atrim=start=${oneFrameTime}:end=${duration + oneFrameTime},asetpts=PTS-STARTPTS`,  // Match audio trim
-      '-movflags', '+faststart',                // Optimize for playback
-      '-pix_fmt', 'yuv420p',                    // Ensure compatible pixel format
+      '-ac', '2',
+      '-movflags', '+faststart',
+      '-pix_fmt', 'yuv420p',
       `"${outputPath}"`
     ].join(' ');
 
