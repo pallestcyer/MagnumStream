@@ -52,12 +52,17 @@ export default function SalesPage() {
 
   const ANALYTICS_PASSWORD = "admin123";
 
-  // Check Google Drive authentication status
+  // Local Mac server URL for Drive operations
+  const LOCAL_MAC_SERVER = "http://localhost:3001";
+
+  // Check Google Drive authentication status (via local Mac server)
   const { data: driveAuthStatus } = useQuery({
     queryKey: ["/api/drive/auth/status"],
     queryFn: async () => {
       try {
-        return await apiRequest("GET", "/api/drive/auth/status");
+        const res = await fetch(`${LOCAL_MAC_SERVER}/api/drive/auth/status`);
+        if (!res.ok) return { authenticated: false };
+        return res.json();
       } catch (error) {
         return { authenticated: false };
       }
@@ -67,19 +72,28 @@ export default function SalesPage() {
 
   const handleAuthenticateDrive = async () => {
     try {
-      const response = await apiRequest("GET", "/api/drive/auth/url");
+      const res = await fetch(`${LOCAL_MAC_SERVER}/api/drive/auth/url`);
+      if (!res.ok) throw new Error("Failed to get auth URL");
+      const response = await res.json();
       window.open(response.authUrl, '_blank', 'width=600,height=700');
 
       // Poll for auth status
       const checkInterval = setInterval(async () => {
-        const status = await apiRequest("GET", "/api/drive/auth/status");
-        if (status.authenticated) {
-          clearInterval(checkInterval);
-          queryClient.invalidateQueries({ queryKey: ["/api/drive/auth/status"] });
-          toast({
-            title: "Google Drive Connected",
-            description: "You can now share videos with customers automatically",
-          });
+        try {
+          const statusRes = await fetch(`${LOCAL_MAC_SERVER}/api/drive/auth/status`);
+          if (statusRes.ok) {
+            const status = await statusRes.json();
+            if (status.authenticated) {
+              clearInterval(checkInterval);
+              queryClient.invalidateQueries({ queryKey: ["/api/drive/auth/status"] });
+              toast({
+                title: "Google Drive Connected",
+                description: "You can now share videos with customers automatically",
+              });
+            }
+          }
+        } catch (e) {
+          // Ignore polling errors
         }
       }, 2000);
 
@@ -126,13 +140,19 @@ export default function SalesPage() {
       return await apiRequest("POST", "/api/sales", saleData);
     },
     onSuccess: async (_, variables) => {
-      // Try to share the Drive folder with customer email
+      // Try to share the Drive folder with customer email (via local Mac server)
       try {
-        await apiRequest("POST", "/api/drive/share-folder", {
-          recordingId: variables.recordingId,
-          customerEmail: variables.customerEmail
+        const shareRes = await fetch(`${LOCAL_MAC_SERVER}/api/drive/share-folder`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recordingId: variables.recordingId,
+            customerEmail: variables.customerEmail
+          })
         });
-        console.log(`✅ Shared Drive folder with ${variables.customerEmail}`);
+        if (shareRes.ok) {
+          console.log(`✅ Shared Drive folder with ${variables.customerEmail}`);
+        }
       } catch (error) {
         console.warn('Could not share Drive folder (OAuth may not be set up):', error);
         // Don't fail the sale if sharing fails - it's optional

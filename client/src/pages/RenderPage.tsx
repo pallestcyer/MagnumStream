@@ -87,30 +87,30 @@ export default function RenderPage() {
         description: "Generating clips from your scene selections...",
       });
       
-      // Generate clips using saved timeline positions
-      const clipResponse = await fetch(`/api/recordings/${recordingId}/generate-clips`, {
+      // Generate clips using saved timeline positions (via local Mac server for FFmpeg)
+      const clipResponse = await fetch(`http://localhost:3001/api/recordings/${recordingId}/generate-clips`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}) // ClipGenerator will fetch slots from database
       });
-      
+
       if (!clipResponse.ok) {
         throw new Error('Failed to generate clips');
       }
-      
+
       const clipResult = await clipResponse.json();
       setGeneratedClips(clipResult.clips);
       setProgress(70);
-      
+
       toast({
         title: "Clips Generated",
         description: `Successfully generated ${clipResult.clips.length} video clips`,
       });
-      
+
       setRenderStatus("creating_job");
-      
-      // Create DaVinci job file
-      const jobResponse = await fetch(`/api/recordings/${recordingId}/create-davinci-job`, {
+
+      // Create DaVinci job file (via local Mac server)
+      const jobResponse = await fetch(`http://localhost:3001/api/recordings/${recordingId}/create-davinci-job`, {
         method: 'POST'
       });
       

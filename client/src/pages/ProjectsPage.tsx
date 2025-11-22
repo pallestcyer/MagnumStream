@@ -193,12 +193,16 @@ export default function ProjectsPage() {
       return await apiRequest("POST", "/api/sales", saleData);
     },
     onSuccess: async (_, variables) => {
-      // Try to share the Drive folder with customer email based on bundle type
+      // Try to share the Drive folder with customer email based on bundle type (via local Mac server)
       try {
-        await apiRequest("POST", "/api/drive/share-folder", {
-          recordingId: variables.recordingId,
-          customerEmail: variables.customerEmail,
-          bundle: variables.bundle
+        await fetch("http://localhost:3001/api/drive/share-folder", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recordingId: variables.recordingId,
+            customerEmail: variables.customerEmail,
+            bundle: variables.bundle
+          })
         });
       } catch (error) {
         // Don't fail the sale if sharing fails - it's optional
@@ -538,7 +542,8 @@ export default function ProjectsPage() {
         formData.append('photos', file);
       });
 
-      const response = await fetch(`/api/recordings/${photosProject.id}/upload-photos`, {
+      // Upload photos to local Mac server (has Google Drive OAuth)
+      const response = await fetch(`http://localhost:3001/api/recordings/${photosProject.id}/upload-photos`, {
         method: 'POST',
         body: formData,
       });
