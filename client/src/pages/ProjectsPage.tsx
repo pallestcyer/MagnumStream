@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
@@ -91,7 +91,27 @@ export default function ProjectsPage() {
       flightTime: string;
       flightPilot: string;
     }) => {
-      return await apiRequest("POST", "/api/recordings", projectData);
+      // Create project in database (via Vercel API)
+      const response = await apiRequest("POST", "/api/recordings", projectData);
+      const project = await response.json();
+
+      // Create Drive folder via local Mac server
+      try {
+        const driveFolderResponse = await fetch("http://localhost:3001/api/drive/create-folder", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ recordingId: project.id }),
+        });
+
+        if (driveFolderResponse.ok) {
+          const folderData = await driveFolderResponse.json();
+          return folderData.recording || project;
+        }
+      } catch (driveError) {
+        console.warn("Could not create Drive folder:", driveError);
+      }
+
+      return project;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/recordings"] });
@@ -159,46 +179,6 @@ export default function ProjectsPage() {
       });
     },
   });
-
-  const createDriveFolderMutation = useMutation({
-    mutationFn: async (recordingId: string) => {
-      return await apiRequest("POST", "/api/drive/create-folder", { recordingId });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/recordings"] });
-    },
-    onError: () => {
-      // Silent failure - Drive folder creation is best-effort
-    },
-  });
-
-  // Track which projects we've already tried to create folders for
-  const attemptedFolderCreations = useRef<Set<string>>(new Set());
-
-  // Auto-create Drive folders for projects missing them (runs on local Mac server)
-  useEffect(() => {
-    if (!projects || projects.length === 0) return;
-
-    const projectsNeedingFolders = projects.filter(
-      (p) => !p.driveFolderUrl && p.flightPilot && p.flightTime && !attemptedFolderCreations.current.has(p.id)
-    );
-
-    // Create folders for each project that needs one (sequentially to avoid rate limits)
-    const createFoldersSequentially = async () => {
-      for (const project of projectsNeedingFolders) {
-        attemptedFolderCreations.current.add(project.id);
-        try {
-          await createDriveFolderMutation.mutateAsync(project.id);
-        } catch {
-          // Silent failure - will retry on next page load
-        }
-      }
-    };
-
-    if (projectsNeedingFolders.length > 0) {
-      createFoldersSequentially();
-    }
-  }, [projects]);
 
   const createSaleMutation = useMutation({
     mutationFn: async (saleData: {
