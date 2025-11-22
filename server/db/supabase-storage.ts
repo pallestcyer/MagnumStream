@@ -139,6 +139,7 @@ export class SupabaseStorage implements IStorage {
       staffMember: data.staff_member,
       flightDate: data.flight_date,
       flightTime: data.flight_time,
+      flightPilot: data.flight_pilot,
       exportStatus: data.export_status,
       driveFileId: data.drive_file_id,
       driveFileUrl: data.drive_file_url,
@@ -196,7 +197,7 @@ export class SupabaseStorage implements IStorage {
 
     console.log(`✅ SUPABASE UPDATE SUCCESS: Recording ${id}`);
     console.log(`   Updated export_status:`, data?.export_status);
-    
+
     return data ? {
       id: data.id,
       projectName: data.project_name,
@@ -205,6 +206,7 @@ export class SupabaseStorage implements IStorage {
       staffMember: data.staff_member,
       flightDate: data.flight_date,
       flightTime: data.flight_time,
+      flightPilot: data.flight_pilot,
       exportStatus: data.export_status,
       driveFileId: data.drive_file_id,
       driveFileUrl: data.drive_file_url,
