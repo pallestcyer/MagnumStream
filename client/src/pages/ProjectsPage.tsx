@@ -667,7 +667,12 @@ export default function ProjectsPage() {
                   className={`w-full ${photosCompleted ? 'border-green-500/50 text-green-500 hover:bg-green-500/10' : ''}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleOpenPhotosDialog(project);
+                    if (photosCompleted && project.photosFolderId) {
+                      // Photos uploaded - open Photos folder in Drive
+                      window.open(`https://drive.google.com/drive/folders/${project.photosFolderId}`, '_blank');
+                    } else {
+                      handleOpenPhotosDialog(project);
+                    }
                   }}
                 >
                   {photosCompleted ? (

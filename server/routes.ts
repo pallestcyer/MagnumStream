@@ -654,9 +654,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Mark photos as uploaded in the database
+      // Mark photos as uploaded in the database and store the photos folder ID
       await storage.updateFlightRecording(recordingId, {
-        photosUploaded: true
+        photosUploaded: true,
+        photosFolderId: photosFolderId
       });
 
       console.log(`✅ Uploaded ${uploadResults.length}/${files.length} photos`);
