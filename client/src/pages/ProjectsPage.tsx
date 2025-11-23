@@ -432,8 +432,11 @@ export default function ProjectsPage() {
     if (status === 'pending') {
       // Not yet recorded - go to recording page
       setLocation('/recording');
+    } else if (status === 'completed' && project.driveFolderUrl) {
+      // Completed - open Drive folder directly in new tab
+      window.open(project.driveFolderUrl, '_blank');
     } else {
-      // Recorded, in_progress, or completed - go to editor
+      // Recorded or in_progress - go to editor
       setLocation('/editor/cruising');
     }
   };
@@ -442,7 +445,7 @@ export default function ProjectsPage() {
     switch (status) {
       case 'completed':
         return {
-          label: 'Complete',
+          label: 'View',
           icon: CheckCircle2,
           className: 'border-green-500/50 text-green-500 hover:bg-green-500/10',
         };
