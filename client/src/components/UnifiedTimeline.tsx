@@ -127,30 +127,6 @@ export default function UnifiedTimeline({
 
   return (
     <div className="p-6 rounded-xl bg-card/30 backdrop-blur-md border border-card-border space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div
-            className="w-2 h-8 rounded-full"
-            style={{
-              backgroundColor: sceneType === 'cruising' ? '#FF6B35' :
-                               sceneType === 'chase' ? '#FFB347' : '#FF6347'
-            }}
-          />
-          <div>
-            <h3 className="text-lg font-semibold text-foreground capitalize">
-              {sceneType} Scene Timeline
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              {sceneSlots.length} slots • {formatTime(sceneDuration)} total duration
-            </p>
-          </div>
-        </div>
-        <div className="text-sm text-muted-foreground">
-          Click or drag markers to adjust
-        </div>
-      </div>
-
       {/* Unified Timeline */}
       <div className="relative">
         {/* Time markers */}
