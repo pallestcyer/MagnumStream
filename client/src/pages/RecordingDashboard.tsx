@@ -66,7 +66,9 @@ export default function RecordingDashboard() {
   const chunksRef2 = useRef<Blob[]>([]);
   const elapsedTimeRef = useRef<number>(0);
   const recordingSceneRef = useRef<SceneType>('cruising'); // Track which scene is being recorded
-  const [currentRecordingId, setCurrentRecordingId] = useState<string | null>(null);
+  const [currentRecordingId, setCurrentRecordingId] = useState<string | null>(
+    () => localStorage.getItem('currentRecordingId')
+  );
 
   const currentScene = SCENES[currentSceneIndex];
 
@@ -344,10 +346,29 @@ export default function RecordingDashboard() {
   const handleStartRecording = async () => {
     setRecordingState("countdown");
     setElapsedTime(0);
-    
-    // Create a recording session
-    if (!currentRecordingId) {
-      // Create flight recording in database and get the ID from the response
+
+    // Check for existing recording ID (from ProjectsPage or localStorage)
+    const existingRecordingId = currentRecordingId || localStorage.getItem('currentRecordingId');
+
+    if (existingRecordingId) {
+      // Use existing recording - just update status to 'recording'
+      console.log('📋 Using existing recording:', existingRecordingId);
+      setCurrentRecordingId(existingRecordingId);
+
+      // Update the existing recording's status to 'recording'
+      try {
+        await fetch(`/api/recordings/${existingRecordingId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ exportStatus: 'recording' })
+        });
+        console.log('✅ Updated recording status to recording');
+      } catch (error) {
+        console.error('Failed to update recording status:', error);
+      }
+    } else {
+      // No existing recording - create a new one (fallback for direct access)
+      console.log('⚠️ No existing recording ID found, creating new recording');
       try {
         const response = await fetch('/api/recordings', {
           method: 'POST',
