@@ -565,6 +565,7 @@ class DaVinciAutomation:
             # DO NOT use MediaPoolItem.ReplaceClip as it modifies the source file reference globally
             replaced_slots = []
             processed_slots = set()
+            replacement_methods = {}  # Track which method worked for each slot
 
             for slot_number in sorted(imported_clips.keys()):
                 clip_data = imported_clips[slot_number]
@@ -714,6 +715,7 @@ class DaVinciAutomation:
 
                                 replaced_slots.append(slot_number)
                                 replaced = True
+                                replacement_methods[slot_number] = "AddTake"
                                 logger.info(f"✅ Slot {slot_number}: AddTake method succeeded (take selected)")
                     elif add_result:
                         # AddTake returned truthy but count didn't change - still try to proceed
@@ -725,6 +727,7 @@ class DaVinciAutomation:
                                 target_item.SelectTakeByIndex(take_count)
                                 replaced_slots.append(slot_number)
                                 replaced = True
+                                replacement_methods[slot_number] = "AddTake-forced"
                                 logger.info(f"✅ Slot {slot_number}: AddTake method (forced, take selected)")
 
                 except Exception as e:
@@ -746,6 +749,7 @@ class DaVinciAutomation:
                             if result:
                                 replaced_slots.append(slot_number)
                                 replaced = True
+                                replacement_methods[slot_number] = "TimelineItem.ReplaceClip"
                                 logger.info(f"✅ Slot {slot_number}: TimelineItem.ReplaceClip succeeded")
                         else:
                             logger.warning(f"   ReplaceClip not available or not callable")
@@ -753,78 +757,31 @@ class DaVinciAutomation:
                         logger.warning(f"   TimelineItem.ReplaceClip failed: {e}")
 
                 # METHOD 3: Delete and re-insert at same position
-                # This is a more aggressive approach - remove the clip and add the new one
+                # DISABLED: This loses effects/attributes on the timeline item
+                # Keeping code for reference but not executing
                 if not replaced:
-                    try:
-                        logger.info(f"   Attempting delete-and-insert method...")
+                    logger.warning(f"   ⚠️ METHOD 3 (delete-and-insert) SKIPPED - would lose effects")
+                    logger.warning(f"   AddTake and TimelineItem.ReplaceClip both failed for slot {slot_number}")
 
-                        # Get the exact position info we need
-                        start_frame = target_item.GetStart()
-                        end_frame = target_item.GetEnd()
-                        duration = end_frame - start_frame
-                        track_index = 3  # We know all clips are on V3
-
-                        logger.info(f"   Original position: frame {start_frame} to {end_frame} (duration: {duration})")
-
-                        # Try to delete the timeline item
-                        if hasattr(self.timeline, 'DeleteClips'):
-                            delete_result = self.timeline.DeleteClips([target_item], False)  # False = don't ripple
-                            logger.info(f"   DeleteClips result: {delete_result}")
-
-                            if delete_result:
-                                # Now insert the new clip at the same position
-                                # Use InsertGeneratorIntoTimeline or AppendToTimeline approaches
-                                if hasattr(self.media_pool, 'AppendToTimeline'):
-                                    # Build clip info with exact timing
-                                    clip_info = {
-                                        "mediaPoolItem": new_media_item,
-                                        "startFrame": 0,
-                                        "endFrame": duration,
-                                        "trackIndex": track_index,
-                                        "recordFrame": start_frame  # Where to place on timeline
-                                    }
-                                    append_result = self.media_pool.AppendToTimeline([clip_info])
-                                    logger.info(f"   AppendToTimeline result: {append_result}")
-
-                                    if append_result and len(append_result) > 0:
-                                        replaced_slots.append(slot_number)
-                                        replaced = True
-                                        logger.info(f"✅ Slot {slot_number}: Delete-and-insert succeeded")
-                        else:
-                            logger.warning(f"   DeleteClips method not available on timeline")
-                    except Exception as e:
-                        logger.warning(f"   Delete-and-insert failed: {e}")
-                        import traceback
-                        logger.warning(traceback.format_exc())
-
-                # METHOD 4: Last resort - try MediaPoolItem.ReplaceClip anyway with logging
-                # We previously removed this because it corrupts globally, but maybe it's
-                # the only thing that works. Log heavily so we understand the impact.
+                # METHOD 4: MediaPoolItem.ReplaceClip
+                # DISABLED: This corrupts the template globally
+                # Keeping code for reference but not executing
                 if not replaced:
-                    try:
-                        logger.warning(f"   ⚠️ Attempting MediaPoolItem.ReplaceClip as LAST RESORT...")
-                        logger.warning(f"   ⚠️ This may corrupt the template! Testing only!")
-
-                        original_media = slot_info.get('media_pool_item')
-                        if original_media and hasattr(original_media, 'ReplaceClip'):
-                            logger.info(f"   Original media pool item: {original_media.GetName() if hasattr(original_media, 'GetName') else original_media}")
-                            replace_result = original_media.ReplaceClip(new_clip_path)
-                            logger.info(f"   MediaPoolItem.ReplaceClip result: {replace_result}")
-
-                            if replace_result:
-                                replaced_slots.append(slot_number)
-                                replaced = True
-                                logger.warning(f"✅ Slot {slot_number}: MediaPoolItem.ReplaceClip worked (may cause template corruption)")
-                    except Exception as e:
-                        logger.warning(f"   MediaPoolItem.ReplaceClip failed: {e}")
+                    logger.warning(f"   ⚠️ METHOD 4 (MediaPoolItem.ReplaceClip) SKIPPED - corrupts template")
 
                 if not replaced:
-                    logger.error(f"❌ Failed to replace slot {slot_number} - ALL methods failed")
-                    logger.error(f"   The template may need to be rebuilt with unique clips per position")
+                    logger.error(f"❌ Failed to replace slot {slot_number} - safe methods failed")
+                    logger.error(f"   Check if this slot has special properties in the template")
 
             # POST-REPLACEMENT VALIDATION
             logger.info(f"🎉 Clip replacement complete: {len(replaced_slots)}/{len(imported_clips)} slots replaced")
             logger.info(f"   Replaced slots: {sorted(replaced_slots)}")
+
+            # Show which method was used for each slot
+            logger.info(f"📊 Replacement methods summary:")
+            for slot in sorted(imported_clips.keys()):
+                method = replacement_methods.get(slot, "FAILED")
+                logger.info(f"   Slot {slot}: {method}")
 
             if len(replaced_slots) < len(imported_clips):
                 missing_slots = set(imported_clips.keys()) - set(replaced_slots)
