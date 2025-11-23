@@ -8,7 +8,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Users/USERNAME/MagnumStream/deploy/start-mac-service.sh</string>
+        <string>/Users/magnummedia/MagnumStream/deploy/start-mac-service.sh</string>
     </array>
     
     <key>RunAtLoad</key>
@@ -21,13 +21,13 @@
     </dict>
     
     <key>StandardOutPath</key>
-    <string>/Users/USERNAME/MagnumStream/logs/launchd.log</string>
+    <string>/Users/magnummedia/MagnumStream/logs/launchd.log</string>
     
     <key>StandardErrorPath</key>
-    <string>/Users/USERNAME/MagnumStream/logs/launchd.error.log</string>
+    <string>/Users/magnummedia/MagnumStream/logs/launchd.error.log</string>
     
     <key>WorkingDirectory</key>
-    <string>/Users/USERNAME/MagnumStream</string>
+    <string>/Users/magnummedia/MagnumStream</string>
     
     <key>EnvironmentVariables</key>
     <dict>
