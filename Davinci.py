@@ -500,8 +500,9 @@ class DaVinciAutomation:
 
             logger.info(f"📦 Successfully imported {len(imported_clips)}/{len(clips)} clips")
 
-            # STEP 2: DYNAMIC ANALYSIS - Scan V3 track and map clips by slot number from filename
-            # This approach doesn't rely on hardcoded frame positions
+            # STEP 2: DYNAMIC ANALYSIS - Scan V3 track and map by FRAME POSITION
+            # The template reuses media pool clips, so we must use frame positions (which are unique)
+            # to identify which timeline position corresponds to which slot number
             track_index = 3  # All clips are on track V3
             timeline_items = self.timeline.GetItemListInTrack('video', track_index)
             logger.info(f"🔍 Found {len(timeline_items)} items on video track V{track_index}")
@@ -511,43 +512,46 @@ class DaVinciAutomation:
                 logger.warning(f"⚠️ Expected 14 timeline items but found {len(timeline_items)}")
                 logger.warning(f"   Template may have been modified or contains extra/missing clips")
 
-            # Create mapping of slot_number -> timeline_item based on clip filename
-            # Template clips should be named like "slot_1_cruising_cam1.mp4"
-            import re
-            slot_to_item = {}
-
+            # Build frame_position -> timeline_item mapping
+            frame_to_item = {}
             logger.info(f"📊 Analyzing timeline clips on V{track_index}:")
             for item in timeline_items:
+                start_frame = item.GetStart()
                 media_pool_item = item.GetMediaPoolItem()
-                if media_pool_item:
-                    clip_name = media_pool_item.GetName()
-                    start_frame = item.GetStart()
+                clip_name = media_pool_item.GetName() if media_pool_item else "Unknown"
+                frame_to_item[start_frame] = {
+                    'item': item,
+                    'media_pool_item': media_pool_item,
+                    'clip_name': clip_name,
+                    'start_frame': start_frame
+                }
+                logger.info(f"   Frame {start_frame}: '{clip_name}'")
 
-                    # Extract slot number from filename like "slot_1_cruising_cam1.mp4"
-                    match = re.search(r'slot_(\d+)_', clip_name)
-                    if match:
-                        slot_num = int(match.group(1))
-                        slot_to_item[slot_num] = {
-                            'item': item,
-                            'media_pool_item': media_pool_item,
-                            'clip_name': clip_name,
-                            'start_frame': start_frame
-                        }
-                        logger.info(f"   Found slot {slot_num}: '{clip_name}' at frame {start_frame}")
-                    else:
-                        logger.warning(f"   ⚠️ Could not extract slot number from: '{clip_name}' at frame {start_frame}")
+            # Now map slot numbers to frame positions using CLIP_POSITIONS
+            # This tells us: slot 1 should be at frame 86485, slot 2 at frame 86549, etc.
+            slot_to_item = {}
+            logger.info(f"📊 Mapping slots to timeline positions:")
+            for slot_num, position in CLIP_POSITIONS.items():
+                expected_frame = position['start_frame']
+                if expected_frame in frame_to_item:
+                    slot_to_item[slot_num] = frame_to_item[expected_frame]
+                    clip_name = frame_to_item[expected_frame]['clip_name']
+                    logger.info(f"   Slot {slot_num} -> frame {expected_frame} (currently: '{clip_name}')")
+                else:
+                    logger.warning(f"   Slot {slot_num} -> frame {expected_frame} NOT FOUND")
 
-            # Validate we found all 14 slots
+            # Validate we mapped all 14 slots
             found_slots = sorted(slot_to_item.keys())
             expected_slots = list(range(1, 15))
             missing_slots = [s for s in expected_slots if s not in found_slots]
 
             if missing_slots:
-                logger.error(f"❌ Missing slots in template: {missing_slots}")
+                logger.error(f"❌ Missing slot mappings: {missing_slots}")
                 logger.error(f"   Found slots: {found_slots}")
+                logger.error(f"   Available frames: {sorted(frame_to_item.keys())}")
                 return False
 
-            logger.info(f"✅ All 14 slots found in template: {found_slots}")
+            logger.info(f"✅ All 14 slots mapped to timeline positions")
 
             # STEP 3: Replace each clip by matching slot numbers
             replaced_slots = []
@@ -730,17 +734,20 @@ class DaVinciAutomation:
             return "Customer"
     
     def _save_project(self, project_name):
-        """Save the current project state without renaming"""
+        """DO NOT save the template - render without saving to preserve template integrity"""
         try:
-            # Just save the current project state - don't rename to avoid messing up the template
-            self.project_manager.SaveProject()
-            
-            logger.info(f"Project saved successfully: {TEMPLATE_PROJECT_NAME}")
-            logger.info(f"Clips have been updated in place")
+            # CRITICAL: Do NOT save the project!
+            # Saving would corrupt the template by persisting the replaced clips.
+            # DaVinci can render without saving, and we want the template to remain pristine
+            # for the next render job.
+
+            logger.info(f"⚠️ Skipping project save to preserve template integrity")
+            logger.info(f"   Template '{TEMPLATE_PROJECT_NAME}' will NOT be modified")
+            logger.info(f"   Clips replaced in memory only - will render then discard changes")
             return True
-            
+
         except Exception as e:
-            logger.error(f"Failed to save project: {e}")
+            logger.error(f"Failed in save_project: {e}")
             return False
     
     # Note: _sync_to_google_drive method removed
