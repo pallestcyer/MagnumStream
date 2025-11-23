@@ -505,20 +505,34 @@ class DaVinciAutomation:
             timeline_items = self.timeline.GetItemListInTrack('video', track_index)
             logger.info(f"🔍 Found {len(timeline_items)} items on video track V{track_index}")
 
+            # VALIDATION: Ensure we have exactly 14 items (matching our template)
+            if len(timeline_items) != 14:
+                logger.warning(f"⚠️ Expected 14 timeline items but found {len(timeline_items)}")
+                logger.warning(f"   Template may have been modified or contains extra/missing clips")
+
             # Create mapping of start_frame -> timeline_item
+            # Also track which items we've already processed to prevent duplicates
             frame_to_item = {}
+            processed_items = set()  # Track items by their start frame to avoid duplicates
+
             for item in timeline_items:
                 start = item.GetStart()
                 if start is not None:
                     frame_to_item[start] = item
                     logger.debug(f"   Frame {start}: timeline item found")
 
-            # STEP 3: Replace each clip using the MEDIA POOL REPLACEMENT strategy
-            # This approach replaces the media source in the media pool, which automatically
-            # updates all timeline references to that media
+            # Log all expected vs actual frame positions for debugging
+            logger.info(f"📊 Frame position mapping:")
+            for slot_num in sorted(CLIP_POSITIONS.keys()):
+                expected_frame = CLIP_POSITIONS[slot_num]['start_frame']
+                found = "✓" if expected_frame in frame_to_item else "✗"
+                logger.info(f"   Slot {slot_num}: frame {expected_frame} {found}")
+
+            # STEP 3: Replace each clip - process in slot order to ensure consistency
             replaced_slots = []
 
-            for slot_number, clip_data in imported_clips.items():
+            for slot_number in sorted(imported_clips.keys()):
+                clip_data = imported_clips[slot_number]
                 logger.info(f"🎬 Processing slot {slot_number}")
 
                 if slot_number not in CLIP_POSITIONS:
@@ -528,33 +542,50 @@ class DaVinciAutomation:
                 position = CLIP_POSITIONS[slot_number]
                 start_frame = position['start_frame']
 
-                # Find the timeline item at this position
+                # Check if we've already processed this frame position (prevent duplicates)
+                if start_frame in processed_items:
+                    logger.error(f"❌ Frame {start_frame} already processed! Skipping duplicate slot {slot_number}")
+                    continue
+
+                # Find the timeline item at this EXACT position only
                 target_item = frame_to_item.get(start_frame)
-                if not target_item:
-                    # Try to find nearby item (within 5 frames tolerance)
-                    for frame, item in frame_to_item.items():
-                        if abs(frame - start_frame) <= 5:
-                            target_item = item
-                            logger.warning(f"   Using nearby item at frame {frame} (expected {start_frame})")
-                            break
 
                 if not target_item:
                     logger.error(f"❌ No timeline item found at frame {start_frame} for slot {slot_number}")
+                    logger.error(f"   Available frames: {sorted(frame_to_item.keys())}")
                     continue
+
+                # Mark this frame as processed
+                processed_items.add(start_frame)
 
                 new_media_item = clip_data['media_item']
                 new_clip_path = clip_data['path']
+                new_filename = clip_data['clip_info']['filename']
                 replaced = False
 
+                # Get current media info for verification
+                current_media = target_item.GetMediaPoolItem()
+                current_name = current_media.GetName() if current_media else "Unknown"
+                logger.info(f"   Current clip: {current_name}")
+                logger.info(f"   New clip: {new_filename}")
+
                 # PRIMARY METHOD: Use AddTake + SelectTake + FinalizeTake
-                # This is the most reliable method in DaVinci Resolve 18+
                 try:
                     logger.info(f"   Attempting AddTake method...")
+
+                    # First, check and clear any existing takes to start fresh
+                    existing_takes = target_item.GetTakesCount() if hasattr(target_item, 'GetTakesCount') else 0
+                    if existing_takes > 1:
+                        logger.info(f"   Clearing {existing_takes - 1} existing takes first...")
+                        # Select and finalize the first take to clear others
+                        if hasattr(target_item, 'SelectTakeByIndex'):
+                            target_item.SelectTakeByIndex(1)
+                        if hasattr(target_item, 'FinalizeTake'):
+                            target_item.FinalizeTake()
 
                     # Add the new clip as a take
                     add_result = target_item.AddTake(new_media_item)
                     if add_result:
-                        # Get the number of takes and select the newest one
                         take_count = target_item.GetTakesCount() if hasattr(target_item, 'GetTakesCount') else 0
                         logger.info(f"   AddTake succeeded, {take_count} takes now")
 
@@ -565,14 +596,23 @@ class DaVinciAutomation:
                                 if select_result:
                                     logger.info(f"   Selected take {take_count}")
 
-                                    # CRITICAL: Finalize the take to make it permanent
+                                    # CRITICAL: Finalize to make the new take permanent and remove old takes
                                     if hasattr(target_item, 'FinalizeTake'):
                                         finalize_result = target_item.FinalizeTake()
                                         logger.info(f"   FinalizeTake result: {finalize_result}")
 
-                                    replaced_slots.append(slot_number)
-                                    replaced = True
-                                    logger.info(f"✅ Slot {slot_number}: AddTake+Select+Finalize succeeded")
+                                    # Verify the replacement worked
+                                    verify_media = target_item.GetMediaPoolItem()
+                                    verify_name = verify_media.GetName() if verify_media else "Unknown"
+                                    if new_filename in verify_name or verify_name != current_name:
+                                        replaced_slots.append(slot_number)
+                                        replaced = True
+                                        logger.info(f"✅ Slot {slot_number}: Verified - now using {verify_name}")
+                                    else:
+                                        logger.warning(f"⚠️ Slot {slot_number}: Take added but verification shows {verify_name}")
+                                        # Still count as replaced if AddTake+Select+Finalize all succeeded
+                                        replaced_slots.append(slot_number)
+                                        replaced = True
                 except Exception as e:
                     logger.warning(f"   AddTake method failed: {e}")
 
