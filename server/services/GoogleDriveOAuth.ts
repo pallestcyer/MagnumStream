@@ -314,6 +314,27 @@ export class GoogleDriveOAuth {
   }
 
   /**
+   * Find a folder by name in root of Drive (does not create if missing)
+   * Returns folder ID or null if not found
+   */
+  private async findFolderByName(drive: any, name: string): Promise<string | null> {
+    const query = `name='${name}' and 'root' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+
+    const result = await drive.files.list({
+      q: query,
+      fields: 'files(id, name)',
+      spaces: 'drive'
+    });
+
+    if (result.data.files && result.data.files.length > 0) {
+      console.log(`📁 Found folder "${name}" with ID: ${result.data.files[0].id}`);
+      return result.data.files[0].id!;
+    }
+
+    return null;
+  }
+
+  /**
    * Get or create a folder, returns folder ID
    */
   private async getOrCreateFolder(drive: any, name: string, parentId: string | null): Promise<string> {
@@ -396,11 +417,20 @@ export class GoogleDriveOAuth {
       const flightFolderName = `${flightNumber}-${pilotInitials}`;
       const customerFolderName = customerName.replace(/[/\\:*?"<>|]/g, '_'); // Sanitize for filesystem
 
-      console.log(`📁 Creating project folder structure:`);
+      // Find the "Magnum Media Purchases" folder as the root parent
+      const rootFolderName = 'Magnum Media Purchases';
+      const rootFolderId = await this.findFolderByName(drive, rootFolderName);
+
+      if (!rootFolderId) {
+        console.error(`❌ Could not find "${rootFolderName}" folder in Google Drive. Please create it first.`);
+        throw new Error(`Root folder "${rootFolderName}" not found in Google Drive`);
+      }
+
+      console.log(`📁 Creating project folder structure inside "${rootFolderName}":`);
       console.log(`   ${year}/${month}/${day}/${flightFolderName}/${customerFolderName}/`);
 
-      // Create folder hierarchy
-      const yearFolderId = await this.getOrCreateFolder(drive, year, null);
+      // Create folder hierarchy inside Magnum Media Purchases
+      const yearFolderId = await this.getOrCreateFolder(drive, year, rootFolderId);
       const monthFolderId = await this.getOrCreateFolder(drive, month, yearFolderId);
       const dayFolderId = await this.getOrCreateFolder(drive, day, monthFolderId);
       const flightFolderId = await this.getOrCreateFolder(drive, flightFolderName, dayFolderId);
