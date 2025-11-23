@@ -228,6 +228,16 @@ class DaVinciAutomation:
                 logger.error("   The template is missing expected clips. Please restore from backup.")
                 return False
 
+            # DEBUG: Log template state IMMEDIATELY after load, before ANY modifications
+            logger.info("🔍 DEBUG: Template state immediately after loading (before any changes):")
+            track_index = 3
+            debug_items = self.timeline.GetItemListInTrack('video', track_index)
+            for item in debug_items:
+                start = item.GetStart()
+                media = item.GetMediaPoolItem()
+                name = media.GetName() if media else "NO MEDIA"
+                logger.info(f"   Frame {start}: '{name}'")
+
             # Import and replace clips using existing project structure
             if not self._replace_clips_from_project(clips, recording_id):
                 return False
