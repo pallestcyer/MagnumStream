@@ -105,7 +105,7 @@ CLIP_POSITIONS = {
     2: {"track": 3, "start_frame": 86549},    # Cruising front view, 29 frames (1.210s) → seamless to 3
     3: {"track": 3, "start_frame": 86578},    # Cruising side view, 31 frames (1.293s)
     4: {"track": 3, "start_frame": 86631},    # Cruising front view, 23 frames (0.959s) → seamless to 5
-    5: {"track": 3, "start_frame": 86654},    # Cruising side view, 37 frames (1.543s)
+    5: {"track": 3, "start_frame": 86653},    # Cruising side view, 37 frames (1.543s)
     6: {"track": 3, "start_frame": 86790},    # Cruising front view, 16 frames (0.667s)
     7: {"track": 3, "start_frame": 86844},    # Cruising side view, 19 frames (0.792s)
 
