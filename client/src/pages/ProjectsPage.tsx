@@ -45,7 +45,7 @@ const getRoundedTime = () => {
   now.setMilliseconds(0);
   return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 };
-import { Plus, Clock, Plane, Mail, Video, Image, DollarSign, X, CheckCircle2, Edit3, PlayCircle, Upload, Trash2, ExternalLink, FileVideo } from "lucide-react";
+import { Plus, Clock, Plane, Mail, Video, Image, DollarSign, X, CheckCircle2, Edit3, PlayCircle, Upload, Trash2, ExternalLink, FileVideo, Play } from "lucide-react";
 import type { FlightRecording } from "@shared/schema";
 import { BUNDLE_OPTIONS } from "@shared/schema";
 
@@ -445,7 +445,7 @@ export default function ProjectsPage() {
     switch (status) {
       case 'completed':
         return {
-          label: 'View',
+          label: 'Complete',
           icon: CheckCircle2,
           className: 'border-green-500/50 text-green-500 hover:bg-green-500/10',
         };
@@ -467,6 +467,51 @@ export default function ProjectsPage() {
           icon: Video,
           className: '',
         };
+    }
+  };
+
+  const handlePlayVideo = async (project: FlightRecording) => {
+    try {
+      // Get the local device URL for Mac service
+      const healthResponse = await fetch('/api/health');
+      let localDeviceUrl = '';
+
+      if (healthResponse.ok) {
+        const healthData = await healthResponse.json();
+        localDeviceUrl = healthData.services?.localDevice || '';
+      }
+
+      // Fallback to localhost in development
+      if (!localDeviceUrl) {
+        localDeviceUrl = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+      }
+
+      const apiUrl = localDeviceUrl || 'http://localhost:3001';
+
+      // Call backend to open the local file in native player
+      const response = await fetch(`${apiUrl}/api/recordings/open-local-video`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          localVideoPath: project.localVideoPath || undefined,
+          recordingId: project.id
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to open video');
+      }
+
+      const result = await response.json();
+      console.log('✅ Video opened in native player:', result.path);
+    } catch (error) {
+      console.error('Error opening video:', error);
+      toast({
+        title: "Error",
+        description: "Failed to open video file. Please check the file exists locally on the Mac.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -630,13 +675,28 @@ export default function ProjectsPage() {
         {/* Action Buttons */}
         <div className="mt-auto pt-4 space-y-3">
           {/* Video Thumbnail - always show for consistent card height */}
-          <div className={`aspect-video rounded-lg overflow-hidden relative ${project.exportStatus === 'completed' && project.thumbnailUrl ? 'bg-muted' : ''}`}>
+          <div className={`aspect-video rounded-lg overflow-hidden relative group ${project.exportStatus === 'completed' && project.thumbnailUrl ? 'bg-muted' : ''}`}>
             {project.exportStatus === 'completed' && project.thumbnailUrl && (
-              <img
-                src={project.thumbnailUrl}
-                alt={`${project.pilotName} Flight Video`}
-                className="w-full h-full object-cover"
-              />
+              <>
+                <img
+                  src={project.thumbnailUrl}
+                  alt={`${project.pilotName} Flight Video`}
+                  className="w-full h-full object-cover"
+                />
+                {/* Play button overlay */}
+                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Button
+                    size="lg"
+                    className="bg-white/20 hover:bg-white/30 backdrop-blur-sm border-white/30"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePlayVideo(project);
+                    }}
+                  >
+                    <Play className="w-6 h-6 text-white" />
+                  </Button>
+                </div>
+              </>
             )}
           </div>
           <div className="grid grid-cols-2 gap-2">
