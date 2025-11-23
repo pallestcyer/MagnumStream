@@ -240,8 +240,13 @@ class DaVinciAutomation:
             output_path = self._render_project(job_data)
             if not output_path:
                 return False
-            
+
             logger.info(f"Successfully completed DaVinci render: {output_path}")
+
+            # CRITICAL: Close project WITHOUT saving after render
+            # This discards all in-memory changes (takes, etc.) so the template
+            # remains pristine for the next render
+            self._close_project_without_saving()
 
             # Note: Google Drive sync is handled by the Node.js server after receiving the output path
             # This allows the server to update the database with the Drive path atomically
@@ -250,6 +255,8 @@ class DaVinciAutomation:
 
         except Exception as e:
             logger.error(f"Error processing DaVinci job: {e}")
+            # Also close without saving on error
+            self._close_project_without_saving()
             return False
     
     def _load_template_project(self):
@@ -625,10 +632,10 @@ class DaVinciAutomation:
                             logger.info(f"   SelectTakeByIndex({takes_count_after}) result: {select_result}")
 
                             if select_result:
-                                # CRITICAL: Finalize to make the new take permanent and remove old takes
-                                if hasattr(target_item, 'FinalizeTake'):
-                                    finalize_result = target_item.FinalizeTake()
-                                    logger.info(f"   FinalizeTake result: {finalize_result}")
+                                # NOTE: Do NOT call FinalizeTake() here!
+                                # FinalizeTake() permanently removes all other takes and prevents
+                                # future AddTake calls from working. We just select the take
+                                # and render - the selection is enough for the render to use it.
 
                                 # Verify the replacement worked
                                 verify_media = target_item.GetMediaPoolItem()
@@ -637,20 +644,18 @@ class DaVinciAutomation:
 
                                 replaced_slots.append(slot_number)
                                 replaced = True
-                                logger.info(f"✅ Slot {slot_number}: AddTake method succeeded")
+                                logger.info(f"✅ Slot {slot_number}: AddTake method succeeded (take selected)")
                     elif add_result:
                         # AddTake returned truthy but count didn't change - still try to proceed
                         logger.warning(f"   AddTake returned {add_result} but takes count unchanged")
-                        # Try selecting and finalizing anyway
+                        # Try selecting anyway (no finalize)
                         if hasattr(target_item, 'GetTakesCount'):
                             take_count = target_item.GetTakesCount()
                             if take_count > 0 and hasattr(target_item, 'SelectTakeByIndex'):
                                 target_item.SelectTakeByIndex(take_count)
-                                if hasattr(target_item, 'FinalizeTake'):
-                                    target_item.FinalizeTake()
                                 replaced_slots.append(slot_number)
                                 replaced = True
-                                logger.info(f"✅ Slot {slot_number}: AddTake method (forced)")
+                                logger.info(f"✅ Slot {slot_number}: AddTake method (forced, take selected)")
 
                 except Exception as e:
                     logger.warning(f"   AddTake method exception: {e}")
@@ -752,9 +757,9 @@ class DaVinciAutomation:
         try:
             # CRITICAL: Do NOT save the project!
             #
-            # Why: MediaPoolItem.ReplaceClip modifies the source file references in the
-            # media pool. If we save, those changes persist to the template and corrupt
-            # future renders (slots get mixed up because they all point to the wrong files).
+            # Why: AddTake modifies the timeline items in memory. If we save, those changes
+            # persist to the template and prevent future AddTake calls from working (since
+            # the takes are already there).
             #
             # Solution: Don't save at all. DaVinci can render directly from the in-memory
             # state. After render completes, we close the project without saving, and the
@@ -768,6 +773,26 @@ class DaVinciAutomation:
         except Exception as e:
             logger.error(f"Failed in save_project: {e}")
             return False
+
+    def _close_project_without_saving(self):
+        """Close current project without saving to discard all in-memory changes"""
+        try:
+            if self.current_project:
+                project_name = self.current_project.GetName()
+                logger.info(f"🔄 Closing project '{project_name}' WITHOUT saving")
+                logger.info(f"   All take changes will be discarded")
+                logger.info(f"   Template will be pristine for next render")
+
+                # CloseProject without saving first discards all changes
+                self.project_manager.CloseProject(self.current_project)
+                self.current_project = None
+                self.timeline = None
+                self.media_pool = None
+
+                logger.info(f"✅ Project closed successfully (changes discarded)")
+        except Exception as e:
+            logger.warning(f"Error closing project: {e}")
+            # Not critical - project will be closed on next load anyway
     
     # Note: _sync_to_google_drive method removed
     # Google Drive sync is now handled by the Node.js server (routes.ts)
