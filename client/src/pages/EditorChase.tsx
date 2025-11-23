@@ -160,42 +160,51 @@ export default function EditorChase() {
             const needsSpread = prev.some(s => s.windowStart < 0);
             if (needsSpread) {
               const slots = SLOT_TEMPLATE.filter(s => s.sceneType === 'chase');
-              const newSelections = [...prev];
 
-              // Count only lead slots and independent slots for spacing calculation
+              // Create a map for tracking positions by slot number
+              const positionMap = new Map<number, number>();
+
+              // First pass: identify lead/independent slots and calculate their positions
               const leadAndIndependentSlots = slots.filter(s =>
                 !SEAMLESS_PAIRS.some(p => p.follow === s.slotNumber)
               );
-              const usableTime = actualDuration * 0.85;
-              const spacing = usableTime / leadAndIndependentSlots.length;
 
-              let positionIndex = 0;
-              slots.forEach((slotConfig, idx) => {
-                const isFollowSlot = SEAMLESS_PAIRS.find(p => p.follow === slotConfig.slotNumber);
+              // Calculate total duration needed for all slots (including seamless pairs)
+              let totalSlotDuration = 0;
+              slots.forEach(slot => {
+                totalSlotDuration += slot.duration;
+              });
 
-                if (isFollowSlot) {
-                  // Follow slot: position right after its lead slot
-                  const leadSlotIndex = slots.findIndex(s => s.slotNumber === isFollowSlot.lead);
-                  const leadSelection = newSelections.find(s => s.slotNumber === isFollowSlot.lead);
-                  const leadConfig = slots[leadSlotIndex];
-                  if (leadSelection && leadConfig) {
-                    newSelections[idx] = {
-                      ...newSelections[idx],
-                      windowStart: leadSelection.windowStart + leadConfig.duration
-                    };
-                  }
+              // Use available time leaving some buffer at the end
+              const usableTime = Math.max(actualDuration - 5, actualDuration * 0.9);
+              const availableGapTime = usableTime - totalSlotDuration;
+              const gapBetweenGroups = Math.max(0, availableGapTime / Math.max(1, leadAndIndependentSlots.length));
+
+              // Position lead and independent slots first
+              let currentPosition = 0;
+              leadAndIndependentSlots.forEach((slotConfig) => {
+                positionMap.set(slotConfig.slotNumber, currentPosition);
+
+                // Check if this slot has a follow slot in a seamless pair
+                const seamlessPair = SEAMLESS_PAIRS.find(p => p.lead === slotConfig.slotNumber);
+                if (seamlessPair) {
+                  // Position the follow slot right after the lead
+                  const followPosition = currentPosition + slotConfig.duration;
+                  positionMap.set(seamlessPair.follow, followPosition);
+
+                  // Find follow slot duration
+                  const followSlot = slots.find(s => s.slotNumber === seamlessPair.follow);
+                  currentPosition = followPosition + (followSlot?.duration || 3) + gapBetweenGroups;
                 } else {
-                  // Lead or independent slot: spread evenly
-                  const newStart = Math.min(positionIndex * spacing, actualDuration - slotConfig.duration);
-                  newSelections[idx] = {
-                    ...newSelections[idx],
-                    windowStart: Math.max(0, newStart)
-                  };
-                  positionIndex++;
+                  currentPosition += slotConfig.duration + gapBetweenGroups;
                 }
               });
 
-              return newSelections;
+              // Now update the selections with the calculated positions
+              return prev.map(selection => ({
+                ...selection,
+                windowStart: positionMap.get(selection.slotNumber) ?? 0
+              }));
             }
             return prev;
           });

@@ -208,13 +208,13 @@ export default function UnifiedTimeline({
                 <div
                   className={`absolute top-0 h-full flex flex-col items-center select-none transition-transform ${
                     isDragging ? 'cursor-grabbing z-30' : isActive ? 'z-20 cursor-grab' : 'z-10 cursor-grab'
-                  } ${isFollowSlot ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  }`}
                   style={{
                     left: `${timeToPercent(windowStart)}%`,
                     transform: `translateX(-50%) ${isDragging ? 'scale(1.15)' : isActive ? 'scale(1.05)' : 'scale(1)'}`,
                   }}
-                  onMouseDown={(e) => !isFollowSlot && handleMouseDown(e, slot.slotNumber)}
-                  onTouchStart={(e) => !isFollowSlot && handleTouchStart(e, slot.slotNumber)}
+                  onMouseDown={(e) => handleMouseDown(e, slot.slotNumber)}
+                  onTouchStart={(e) => handleTouchStart(e, slot.slotNumber)}
                   onMouseEnter={() => setHoverSlot(slot.slotNumber)}
                   onMouseLeave={() => setHoverSlot(null)}
                   onClick={(e) => {
