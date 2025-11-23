@@ -432,8 +432,11 @@ export default function ProjectsPage() {
     if (status === 'pending') {
       // Not yet recorded - go to recording page
       setLocation('/recording');
+    } else if (status === 'completed' && project.videoFolderId) {
+      // Completed - open Video subfolder in Drive directly
+      window.open(`https://drive.google.com/drive/folders/${project.videoFolderId}`, '_blank');
     } else if (status === 'completed' && project.driveFolderUrl) {
-      // Completed - open Drive folder directly in new tab
+      // Fallback to parent Drive folder if no video folder ID
       window.open(project.driveFolderUrl, '_blank');
     } else {
       // Recorded or in_progress - go to editor
