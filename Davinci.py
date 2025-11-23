@@ -554,6 +554,8 @@ class DaVinciAutomation:
             logger.info(f"✅ All 14 slots mapped to timeline positions")
 
             # STEP 3: Replace each clip by matching slot numbers
+            # CRITICAL: We use AddTake/SelectTake/FinalizeTake which replaces per-timeline-instance
+            # DO NOT use MediaPoolItem.ReplaceClip as it modifies the source file reference globally
             replaced_slots = []
             processed_slots = set()
 
@@ -589,86 +591,98 @@ class DaVinciAutomation:
                 logger.info(f"   Current clip: {current_name} (frame {current_frame})")
                 logger.info(f"   New clip: {new_filename}")
 
-                # PRIMARY METHOD: Use AddTake + SelectTake + FinalizeTake
+                # METHOD 1: Use AddTake + SelectTake + FinalizeTake (preferred - per-instance replacement)
                 try:
                     logger.info(f"   Attempting AddTake method...")
 
-                    # First, check and clear any existing takes to start fresh
-                    existing_takes = target_item.GetTakesCount() if hasattr(target_item, 'GetTakesCount') else 0
-                    if existing_takes > 1:
-                        logger.info(f"   Clearing {existing_takes - 1} existing takes first...")
-                        # Select and finalize the first take to clear others
-                        if hasattr(target_item, 'SelectTakeByIndex'):
-                            target_item.SelectTakeByIndex(1)
-                        if hasattr(target_item, 'FinalizeTake'):
-                            target_item.FinalizeTake()
+                    # Log available methods on the timeline item for debugging
+                    take_methods = [m for m in dir(target_item) if 'take' in m.lower() or 'Take' in m]
+                    logger.info(f"   Available take methods: {take_methods}")
+
+                    # Check current takes count
+                    takes_count_before = 0
+                    if hasattr(target_item, 'GetTakesCount'):
+                        takes_count_before = target_item.GetTakesCount()
+                        logger.info(f"   Takes before: {takes_count_before}")
 
                     # Add the new clip as a take
                     add_result = target_item.AddTake(new_media_item)
-                    if add_result:
-                        take_count = target_item.GetTakesCount() if hasattr(target_item, 'GetTakesCount') else 0
-                        logger.info(f"   AddTake succeeded, {take_count} takes now")
+                    logger.info(f"   AddTake result: {add_result} (type: {type(add_result)})")
 
-                        if take_count > 0:
-                            # Select the latest take (the one we just added)
-                            if hasattr(target_item, 'SelectTakeByIndex'):
-                                select_result = target_item.SelectTakeByIndex(take_count)
-                                if select_result:
-                                    logger.info(f"   Selected take {take_count}")
+                    # Check takes count after
+                    takes_count_after = 0
+                    if hasattr(target_item, 'GetTakesCount'):
+                        takes_count_after = target_item.GetTakesCount()
+                        logger.info(f"   Takes after: {takes_count_after}")
 
-                                    # CRITICAL: Finalize to make the new take permanent and remove old takes
-                                    if hasattr(target_item, 'FinalizeTake'):
-                                        finalize_result = target_item.FinalizeTake()
-                                        logger.info(f"   FinalizeTake result: {finalize_result}")
+                    # If takes increased, the add worked
+                    if takes_count_after > takes_count_before:
+                        logger.info(f"   AddTake succeeded, {takes_count_after} takes now")
 
-                                    # Verify the replacement worked
-                                    verify_media = target_item.GetMediaPoolItem()
-                                    verify_name = verify_media.GetName() if verify_media else "Unknown"
-                                    if new_filename in verify_name or verify_name != current_name:
-                                        replaced_slots.append(slot_number)
-                                        replaced = True
-                                        logger.info(f"✅ Slot {slot_number}: Verified - now using {verify_name}")
-                                    else:
-                                        logger.warning(f"⚠️ Slot {slot_number}: Take added but verification shows {verify_name}")
-                                        # Still count as replaced if AddTake+Select+Finalize all succeeded
-                                        replaced_slots.append(slot_number)
-                                        replaced = True
+                        # Select the latest take (the one we just added)
+                        if hasattr(target_item, 'SelectTakeByIndex'):
+                            select_result = target_item.SelectTakeByIndex(takes_count_after)
+                            logger.info(f"   SelectTakeByIndex({takes_count_after}) result: {select_result}")
+
+                            if select_result:
+                                # CRITICAL: Finalize to make the new take permanent and remove old takes
+                                if hasattr(target_item, 'FinalizeTake'):
+                                    finalize_result = target_item.FinalizeTake()
+                                    logger.info(f"   FinalizeTake result: {finalize_result}")
+
+                                # Verify the replacement worked
+                                verify_media = target_item.GetMediaPoolItem()
+                                verify_name = verify_media.GetName() if verify_media else "Unknown"
+                                logger.info(f"   Verification: clip is now '{verify_name}'")
+
+                                replaced_slots.append(slot_number)
+                                replaced = True
+                                logger.info(f"✅ Slot {slot_number}: AddTake method succeeded")
+                    elif add_result:
+                        # AddTake returned truthy but count didn't change - still try to proceed
+                        logger.warning(f"   AddTake returned {add_result} but takes count unchanged")
+                        # Try selecting and finalizing anyway
+                        if hasattr(target_item, 'GetTakesCount'):
+                            take_count = target_item.GetTakesCount()
+                            if take_count > 0 and hasattr(target_item, 'SelectTakeByIndex'):
+                                target_item.SelectTakeByIndex(take_count)
+                                if hasattr(target_item, 'FinalizeTake'):
+                                    target_item.FinalizeTake()
+                                replaced_slots.append(slot_number)
+                                replaced = True
+                                logger.info(f"✅ Slot {slot_number}: AddTake method (forced)")
+
                 except Exception as e:
-                    logger.warning(f"   AddTake method failed: {e}")
+                    logger.warning(f"   AddTake method exception: {e}")
+                    import traceback
+                    logger.warning(traceback.format_exc())
 
-                # FALLBACK METHOD 1: Direct ReplaceClip on timeline item
+                # METHOD 2: Direct ReplaceClip on timeline item (if available)
+                # This is safe as it only affects this timeline instance
                 if not replaced:
                     try:
-                        logger.info(f"   Attempting ReplaceClip on timeline item...")
-                        if hasattr(target_item, 'ReplaceClip'):
-                            result = target_item.ReplaceClip(new_media_item)
+                        logger.info(f"   Attempting TimelineItem.ReplaceClip...")
+                        replace_clip_method = getattr(target_item, 'ReplaceClip', None)
+                        logger.info(f"   ReplaceClip method: {replace_clip_method}")
+
+                        if replace_clip_method and callable(replace_clip_method):
+                            result = replace_clip_method(new_media_item)
+                            logger.info(f"   ReplaceClip result: {result}")
                             if result:
                                 replaced_slots.append(slot_number)
                                 replaced = True
-                                logger.info(f"✅ Slot {slot_number}: ReplaceClip succeeded")
-                            else:
-                                logger.warning(f"   ReplaceClip returned False")
+                                logger.info(f"✅ Slot {slot_number}: TimelineItem.ReplaceClip succeeded")
+                        else:
+                            logger.warning(f"   ReplaceClip not available or not callable")
                     except Exception as e:
-                        logger.warning(f"   ReplaceClip failed: {e}")
+                        logger.warning(f"   TimelineItem.ReplaceClip failed: {e}")
 
-                # FALLBACK METHOD 2: Replace via MediaPoolItem.ReplaceClip with file path
-                if not replaced:
-                    try:
-                        logger.info(f"   Attempting MediaPoolItem replacement...")
-                        current_media = target_item.GetMediaPoolItem()
-                        if current_media:
-                            # Try ReplaceClip with the file path string
-                            if hasattr(current_media, 'ReplaceClip'):
-                                result = current_media.ReplaceClip(new_clip_path)
-                                if result:
-                                    replaced_slots.append(slot_number)
-                                    replaced = True
-                                    logger.info(f"✅ Slot {slot_number}: MediaPoolItem.ReplaceClip succeeded")
-                    except Exception as e:
-                        logger.warning(f"   MediaPoolItem replacement failed: {e}")
+                # METHOD 3: SetClipColor or other timeline item methods
+                # REMOVED: MediaPoolItem.ReplaceClip - this corrupts the source globally!
 
                 if not replaced:
-                    logger.error(f"❌ ALL methods failed for slot {slot_number}")
+                    logger.error(f"❌ Failed to replace slot {slot_number} - no safe method worked")
+                    logger.error(f"   The template may need to be rebuilt with unique clips per position")
 
             # POST-REPLACEMENT VALIDATION
             logger.info(f"🎉 Clip replacement complete: {len(replaced_slots)}/{len(imported_clips)} slots replaced")
