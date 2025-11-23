@@ -663,10 +663,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       app.post('/api/drive/share-folder', async (req, res) => {
         try {
-          const { recordingId, customerEmail } = req.body;
+          const { recordingId, customerEmail, customerEmails, bundle } = req.body;
 
-          if (!recordingId || !customerEmail) {
-            return res.status(400).json({ error: 'recordingId and customerEmail are required' });
+          // Support both single email and multiple emails
+          const hasEmails = customerEmails?.length > 0 || customerEmail;
+          if (!recordingId || !hasEmails) {
+            return res.status(400).json({ error: 'recordingId and at least one email are required' });
           }
 
           if (!driveOAuth.isReady()) {
@@ -674,7 +676,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
 
           // Delegate to local device which has the file structure and folder mapping
-          const result = await videoOps.delegateToLocal(`/drive/share-folder`, { recordingId, customerEmail }, 'POST');
+          const result = await videoOps.delegateToLocal(`/drive/share-folder`, { recordingId, customerEmail, customerEmails, bundle }, 'POST');
           res.json(result);
         } catch (error: any) {
           res.status(500).json({ error: error.message });

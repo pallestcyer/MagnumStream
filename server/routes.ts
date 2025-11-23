@@ -1571,13 +1571,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Share Drive folder with customer email based on bundle type
+  // Share Drive folder with customer email(s) based on bundle type
   app.post("/api/drive/share-folder", async (req, res) => {
     try {
-      const { recordingId, customerEmail, bundle } = req.body;
+      const { recordingId, customerEmail, customerEmails, bundle } = req.body;
 
-      if (!recordingId || !customerEmail) {
-        return res.status(400).json({ error: 'recordingId and customerEmail are required' });
+      // Support both single email (customerEmail) and multiple emails (customerEmails)
+      const emails: string[] = customerEmails && Array.isArray(customerEmails)
+        ? customerEmails.filter((e: string) => e && e.trim())
+        : customerEmail ? [customerEmail] : [];
+
+      if (!recordingId || emails.length === 0) {
+        return res.status(400).json({ error: 'recordingId and at least one email are required' });
       }
 
       const { googleDriveOAuth } = await import('./services/GoogleDriveOAuth');
@@ -1623,23 +1628,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Share the folder(s) with customer
-      let allShared = true;
-      for (const folderId of foldersToShare) {
-        const shared = await googleDriveOAuth.shareFolderWithEmail(folderId, customerEmail);
-        if (!shared) {
-          allShared = false;
-          console.error(`❌ Failed to share folder ${folderId} with ${customerEmail}`);
+      // Share the folder(s) with all customer emails
+      const sharedEmails: string[] = [];
+      const failedEmails: string[] = [];
+
+      for (const email of emails) {
+        let emailShared = true;
+        for (const folderId of foldersToShare) {
+          const shared = await googleDriveOAuth.shareFolderWithEmail(folderId, email);
+          if (!shared) {
+            emailShared = false;
+            console.error(`❌ Failed to share folder ${folderId} with ${email}`);
+          }
+        }
+        if (emailShared) {
+          sharedEmails.push(email);
+          console.log(`✅ ${shareDescription} shared with ${email}`);
+        } else {
+          failedEmails.push(email);
         }
       }
 
-      if (allShared) {
-        // Update the sale record to mark Drive as shared
+      if (sharedEmails.length > 0) {
+        // Update the sale record to mark Drive as shared (use first email for lookup)
         try {
           const sales = await storage.getAllSales?.();
           if (sales) {
             const matchingSale = sales
-              .filter((s: any) => s.recordingId === recordingId && s.customerEmail === customerEmail)
+              .filter((s: any) => s.recordingId === recordingId && emails.includes(s.customerEmail))
               .sort((a: any, b: any) => new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime())[0];
 
             if (matchingSale && storage.updateSale) {
@@ -1651,10 +1667,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.warn('⚠️ Could not update sale drive_shared status:', updateError);
         }
 
-        console.log(`✅ ${shareDescription} shared with ${customerEmail}`);
-        res.json({ success: true, message: `${shareDescription} shared with ${customerEmail}` });
+        const message = failedEmails.length > 0
+          ? `${shareDescription} shared with ${sharedEmails.join(', ')}. Failed for: ${failedEmails.join(', ')}`
+          : `${shareDescription} shared with ${sharedEmails.join(', ')}`;
+
+        res.json({ success: true, message, sharedEmails, failedEmails });
       } else {
-        res.status(500).json({ error: 'Failed to share folder' });
+        res.status(500).json({ error: 'Failed to share folder with any email' });
       }
     } catch (error: any) {
       console.error('Failed to share folder:', error);

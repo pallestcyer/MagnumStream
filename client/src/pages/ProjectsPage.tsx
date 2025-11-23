@@ -185,6 +185,7 @@ export default function ProjectsPage() {
       recordingId: string;
       customerName: string;
       customerEmail: string;
+      customerEmails: string[];  // All emails for sharing
       staffMember: string;
       bundle: string;
       saleAmount: number;
@@ -193,14 +194,14 @@ export default function ProjectsPage() {
       return await apiRequest("POST", "/api/sales", saleData);
     },
     onSuccess: async (_, variables) => {
-      // Try to share the Drive folder with customer email based on bundle type (via local Mac server)
+      // Try to share the Drive folder with ALL customer emails based on bundle type (via local Mac server)
       try {
         await fetch("http://localhost:3001/api/drive/share-folder", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             recordingId: variables.recordingId,
-            customerEmail: variables.customerEmail,
+            customerEmails: variables.customerEmails,  // Send all emails
             bundle: variables.bundle
           })
         });
@@ -303,11 +304,12 @@ export default function ProjectsPage() {
 
     const bundle = BUNDLE_OPTIONS.find((b) => b.value === selectedBundle);
 
-    // Create a sale for the primary email (first one)
+    // Create a sale with primary email (first one) and share with ALL emails
     createSaleMutation.mutate({
       recordingId: saleProject.id,
       customerName: saleProject.pilotName,
       customerEmail: validEmails[0],
+      customerEmails: validEmails,  // Pass all emails for Drive sharing
       staffMember: saleStaffMember,
       bundle: selectedBundle,
       saleAmount: bundle?.price || 0,
