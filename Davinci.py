@@ -598,13 +598,27 @@ class DaVinciAutomation:
                 logger.info(f"   Current clip: {current_name} (frame {current_frame})")
                 logger.info(f"   New clip: {new_filename}")
 
-                # METHOD 1: Use AddTake + SelectTake + FinalizeTake (preferred - per-instance replacement)
+                # METHOD 1: Use AddTake + SelectTake (preferred - per-instance replacement)
                 try:
                     logger.info(f"   Attempting AddTake method...")
 
                     # Log available methods on the timeline item for debugging
                     take_methods = [m for m in dir(target_item) if 'take' in m.lower() or 'Take' in m]
                     logger.info(f"   Available take methods: {take_methods}")
+
+                    # CRITICAL: Clear any existing takes from previous renders
+                    # This is necessary because DaVinci retains takes even after close without save
+                    if hasattr(target_item, 'GetTakesCount') and hasattr(target_item, 'DeleteTakeByIndex'):
+                        existing_takes = target_item.GetTakesCount()
+                        if existing_takes > 0:
+                            logger.info(f"   Clearing {existing_takes} existing take(s)...")
+                            # Delete takes from highest index to lowest to avoid index shifting
+                            for i in range(existing_takes, 0, -1):
+                                try:
+                                    del_result = target_item.DeleteTakeByIndex(i)
+                                    logger.info(f"   Deleted take {i}: {del_result}")
+                                except Exception as de:
+                                    logger.warning(f"   Could not delete take {i}: {de}")
 
                     # Check current takes count
                     takes_count_before = 0
