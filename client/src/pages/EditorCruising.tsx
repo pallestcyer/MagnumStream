@@ -151,17 +151,48 @@ export default function EditorCruising() {
           setSceneVideos(videos);
 
           // Spread markers evenly across the actual scene duration if not yet positioned
+          // Keep seamless pairs connected (follow slot starts where lead slot ends)
           const actualDuration = videos.duration || 60;
           setSlotSelections(prev => {
             const needsSpread = prev.some(s => s.windowStart < 0);
             if (needsSpread) {
               const slots = SLOT_TEMPLATE.filter(s => s.sceneType === 'cruising');
-              return prev.map((slot, index) => ({
-                ...slot,
-                windowStart: slot.windowStart < 0
-                  ? Math.min((index / slots.length) * (actualDuration * 0.8), actualDuration - (slots[index]?.duration || 1))
-                  : slot.windowStart
-              }));
+              const newSelections = [...prev];
+
+              // Count only lead slots and independent slots for spacing calculation
+              const leadAndIndependentSlots = slots.filter(s =>
+                !SEAMLESS_PAIRS.some(p => p.follow === s.slotNumber)
+              );
+              const usableTime = actualDuration * 0.85;
+              const spacing = usableTime / leadAndIndependentSlots.length;
+
+              let positionIndex = 0;
+              slots.forEach((slotConfig, idx) => {
+                const isFollowSlot = SEAMLESS_PAIRS.find(p => p.follow === slotConfig.slotNumber);
+
+                if (isFollowSlot) {
+                  // Follow slot: position right after its lead slot
+                  const leadSlotIndex = slots.findIndex(s => s.slotNumber === isFollowSlot.lead);
+                  const leadSelection = newSelections.find(s => s.slotNumber === isFollowSlot.lead);
+                  const leadConfig = slots[leadSlotIndex];
+                  if (leadSelection && leadConfig) {
+                    newSelections[idx] = {
+                      ...newSelections[idx],
+                      windowStart: leadSelection.windowStart + leadConfig.duration
+                    };
+                  }
+                } else {
+                  // Lead or independent slot: spread evenly
+                  const newStart = Math.min(positionIndex * spacing, actualDuration - slotConfig.duration);
+                  newSelections[idx] = {
+                    ...newSelections[idx],
+                    windowStart: Math.max(0, newStart)
+                  };
+                  positionIndex++;
+                }
+              });
+
+              return newSelections;
             }
             return prev;
           });

@@ -438,9 +438,12 @@ export default function ProjectsPage() {
     } else if (status === 'completed' && project.driveFolderUrl) {
       // Fallback to parent Drive folder if no video folder ID
       window.open(project.driveFolderUrl, '_blank');
-    } else {
-      // Recorded or in_progress - go to editor
+    } else if (status === 'recorded' || status === 'in_progress') {
+      // All scenes recorded OR already editing - go to editor
       setLocation('/editor/cruising');
+    } else {
+      // Any other status (partially recorded) - go to recording page to complete
+      setLocation('/recording');
     }
   };
 
