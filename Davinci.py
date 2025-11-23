@@ -756,22 +756,37 @@ class DaVinciAutomation:
                     except Exception as e:
                         logger.warning(f"   TimelineItem.ReplaceClip failed: {e}")
 
-                # METHOD 3: Delete and re-insert at same position
-                # DISABLED: This loses effects/attributes on the timeline item
-                # Keeping code for reference but not executing
+                # METHOD 3: MediaPoolItem.ReplaceClip
+                # WARNING: This modifies the source file reference globally, which means:
+                # - If the template reuses media pool items, multiple positions get affected
+                # - The template will be modified (we close without saving to prevent persistence)
+                # This is currently the ONLY method that works in DaVinci Resolve
                 if not replaced:
-                    logger.warning(f"   ⚠️ METHOD 3 (delete-and-insert) SKIPPED - would lose effects")
-                    logger.warning(f"   AddTake and TimelineItem.ReplaceClip both failed for slot {slot_number}")
+                    try:
+                        logger.info(f"   Attempting MediaPoolItem.ReplaceClip...")
 
-                # METHOD 4: MediaPoolItem.ReplaceClip
-                # DISABLED: This corrupts the template globally
-                # Keeping code for reference but not executing
-                if not replaced:
-                    logger.warning(f"   ⚠️ METHOD 4 (MediaPoolItem.ReplaceClip) SKIPPED - corrupts template")
+                        original_media = slot_info.get('media_pool_item')
+                        if original_media and hasattr(original_media, 'ReplaceClip'):
+                            original_name = original_media.GetName() if hasattr(original_media, 'GetName') else "unknown"
+                            logger.info(f"   Original media pool item: '{original_name}'")
+                            logger.info(f"   Replacing with: {new_clip_path}")
+
+                            replace_result = original_media.ReplaceClip(new_clip_path)
+                            logger.info(f"   MediaPoolItem.ReplaceClip result: {replace_result}")
+
+                            if replace_result:
+                                replaced_slots.append(slot_number)
+                                replaced = True
+                                replacement_methods[slot_number] = "MediaPoolItem.ReplaceClip"
+                                logger.info(f"✅ Slot {slot_number}: MediaPoolItem.ReplaceClip succeeded")
+                        else:
+                            logger.warning(f"   MediaPoolItem.ReplaceClip not available")
+                    except Exception as e:
+                        logger.warning(f"   MediaPoolItem.ReplaceClip failed: {e}")
 
                 if not replaced:
-                    logger.error(f"❌ Failed to replace slot {slot_number} - safe methods failed")
-                    logger.error(f"   Check if this slot has special properties in the template")
+                    logger.error(f"❌ Failed to replace slot {slot_number} - ALL methods failed")
+                    logger.error(f"   The template may need unique media pool items per position")
 
             # POST-REPLACEMENT VALIDATION
             logger.info(f"🎉 Clip replacement complete: {len(replaced_slots)}/{len(imported_clips)} slots replaced")
