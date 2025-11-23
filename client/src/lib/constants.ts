@@ -1,11 +1,18 @@
 // Shared constants for MagnumStream
 
+// Staff members grouped by role
 export const STAFF_MEMBERS = [
-  { value: "john", label: "John Smith" },
-  { value: "sarah", label: "Sarah Johnson" },
-  { value: "michael", label: "Michael Chen" },
-  { value: "emily", label: "Emily Rodriguez" },
-  { value: "david", label: "David Williams" },
+  // Customer Service Representatives (CSR)
+  { value: "kiana_machado", label: "Kiana Machado", role: "CSR" },
+  { value: "jessicha_kealoha", label: "Jessicha Kealoha", role: "CSR" },
+  { value: "asa_nagata", label: "Asa Nagata", role: "CSR" },
+  { value: "kylen_malepeai", label: "Kylen Malepeai", role: "CSR" },
+  { value: "nelin_cadena", label: "Nelin Cadena", role: "CSR" },
+  // Customer Service Managers
+  { value: "ian_mothered", label: "Ian Mothered", role: "Manager" },
+  { value: "rubi_guerra", label: "Rubi Guerra", role: "Manager" },
+  // Shift Supervisors
+  { value: "kevin_pedersen", label: "Kevin Pedersen", role: "Supervisor" },
 ] as const;
 
 // Helper function to get staff member display name from ID
@@ -14,16 +21,25 @@ export function getStaffMemberName(id: string): string {
   return member?.label || id;
 }
 
+// Pilots with initials for Google Drive folder structure
 export const PILOTS = [
-  { value: "captain_mike", label: "Captain Mike" },
-  { value: "captain_sarah", label: "Captain Sarah" },
-  { value: "captain_tom", label: "Captain Tom" },
-  { value: "captain_lisa", label: "Captain Lisa" },
+  { value: "SK", label: "Shawn Konzal", initials: "SK" },
+  { value: "JP", label: "Jeff Protocolo", initials: "JP" },
+  { value: "HR", label: "Herbert Rafol", initials: "HR" },
+  { value: "JO", label: "Jaedon Oliver", initials: "JO" },
+  { value: "TB", label: "Travis Bartholomew", initials: "TB" },
+  { value: "JL", label: "Josh LaBonte", initials: "JL" },
+  { value: "TC", label: "Tianna Castillo", initials: "TC" },
 ] as const;
 
 export function getPilotName(id: string): string {
   const pilot = PILOTS.find(p => p.value === id);
   return pilot?.label || id;
+}
+
+export function getPilotInitials(id: string): string {
+  const pilot = PILOTS.find(p => p.value === id);
+  return pilot?.initials || id;
 }
 
 export const FLIGHT_TIMES = [

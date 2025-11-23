@@ -372,12 +372,21 @@ export class GoogleDriveOAuth {
       const month = `${(date.getMonth() + 1).toString().padStart(2, '0')}-${monthNames[date.getMonth()]}`;
       const day = date.getDate().toString().padStart(2, '0');
 
-      // Get pilot initials from pilot name (e.g., "captain_mike" -> "CM", "Captain Sarah" -> "CS")
-      const pilotInitials = pilotName
-        .replace('captain_', '')
-        .split(/[\s_]+/)
-        .map(word => word.charAt(0).toUpperCase())
-        .join('');
+      // Get pilot initials - the value passed should already be initials (e.g., "SK", "JP")
+      // If it's a 2-3 character uppercase string, use it directly
+      // Otherwise fall back to extracting initials from full name
+      let pilotInitials: string;
+      if (pilotName.length <= 3 && /^[A-Z]+$/.test(pilotName)) {
+        // Already initials format (e.g., "SK", "JP", "HR")
+        pilotInitials = pilotName;
+      } else {
+        // Legacy format - extract initials from name (e.g., "captain_mike" -> "CM")
+        pilotInitials = pilotName
+          .replace('captain_', '')
+          .split(/[\s_]+/)
+          .map(word => word.charAt(0).toUpperCase())
+          .join('');
+      }
 
       // Calculate flight number based on time (count of flights that day)
       // For now, use time-based numbering: format time as flight number
