@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import PhaseNavigation from "@/components/PhaseNavigation";
 import ExportWorkflow from "@/components/ExportWorkflow";
-import SlotSelector from "@/components/SlotSelector";
+import UnifiedTimeline from "@/components/UnifiedTimeline";
 import { SLOT_TEMPLATE } from "@shared/schema";
 import { usePilot } from "@/contexts/PilotContext";
 import { ArrowLeft, Download, Play, Volume2, VolumeX } from "lucide-react";
@@ -30,7 +30,7 @@ export default function EditorArrival() {
   const [slotSelections, setSlotSelections] = useState<SlotSelection[]>(
     SLOT_TEMPLATE.filter(s => s.sceneType === 'arrival').map(slot => ({
       slotNumber: slot.slotNumber,
-      windowStart: 0,
+      windowStart: -1, // -1 indicates "not yet positioned" - will be spread when duration is known
     }))
   );
   const [currentRecordingId, setCurrentRecordingId] = useState<string | null>(null);
@@ -115,6 +115,22 @@ export default function EditorArrival() {
         
         if (videos.camera1 || videos.camera2) {
           setSceneVideos(videos);
+
+          // Spread markers evenly across the actual scene duration if not yet positioned
+          const actualDuration = videos.duration || 30;
+          setSlotSelections(prev => {
+            const needsSpread = prev.some(s => s.windowStart < 0);
+            if (needsSpread) {
+              const slots = SLOT_TEMPLATE.filter(s => s.sceneType === 'arrival');
+              return prev.map((slot, index) => ({
+                ...slot,
+                windowStart: slot.windowStart < 0
+                  ? Math.min((index / Math.max(slots.length, 1)) * (actualDuration * 0.8), actualDuration - (slots[index]?.duration || 1))
+                  : slot.windowStart
+              }));
+            }
+            return prev;
+          });
         } else {
           // No videos found for current session, clear any existing videos
           console.log('🔄 No arrival videos found for current session, clearing display');
@@ -399,39 +415,15 @@ export default function EditorArrival() {
             </Card>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-1 h-8 bg-green-500 rounded-full" />
-              <h2 className="text-2xl font-semibold text-foreground">Select 3-Second Windows</h2>
-              <span className="text-sm text-muted-foreground">
-                (Click a slot to activate and preview)
-              </span>
-            </div>
-            <div className="grid md:grid-cols-2 gap-4">
-              {arrivalSlots.map(slot => {
-                const selection = slotSelections.find(s => s.slotNumber === slot.slotNumber);
-                const isActive = activeSlot === slot.slotNumber;
-                return (
-                  <div
-                    key={slot.slotNumber}
-                    onClick={() => handleSlotClick(slot.slotNumber)}
-                    className={`cursor-pointer transition-all ${isActive ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}
-                    data-testid={`slot-card-${slot.slotNumber}`}
-                  >
-                    <SlotSelector
-                      slotNumber={slot.slotNumber}
-                      sceneDuration={sceneVideos.duration || 30}
-                      windowStart={selection?.windowStart || 0}
-                      onWindowStartChange={(newStart) => handleWindowStartChange(slot.slotNumber, newStart)}
-                      color={slot.color}
-                      sceneType={slot.sceneType}
-                      cameraAngle={slot.cameraAngle}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          {/* Unified Timeline */}
+          <UnifiedTimeline
+            sceneType="arrival"
+            sceneDuration={sceneVideos.duration || 30}
+            slotSelections={slotSelections}
+            activeSlot={activeSlot}
+            onSlotClick={handleSlotClick}
+            onWindowStartChange={handleWindowStartChange}
+          />
         </div>
       </main>
 
