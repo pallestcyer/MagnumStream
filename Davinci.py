@@ -734,16 +734,21 @@ class DaVinciAutomation:
             return "Customer"
     
     def _save_project(self, project_name):
-        """DO NOT save the template - render without saving to preserve template integrity"""
+        """Skip saving to preserve template - render directly from memory"""
         try:
             # CRITICAL: Do NOT save the project!
-            # Saving would corrupt the template by persisting the replaced clips.
-            # DaVinci can render without saving, and we want the template to remain pristine
-            # for the next render job.
+            #
+            # Why: MediaPoolItem.ReplaceClip modifies the source file references in the
+            # media pool. If we save, those changes persist to the template and corrupt
+            # future renders (slots get mixed up because they all point to the wrong files).
+            #
+            # Solution: Don't save at all. DaVinci can render directly from the in-memory
+            # state. After render completes, we close the project without saving, and the
+            # template remains pristine for the next render job.
 
-            logger.info(f"⚠️ Skipping project save to preserve template integrity")
-            logger.info(f"   Template '{TEMPLATE_PROJECT_NAME}' will NOT be modified")
-            logger.info(f"   Clips replaced in memory only - will render then discard changes")
+            logger.info(f"⏭️ Skipping save to preserve template integrity")
+            logger.info(f"   Rendering directly from in-memory state")
+            logger.info(f"   Template '{TEMPLATE_PROJECT_NAME}' will NOT be modified on disk")
             return True
 
         except Exception as e:
