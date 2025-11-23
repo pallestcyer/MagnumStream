@@ -500,7 +500,8 @@ class DaVinciAutomation:
 
             logger.info(f"📦 Successfully imported {len(imported_clips)}/{len(clips)} clips")
 
-            # STEP 2: Get timeline items and create a mapping by frame position
+            # STEP 2: DYNAMIC ANALYSIS - Scan V3 track and map clips by slot number from filename
+            # This approach doesn't rely on hardcoded frame positions
             track_index = 3  # All clips are on track V3
             timeline_items = self.timeline.GetItemListInTrack('video', track_index)
             logger.info(f"🔍 Found {len(timeline_items)} items on video track V{track_index}")
@@ -510,63 +511,78 @@ class DaVinciAutomation:
                 logger.warning(f"⚠️ Expected 14 timeline items but found {len(timeline_items)}")
                 logger.warning(f"   Template may have been modified or contains extra/missing clips")
 
-            # Create mapping of start_frame -> timeline_item
-            # Also track which items we've already processed to prevent duplicates
-            frame_to_item = {}
-            processed_items = set()  # Track items by their start frame to avoid duplicates
+            # Create mapping of slot_number -> timeline_item based on clip filename
+            # Template clips should be named like "slot_1_cruising_cam1.mp4"
+            import re
+            slot_to_item = {}
 
+            logger.info(f"📊 Analyzing timeline clips on V{track_index}:")
             for item in timeline_items:
-                start = item.GetStart()
-                if start is not None:
-                    frame_to_item[start] = item
-                    logger.debug(f"   Frame {start}: timeline item found")
+                media_pool_item = item.GetMediaPoolItem()
+                if media_pool_item:
+                    clip_name = media_pool_item.GetName()
+                    start_frame = item.GetStart()
 
-            # Log all expected vs actual frame positions for debugging
-            logger.info(f"📊 Frame position mapping:")
-            for slot_num in sorted(CLIP_POSITIONS.keys()):
-                expected_frame = CLIP_POSITIONS[slot_num]['start_frame']
-                found = "✓" if expected_frame in frame_to_item else "✗"
-                logger.info(f"   Slot {slot_num}: frame {expected_frame} {found}")
+                    # Extract slot number from filename like "slot_1_cruising_cam1.mp4"
+                    match = re.search(r'slot_(\d+)_', clip_name)
+                    if match:
+                        slot_num = int(match.group(1))
+                        slot_to_item[slot_num] = {
+                            'item': item,
+                            'media_pool_item': media_pool_item,
+                            'clip_name': clip_name,
+                            'start_frame': start_frame
+                        }
+                        logger.info(f"   Found slot {slot_num}: '{clip_name}' at frame {start_frame}")
+                    else:
+                        logger.warning(f"   ⚠️ Could not extract slot number from: '{clip_name}' at frame {start_frame}")
 
-            # STEP 3: Replace each clip - process in slot order to ensure consistency
+            # Validate we found all 14 slots
+            found_slots = sorted(slot_to_item.keys())
+            expected_slots = list(range(1, 15))
+            missing_slots = [s for s in expected_slots if s not in found_slots]
+
+            if missing_slots:
+                logger.error(f"❌ Missing slots in template: {missing_slots}")
+                logger.error(f"   Found slots: {found_slots}")
+                return False
+
+            logger.info(f"✅ All 14 slots found in template: {found_slots}")
+
+            # STEP 3: Replace each clip by matching slot numbers
             replaced_slots = []
+            processed_slots = set()
 
             for slot_number in sorted(imported_clips.keys()):
                 clip_data = imported_clips[slot_number]
                 logger.info(f"🎬 Processing slot {slot_number}")
 
-                if slot_number not in CLIP_POSITIONS:
-                    logger.warning(f"⚠️ No position defined for slot {slot_number}")
+                # Check if we've already processed this slot (prevent duplicates)
+                if slot_number in processed_slots:
+                    logger.error(f"❌ Slot {slot_number} already processed! Skipping duplicate")
                     continue
 
-                position = CLIP_POSITIONS[slot_number]
-                start_frame = position['start_frame']
-
-                # Check if we've already processed this frame position (prevent duplicates)
-                if start_frame in processed_items:
-                    logger.error(f"❌ Frame {start_frame} already processed! Skipping duplicate slot {slot_number}")
+                # Find the timeline item for this slot number
+                if slot_number not in slot_to_item:
+                    logger.error(f"❌ No timeline item found for slot {slot_number}")
+                    logger.error(f"   Available slots: {sorted(slot_to_item.keys())}")
                     continue
 
-                # Find the timeline item at this EXACT position only
-                target_item = frame_to_item.get(start_frame)
+                slot_info = slot_to_item[slot_number]
+                target_item = slot_info['item']
 
-                if not target_item:
-                    logger.error(f"❌ No timeline item found at frame {start_frame} for slot {slot_number}")
-                    logger.error(f"   Available frames: {sorted(frame_to_item.keys())}")
-                    continue
-
-                # Mark this frame as processed
-                processed_items.add(start_frame)
+                # Mark this slot as processed
+                processed_slots.add(slot_number)
 
                 new_media_item = clip_data['media_item']
                 new_clip_path = clip_data['path']
                 new_filename = clip_data['clip_info']['filename']
                 replaced = False
 
-                # Get current media info for verification
-                current_media = target_item.GetMediaPoolItem()
-                current_name = current_media.GetName() if current_media else "Unknown"
-                logger.info(f"   Current clip: {current_name}")
+                # Get current media info from our pre-scanned data
+                current_name = slot_info['clip_name']
+                current_frame = slot_info['start_frame']
+                logger.info(f"   Current clip: {current_name} (frame {current_frame})")
                 logger.info(f"   New clip: {new_filename}")
 
                 # PRIMARY METHOD: Use AddTake + SelectTake + FinalizeTake
