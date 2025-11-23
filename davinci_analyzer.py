@@ -24,8 +24,8 @@ except ImportError:
 # ============================================================================
 
 # Template project settings
-TEMPLATE_PROJECT_NAME = "MagnumPI_Template"  # Your template project name
-TIMELINE_NAME = "Main Timeline"  # Timeline to analyze
+TEMPLATE_PROJECT_NAME = "MAG_FERRARI-NEW"  # Your template project name
+TIMELINE_NAME = "MAG_FERARRI"  # Timeline to analyze
 OUTPUT_FILE = "clip_positions.json"  # Output file for analysis results
 
 # Logging setup
