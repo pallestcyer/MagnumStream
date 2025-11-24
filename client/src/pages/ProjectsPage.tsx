@@ -82,6 +82,10 @@ export default function ProjectsPage() {
       if (!res.ok) throw new Error("Failed to fetch projects");
       return res.json();
     },
+    // Poll every 5 seconds to update render status
+    refetchInterval: 5000,
+    // Also refetch when window regains focus
+    refetchOnWindowFocus: true,
   });
 
   const createProjectMutation = useMutation({

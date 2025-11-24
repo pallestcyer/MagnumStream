@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { videoStorage } from "@/utils/videoStorage";
 import {
   Dialog,
@@ -30,6 +31,7 @@ interface ExportWorkflowProps {
 type ExportStage = "davinci" | "drive" | "complete"; // | "sms" - SMS feature disabled for now
 
 export default function ExportWorkflow({ open, onOpenChange, flightDate, flightTime }: ExportWorkflowProps) {
+  const [, setLocation] = useLocation();
   const [stage, setStage] = useState<ExportStage>("davinci");
   const [progress, setProgress] = useState(0);
   // const [phoneNumber, setPhoneNumber] = useState(""); // Unused - SMS feature disabled
@@ -384,11 +386,14 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
                 )}
               </div>
               <Button
-                onClick={() => onOpenChange(false)}
+                onClick={() => {
+                  onOpenChange(false);
+                  setLocation('/projects');
+                }}
                 className="mt-4"
                 data-testid="button-close-export"
               >
-                Close
+                Go to Projects
               </Button>
             </div>
           )}
