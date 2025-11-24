@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
@@ -75,6 +75,11 @@ export default function ProjectsPage() {
   const [photosProject, setPhotosProject] = useState<FlightRecording | null>(null);
   const [uploadedPhotos, setUploadedPhotos] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   const { data: projects = [], isLoading } = useQuery<FlightRecording[]>({
     queryKey: ["/api/recordings"],
