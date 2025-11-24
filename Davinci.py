@@ -921,14 +921,73 @@ class DaVinciAutomation:
                     except Exception as e:
                         logger.warning(f"   TimelineItem.ReplaceClip failed: {e}")
 
-                # METHOD 3: MediaPoolItem.ReplaceClip
-                # WARNING: This modifies the source file reference globally, which means:
-                # - If the template reuses media pool items, multiple positions get affected
-                # - The template will be modified (we close without saving to prevent persistence)
-                # This is currently the ONLY method that works in DaVinci Resolve
+                # METHOD 3: Delete and Re-add (safest - doesn't modify media pool items)
+                # This deletes the existing timeline item and adds the new clip at the same position
+                # Note: This will lose any effects/transforms on the clip, but preserves template integrity
                 if not replaced:
                     try:
-                        logger.info(f"   Attempting MediaPoolItem.ReplaceClip...")
+                        logger.info(f"   Attempting Delete-and-Add method...")
+
+                        # Get the existing clip's timeline position info
+                        existing_start = target_item.GetStart()
+                        existing_duration = target_item.GetDuration()
+                        existing_end = target_item.GetEnd()
+                        track_index = 3  # V3 track
+
+                        logger.info(f"   Existing clip: start={existing_start}, duration={existing_duration}, end={existing_end}")
+
+                        # Get the new clip's source frame range
+                        new_clip_props = new_media_item.GetClipProperty() if new_media_item else {}
+                        source_start = int(new_clip_props.get('Start', 0))
+                        source_end = int(new_clip_props.get('End', new_clip_props.get('Frames', 100) - 1))
+                        logger.info(f"   New clip source range: {source_start} - {source_end}")
+
+                        # Delete the existing timeline item
+                        logger.info(f"   Deleting existing timeline item...")
+                        delete_result = self.timeline.DeleteClips([target_item], False)
+                        logger.info(f"   DeleteClips result: {delete_result}")
+
+                        if delete_result:
+                            # Add the new clip at the same timeline position
+                            clip_info = {
+                                "mediaPoolItem": new_media_item,
+                                "startFrame": source_start,
+                                "endFrame": source_end,
+                                "mediaType": 1,  # Video only
+                                "trackIndex": track_index,
+                                "recordFrame": existing_start  # Timeline position
+                            }
+                            logger.info(f"   Adding new clip with clipInfo: recordFrame={existing_start}, trackIndex={track_index}")
+
+                            append_result = self.media_pool.AppendToTimeline([clip_info])
+                            logger.info(f"   AppendToTimeline result: {append_result}")
+
+                            if append_result and len(append_result) > 0:
+                                replaced_slots.append(slot_number)
+                                replaced = True
+                                replacement_methods[slot_number] = "Delete-and-Add"
+                                logger.info(f"✅ Slot {slot_number}: Delete-and-Add succeeded")
+                            else:
+                                logger.warning(f"   AppendToTimeline returned empty/None")
+                                # Try without recordFrame as fallback
+                                logger.info(f"   Trying AppendToTimeline without recordFrame...")
+                                simple_result = self.media_pool.AppendToTimeline([new_media_item])
+                                if simple_result:
+                                    logger.warning(f"   ⚠️ Clip added but may be at wrong position!")
+                        else:
+                            logger.warning(f"   DeleteClips failed")
+
+                    except Exception as e:
+                        logger.warning(f"   Delete-and-Add method failed: {e}")
+                        import traceback
+                        logger.warning(traceback.format_exc())
+
+                # METHOD 4: MediaPoolItem.ReplaceClip (LAST RESORT - corrupts template!)
+                # WARNING: This modifies the source file reference globally
+                # Only use this if all other methods fail
+                if not replaced:
+                    try:
+                        logger.warning(f"   ⚠️ Falling back to MediaPoolItem.ReplaceClip (may corrupt template)...")
 
                         original_media = slot_info.get('media_pool_item')
                         if original_media and hasattr(original_media, 'ReplaceClip'):
@@ -943,7 +1002,7 @@ class DaVinciAutomation:
                                 replaced_slots.append(slot_number)
                                 replaced = True
                                 replacement_methods[slot_number] = "MediaPoolItem.ReplaceClip"
-                                logger.info(f"✅ Slot {slot_number}: MediaPoolItem.ReplaceClip succeeded")
+                                logger.warning(f"✅ Slot {slot_number}: MediaPoolItem.ReplaceClip succeeded (template may be corrupted)")
                         else:
                             logger.warning(f"   MediaPoolItem.ReplaceClip not available")
                     except Exception as e:
