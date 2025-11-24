@@ -379,11 +379,6 @@ export default function ExportWorkflow({ open, onOpenChange, flightDate, flightT
                 <p className="text-sm text-muted-foreground">
                   Video has been rendered and uploaded to Google Drive
                 </p>
-                {driveUrl && (
-                  <p className="text-xs text-muted-foreground">
-                    You can access it from the History or Sales page
-                  </p>
-                )}
               </div>
               <Button
                 onClick={() => {
