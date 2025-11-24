@@ -672,18 +672,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
 
           console.log(`📸 Uploading ${files.length} photos for recording ${recordingId}`);
+          console.log(`📁 Photos folder ID: ${photosFolderId}`);
 
           // Upload each photo
           const uploadResults = [];
+          const errors = [];
           for (const file of files) {
-            const result = await driveOAuth.uploadFileToFolder(
-              photosFolderId,
-              file.originalname,
-              file.buffer,
-              file.mimetype
-            );
-            if (result) {
-              uploadResults.push(result);
+            console.log(`📤 Uploading: ${file.originalname} (${file.size} bytes, ${file.mimetype})`);
+            try {
+              const result = await driveOAuth.uploadFileToFolder(
+                photosFolderId,
+                file.originalname,
+                file.buffer,
+                file.mimetype
+              );
+              if (result) {
+                uploadResults.push(result);
+                console.log(`✅ Upload success: ${file.originalname}`);
+              } else {
+                console.log(`⚠️ Upload returned null for: ${file.originalname}`);
+                errors.push({ file: file.originalname, error: 'Upload returned null' });
+              }
+            } catch (uploadError: any) {
+              console.error(`❌ Upload failed for ${file.originalname}:`, uploadError.message);
+              errors.push({ file: file.originalname, error: uploadError.message });
             }
           }
 
@@ -694,12 +706,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
 
           console.log(`✅ Uploaded ${uploadResults.length}/${files.length} photos`);
+          if (errors.length > 0) {
+            console.log(`⚠️ ${errors.length} errors:`, JSON.stringify(errors));
+          }
 
           res.json({
-            success: true,
+            success: uploadResults.length > 0,
             uploaded: uploadResults.length,
             total: files.length,
-            files: uploadResults
+            files: uploadResults,
+            errors: errors.length > 0 ? errors : undefined
           });
 
         } catch (error: any) {
