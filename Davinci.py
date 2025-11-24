@@ -271,12 +271,22 @@ class DaVinciAutomation:
             return False
     
     def _load_template_project(self):
-        """Load the template project and create a working copy to preserve the original"""
+        """Load the template project, creating a true copy via export/import to preserve the original"""
         try:
             # First, close any currently open project
             current = self.project_manager.GetCurrentProject()
             if current:
                 self.project_manager.CloseProject(current)
+
+            # Clean up any old working copies first
+            existing_projects = self.project_manager.GetProjectListInCurrentFolder()
+            for proj_name in existing_projects:
+                if proj_name.startswith("_WORKING_"):
+                    logger.info(f"🗑️ Deleting old working copy: {proj_name}")
+                    try:
+                        self.project_manager.DeleteProject(proj_name)
+                    except:
+                        pass
 
             # Load template
             template_project = self.project_manager.LoadProject(TEMPLATE_PROJECT_NAME)
@@ -285,60 +295,62 @@ class DaVinciAutomation:
 
             logger.info(f"✅ Loaded template project: {TEMPLATE_PROJECT_NAME}")
 
-            # CRITICAL: Create a working copy to preserve the original template
+            # CRITICAL: Create a TRUE copy via export/import to preserve the original template
             # MediaPoolItem.ReplaceClip writes directly to DaVinci's database,
-            # bypassing the normal save mechanism. Working on a copy ensures
-            # the original template is never modified.
+            # bypassing the normal save mechanism. A true copy isolates changes.
             working_name = f"_WORKING_{TEMPLATE_PROJECT_NAME}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-            # Save as new project (creates a copy)
-            save_result = self.project_manager.SaveProject()
-            if not save_result:
-                logger.warning("Could not save template before copying")
-
-            # Export and re-import would be cleaner, but SaveAs is simpler
-            # Use CreateProject + import timeline approach if SaveAs doesn't work
-
-            # Try SaveProject with new name (some versions support this)
-            # If not, we'll use the project as-is but warn the user
+            # Try export/import approach for a true copy
             try:
-                # Close template first
-                self.project_manager.CloseProject(template_project)
+                import tempfile
+                export_path = Path(tempfile.gettempdir()) / f"{working_name}.drp"
 
-                # Check if a working copy already exists and delete it
-                existing_projects = self.project_manager.GetProjectListInCurrentFolder()
-                for proj_name in existing_projects:
-                    if proj_name.startswith("_WORKING_"):
-                        logger.info(f"🗑️ Deleting old working copy: {proj_name}")
-                        self.project_manager.DeleteProject(proj_name)
+                logger.info(f"📦 Exporting template to create working copy...")
 
-                # Reload template
-                template_project = self.project_manager.LoadProject(TEMPLATE_PROJECT_NAME)
-                if not template_project:
-                    raise Exception("Could not reload template after cleanup")
+                # Export the template project
+                export_result = self.project_manager.ExportProject(
+                    template_project.GetName(),
+                    str(export_path),
+                    withStillsAndLUTs=False
+                )
 
-                # Create working copy by saving with new name
-                # Note: SetName + SaveProject creates a new project entry
-                original_name = template_project.GetName()
-                template_project.SetName(working_name)
+                if export_result and export_path.exists():
+                    logger.info(f"✅ Template exported to: {export_path}")
 
-                if self.project_manager.SaveProject():
-                    logger.info(f"✅ Created working copy: {working_name}")
-                    self.working_copy_name = working_name
-                    self.current_project = template_project
+                    # Close the template (we don't want to modify it)
+                    self.project_manager.CloseProject(template_project)
+
+                    # Import as a new project with working name
+                    import_result = self.project_manager.ImportProject(str(export_path), working_name)
+
+                    if import_result:
+                        # Load the imported working copy
+                        self.current_project = self.project_manager.LoadProject(working_name)
+                        if self.current_project:
+                            logger.info(f"✅ Created isolated working copy: {working_name}")
+                            self.working_copy_name = working_name
+                        else:
+                            raise Exception("Could not load imported working copy")
+                    else:
+                        raise Exception("ImportProject failed")
+
+                    # Clean up the export file
+                    try:
+                        export_path.unlink()
+                    except:
+                        pass
                 else:
-                    # Revert name and work on original (with warning)
-                    template_project.SetName(original_name)
-                    logger.warning("⚠️ Could not create working copy - working on original template")
-                    logger.warning("   MediaPoolItem.ReplaceClip may permanently modify the template!")
-                    self.working_copy_name = None
-                    self.current_project = template_project
+                    raise Exception(f"ExportProject failed or file not created")
 
             except Exception as copy_error:
-                logger.warning(f"⚠️ Working copy creation failed: {copy_error}")
-                logger.warning("   Proceeding with original template (risky)")
+                logger.warning(f"⚠️ Export/Import copy failed: {copy_error}")
+                logger.warning(f"   Falling back to direct template usage")
+                logger.warning(f"   ⚠️ MediaPoolItem.ReplaceClip WILL modify the template!")
+                logger.warning(f"   You may need to restore from backup after this render.")
+
                 self.working_copy_name = None
-                # Reload template if needed
+
+                # Make sure template is loaded
                 if not self.project_manager.GetCurrentProject():
                     self.current_project = self.project_manager.LoadProject(TEMPLATE_PROJECT_NAME)
                 else:
@@ -1006,7 +1018,7 @@ class DaVinciAutomation:
             return False
 
     def _close_project_without_saving(self):
-        """Close current project and delete working copy to keep project list clean"""
+        """Close current project and delete working copy if one was created"""
         try:
             if self.current_project:
                 project_name = self.current_project.GetName()
@@ -1015,13 +1027,14 @@ class DaVinciAutomation:
                 # Close the project first
                 self.project_manager.CloseProject(self.current_project)
 
-                # If this was a working copy, delete it to keep project list clean
+                # If this was a working copy (created via export/import), delete it
+                # This is safe because it's a TRUE copy, not the original template
                 if self.working_copy_name:
                     logger.info(f"🗑️ Deleting working copy: {self.working_copy_name}")
                     try:
                         delete_result = self.project_manager.DeleteProject(self.working_copy_name)
                         if delete_result:
-                            logger.info(f"✅ Working copy deleted successfully")
+                            logger.info(f"✅ Working copy deleted - template preserved")
                         else:
                             logger.warning(f"⚠️ Could not delete working copy (may need manual cleanup)")
                     except Exception as del_error:
