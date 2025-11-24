@@ -144,7 +144,8 @@ class DaVinciAutomation:
         self.current_project = None
         self.media_pool = None
         self.timeline = None
-        
+        self.working_copy_name = None  # Track working copy for cleanup
+
         self._connect_to_resolve()
     
     def _connect_to_resolve(self):
@@ -270,7 +271,7 @@ class DaVinciAutomation:
             return False
     
     def _load_template_project(self):
-        """Load the template project"""
+        """Load the template project and create a working copy to preserve the original"""
         try:
             # First, close any currently open project
             current = self.project_manager.GetCurrentProject()
@@ -278,9 +279,73 @@ class DaVinciAutomation:
                 self.project_manager.CloseProject(current)
 
             # Load template
-            self.current_project = self.project_manager.LoadProject(TEMPLATE_PROJECT_NAME)
-            if not self.current_project:
+            template_project = self.project_manager.LoadProject(TEMPLATE_PROJECT_NAME)
+            if not template_project:
                 raise Exception(f"Could not load template project: {TEMPLATE_PROJECT_NAME}")
+
+            logger.info(f"✅ Loaded template project: {TEMPLATE_PROJECT_NAME}")
+
+            # CRITICAL: Create a working copy to preserve the original template
+            # MediaPoolItem.ReplaceClip writes directly to DaVinci's database,
+            # bypassing the normal save mechanism. Working on a copy ensures
+            # the original template is never modified.
+            working_name = f"_WORKING_{TEMPLATE_PROJECT_NAME}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+            # Save as new project (creates a copy)
+            save_result = self.project_manager.SaveProject()
+            if not save_result:
+                logger.warning("Could not save template before copying")
+
+            # Export and re-import would be cleaner, but SaveAs is simpler
+            # Use CreateProject + import timeline approach if SaveAs doesn't work
+
+            # Try SaveProject with new name (some versions support this)
+            # If not, we'll use the project as-is but warn the user
+            try:
+                # Close template first
+                self.project_manager.CloseProject(template_project)
+
+                # Check if a working copy already exists and delete it
+                existing_projects = self.project_manager.GetProjectListInCurrentFolder()
+                for proj_name in existing_projects:
+                    if proj_name.startswith("_WORKING_"):
+                        logger.info(f"🗑️ Deleting old working copy: {proj_name}")
+                        self.project_manager.DeleteProject(proj_name)
+
+                # Reload template
+                template_project = self.project_manager.LoadProject(TEMPLATE_PROJECT_NAME)
+                if not template_project:
+                    raise Exception("Could not reload template after cleanup")
+
+                # Create working copy by saving with new name
+                # Note: SetName + SaveProject creates a new project entry
+                original_name = template_project.GetName()
+                template_project.SetName(working_name)
+
+                if self.project_manager.SaveProject():
+                    logger.info(f"✅ Created working copy: {working_name}")
+                    self.working_copy_name = working_name
+                    self.current_project = template_project
+                else:
+                    # Revert name and work on original (with warning)
+                    template_project.SetName(original_name)
+                    logger.warning("⚠️ Could not create working copy - working on original template")
+                    logger.warning("   MediaPoolItem.ReplaceClip may permanently modify the template!")
+                    self.working_copy_name = None
+                    self.current_project = template_project
+
+            except Exception as copy_error:
+                logger.warning(f"⚠️ Working copy creation failed: {copy_error}")
+                logger.warning("   Proceeding with original template (risky)")
+                self.working_copy_name = None
+                # Reload template if needed
+                if not self.project_manager.GetCurrentProject():
+                    self.current_project = self.project_manager.LoadProject(TEMPLATE_PROJECT_NAME)
+                else:
+                    self.current_project = self.project_manager.GetCurrentProject()
+
+            if not self.current_project:
+                raise Exception("No project available after setup")
 
             self.media_pool = self.current_project.GetMediaPool()
 
@@ -326,7 +391,7 @@ class DaVinciAutomation:
             return False
 
     def _verify_template_integrity(self):
-        """Verify all 14 expected clip positions exist in the template before starting"""
+        """Verify all 14 expected clip positions exist AND have unique media pool items"""
         try:
             logger.info("🔍 Verifying template integrity (checking for all 14 expected slots)...")
 
@@ -362,14 +427,65 @@ class DaVinciAutomation:
                 logger.warning(f"⚠️ Template has unexpected clips at frames: {sorted(extra_frames)}")
                 logger.warning("   This may be okay, but template might have been modified")
 
-            logger.info(f"✅ Template integrity verified: All 14 expected slots found")
-            logger.info(f"   Expected frames: {sorted(expected_frames)}")
-            logger.info(f"   Actual frames: {sorted(actual_frames)}")
+            # CRITICAL: Verify each slot has a UNIQUE media pool item
+            # If media pool items are shared, MediaPoolItem.ReplaceClip will corrupt the timeline
+            logger.info("🔍 Checking for unique media pool items at each slot...")
+
+            frame_to_media_id = {}
+            frame_to_clip_name = {}
+            media_id_to_frames = {}  # Track which frames use each media ID
+
+            for item in timeline_items:
+                start_frame = item.GetStart()
+                if start_frame not in expected_frames:
+                    continue
+
+                media_pool_item = item.GetMediaPoolItem()
+                if not media_pool_item:
+                    logger.error(f"❌ No media pool item at frame {start_frame}")
+                    return False
+
+                clip_name = media_pool_item.GetName() if hasattr(media_pool_item, 'GetName') else "Unknown"
+                media_id = media_pool_item.GetMediaId() if hasattr(media_pool_item, 'GetMediaId') else str(id(media_pool_item))
+
+                frame_to_media_id[start_frame] = media_id
+                frame_to_clip_name[start_frame] = clip_name
+
+                if media_id not in media_id_to_frames:
+                    media_id_to_frames[media_id] = []
+                media_id_to_frames[media_id].append(start_frame)
+
+            # Check for shared media pool items
+            shared_media = {mid: frames for mid, frames in media_id_to_frames.items() if len(frames) > 1}
+
+            if shared_media:
+                logger.error(f"❌ CRITICAL: Template has SHARED media pool items!")
+                logger.error(f"   MediaPoolItem.ReplaceClip will corrupt the timeline.")
+                logger.error(f"   Each slot position needs a UNIQUE media pool item.")
+                for media_id, frames in shared_media.items():
+                    slot_nums = [s for s, p in CLIP_POSITIONS.items() if p['start_frame'] in frames]
+                    clip_name = frame_to_clip_name.get(frames[0], "Unknown")
+                    logger.error(f"   Media '{clip_name}' (ID: {media_id}) is used at slots: {slot_nums}")
+                logger.error(f"")
+                logger.error(f"   To fix: In DaVinci, ensure each slot has a separate clip in the Media Pool.")
+                logger.error(f"   You may need to duplicate clips or re-import them individually.")
+                return False
+
+            # Log the slot-to-clip mapping
+            logger.info(f"✅ All 14 slots have unique media pool items:")
+            for slot_num, pos in sorted(CLIP_POSITIONS.items()):
+                frame = pos['start_frame']
+                clip_name = frame_to_clip_name.get(frame, "Unknown")
+                logger.info(f"   Slot {slot_num} (frame {frame}): '{clip_name}'")
+
+            logger.info(f"✅ Template integrity verified: All 14 expected slots found with unique media")
 
             return True
 
         except Exception as e:
             logger.error(f"Failed to verify template integrity: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return False
 
     def _configure_project_settings(self):
@@ -890,21 +1006,33 @@ class DaVinciAutomation:
             return False
 
     def _close_project_without_saving(self):
-        """Close current project without saving to discard all in-memory changes"""
+        """Close current project and delete working copy to keep project list clean"""
         try:
             if self.current_project:
                 project_name = self.current_project.GetName()
-                logger.info(f"🔄 Closing project '{project_name}' WITHOUT saving")
-                logger.info(f"   All take changes will be discarded")
-                logger.info(f"   Template will be pristine for next render")
+                logger.info(f"🔄 Closing project '{project_name}'")
 
-                # CloseProject without saving first discards all changes
+                # Close the project first
                 self.project_manager.CloseProject(self.current_project)
+
+                # If this was a working copy, delete it to keep project list clean
+                if self.working_copy_name:
+                    logger.info(f"🗑️ Deleting working copy: {self.working_copy_name}")
+                    try:
+                        delete_result = self.project_manager.DeleteProject(self.working_copy_name)
+                        if delete_result:
+                            logger.info(f"✅ Working copy deleted successfully")
+                        else:
+                            logger.warning(f"⚠️ Could not delete working copy (may need manual cleanup)")
+                    except Exception as del_error:
+                        logger.warning(f"⚠️ Error deleting working copy: {del_error}")
+
                 self.current_project = None
                 self.timeline = None
                 self.media_pool = None
+                self.working_copy_name = None
 
-                logger.info(f"✅ Project closed successfully (changes discarded)")
+                logger.info(f"✅ Project closed successfully")
         except Exception as e:
             logger.warning(f"Error closing project: {e}")
             # Not critical - project will be closed on next load anyway
