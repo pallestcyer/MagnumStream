@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
+import { GoogleDriveOAuth as GoogleDriveOAuthClass } from './GoogleDriveOAuth';
 
 // Slot template configuration
 interface SlotConfig {
@@ -407,62 +408,10 @@ class VideoOperations {
   }
 }
 
-// Simple OAuth helper for Vercel
-class SimpleGoogleDriveOAuth {
-  private oauth2Client: OAuth2Client;
-  private isAuthenticated: boolean = false;
-
-  constructor() {
-    this.oauth2Client = new OAuth2Client(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5000/auth/google/callback'
-    );
-
-    if (process.env.GOOGLE_REFRESH_TOKEN) {
-      this.oauth2Client.setCredentials({
-        refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-      });
-      this.isAuthenticated = true;
-    }
-  }
-
-  isReady(): boolean {
-    return this.isAuthenticated;
-  }
-
-  generateAuthUrl(): string {
-    return this.oauth2Client.generateAuthUrl({
-      access_type: 'offline',
-      scope: ['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/userinfo.email'],
-      prompt: 'consent'
-    });
-  }
-
-  async shareFolderWithEmail(folderId: string, customerEmail: string): Promise<boolean> {
-    try {
-      const drive = google.drive({ version: 'v3', auth: this.oauth2Client });
-      await drive.permissions.create({
-        fileId: folderId,
-        requestBody: {
-          role: 'reader',
-          type: 'user',
-          emailAddress: customerEmail
-        },
-        sendNotificationEmail: true,
-      });
-      return true;
-    } catch (error) {
-      console.error('Error sharing folder:', error);
-      return false;
-    }
-  }
-}
-
 let app: express.Application | null = null;
 const storage = new DatabaseStorage();
 const videoOps = new VideoOperations();
-const driveOAuth = new SimpleGoogleDriveOAuth();
+const driveOAuth = new GoogleDriveOAuthClass();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
