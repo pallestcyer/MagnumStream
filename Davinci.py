@@ -653,12 +653,13 @@ class DaVinciAutomation:
             timeline_items = self.timeline.GetItemListInTrack('video', track_index)
             logger.info(f"🔍 Found {len(timeline_items)} items on video track V{track_index}")
 
-            # VALIDATION: We expect exactly 14 slots on V3 (warmup clips should be on V1/V2)
+            # VALIDATION: We expect exactly 14 slots on V3 (warmup clips should be on V1, NOT V2)
+            # V2 is reserved for the main background video
             if len(timeline_items) < 14:
                 logger.warning(f"⚠️ Expected 14 timeline items on V3 but found {len(timeline_items)}")
                 logger.warning(f"   Template may have missing clips")
             elif len(timeline_items) == 14:
-                logger.info(f"✅ Found 14 timeline items on V3 (warmup clips should be on V1 or V2)")
+                logger.info(f"✅ Found 14 timeline items on V3 (warmup clips should be on V1 only)")
             else:
                 logger.warning(f"⚠️ Found {len(timeline_items)} items on V3, expected 14")
 
@@ -703,17 +704,18 @@ class DaVinciAutomation:
 
             logger.info(f"✅ All 14 slots mapped to timeline positions")
 
-            # WARMUP PHASE: Look for warmup clips on V1 or V2 (below the main V3 track)
-            # These are clips added specifically to "warm up" the AddTake API before processing real slots
+            # WARMUP PHASE: Look for warmup clips on V1 ONLY (below V2 and V3)
+            # CRITICAL: V2 contains the main background video used throughout the entire timeline
+            # We must NOT touch V2 clips or risk corrupting the background video
+            # Only V1 is safe for warmup clips
             warmup_items = []
-            for warmup_track in [1, 2]:  # Check V1 and V2
-                warmup_track_items = self.timeline.GetItemListInTrack('video', warmup_track)
-                if warmup_track_items:
-                    for item in warmup_track_items:
-                        media = item.GetMediaPoolItem()
-                        clip_name = media.GetName() if media else "Unknown (offline)"
-                        warmup_items.append({'item': item, 'media': media, 'name': clip_name, 'track': warmup_track})
-                        logger.info(f"🔥 Found warmup clip on V{warmup_track}: '{clip_name}'")
+            warmup_track_items = self.timeline.GetItemListInTrack('video', 1)  # V1 only
+            if warmup_track_items:
+                for item in warmup_track_items:
+                    media = item.GetMediaPoolItem()
+                    clip_name = media.GetName() if media else "Unknown (offline)"
+                    warmup_items.append({'item': item, 'media': media, 'name': clip_name, 'track': 1})
+                    logger.info(f"🔥 Found warmup clip on V1: '{clip_name}'")
 
             if warmup_items:
                 logger.info(f"🔥 WARMUP PHASE: Priming AddTake API with {len(warmup_items)} warmup clip(s)")
@@ -736,28 +738,20 @@ class DaVinciAutomation:
 
                     if first_imported:
                         try:
-                            # CRITICAL FIX: If warmup media is offline/missing, restore it first
-                            # The export/import to create working copy can break media references
-                            # We use MediaPoolItem.ReplaceClip to restore the warmup clip with valid media
-                            # This is SAFE because the warmup clip is sacrificial (not part of final render)
+                            # IMPORTANT: Do NOT use MediaPoolItem.ReplaceClip to restore warmup media!
+                            # The warmup clip on V2 might be the main background video used throughout
+                            # the timeline. ReplaceClip modifies the media pool item globally, which would
+                            # corrupt the background video everywhere it's used.
+                            #
+                            # Instead, we just try AddTake directly (even on offline clips). If it fails,
+                            # we move to the next warmup clip or create a fresh one programmatically.
+
                             if warmup_media is None or warmup_info['name'] == "Unknown (offline)":
-                                logger.warning(f"   ⚠️ Warmup clip media is offline! Attempting to restore...")
-                                # We can't restore a None media pool item, so try AddTake anyway
-                                # and hope the API still gets primed by the attempt
+                                logger.info(f"   ⚠️ Warmup clip media is offline, but trying AddTake anyway...")
                             else:
-                                # Check if the warmup media pool item is valid by trying to get its name
                                 try:
                                     test_name = warmup_media.GetName()
                                     logger.info(f"   Warmup media pool item is valid: '{test_name}'")
-
-                                    # RESTORE APPROACH: Use ReplaceClip on the warmup's media pool item
-                                    # to ensure it points to valid media (use the first imported clip's file)
-                                    if first_imported_path:
-                                        logger.info(f"   Restoring warmup media with: {first_imported_path}")
-                                        restore_result = warmup_media.ReplaceClip(first_imported_path)
-                                        logger.info(f"   ReplaceClip result: {restore_result}")
-                                        if restore_result:
-                                            logger.info(f"   ✅ Warmup media restored successfully")
                                 except Exception as test_e:
                                     logger.warning(f"   Warmup media pool item may be invalid: {test_e}")
 
@@ -835,7 +829,7 @@ class DaVinciAutomation:
                 if not warmup_succeeded:
                     logger.warning(f"   ⚠️ All warmup methods failed - first real slot may fail AddTake")
             else:
-                logger.info(f"ℹ️ No warmup clips found on V1/V2 - creating fresh warmup clip")
+                logger.info(f"ℹ️ No warmup clips found on V1 - creating fresh warmup clip")
                 # No existing warmup clips - create one fresh
                 first_imported = list(imported_clips.values())[0]['media_item'] if imported_clips else None
                 if first_imported:
