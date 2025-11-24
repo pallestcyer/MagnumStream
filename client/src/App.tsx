@@ -24,19 +24,19 @@ import NotFound from "@/pages/not-found";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={InfoPage} />
+      <Route path="/" component={ProjectsPage} />
+      <Route path="/projects" component={ProjectsPage} />
       <Route path="/recording" component={RecordingDashboard} />
       <Route path="/editor/cruising" component={EditorCruising} />
       <Route path="/editor/chase" component={EditorChase} />
       <Route path="/editor/arrival" component={EditorArrival} />
       <Route path="/editor" component={EditorCruising} />
       <Route path="/render" component={RenderPage} />
-      <Route path="/sales" component={SalesPage} />
+      {/* Sales and Info pages hidden - functionality merged into Projects */}
       <Route path="/history" component={HistoryPage} />
       <Route path="/manual" component={ManualPage} />
       <Route path="/chat" component={ChatPage} />
       <Route path="/issues" component={IssuesPage} />
-      <Route path="/projects" component={ProjectsPage} />
       <Route component={NotFound} />
     </Switch>
   );

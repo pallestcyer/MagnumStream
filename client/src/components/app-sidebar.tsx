@@ -12,32 +12,19 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import {
-  Home,
   History,
   BookOpen,
   MessageSquare,
   AlertCircle,
-  Video,
   Plane,
-  DollarSign,
   FolderKanban
 } from "lucide-react";
 
 const menuItems = [
   {
-    title: "Home",
-    url: "/",
-    icon: Home,
-  },
-  {
     title: "Projects",
-    url: "/projects",
+    url: "/",
     icon: FolderKanban,
-  },
-  {
-    title: "Sales",
-    url: "/sales",
-    icon: DollarSign,
   },
   {
     title: "History",
@@ -84,9 +71,10 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => {
-                const isActive = location === item.url || 
+                const isActive = location === item.url ||
+                  location === "/projects" && item.url === "/" ||
                   (item.url === "/" && (location.startsWith("/recording") || location.startsWith("/editor")));
-                
+
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive}>
