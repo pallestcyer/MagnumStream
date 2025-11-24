@@ -727,16 +727,34 @@ class DaVinciAutomation:
 
                     if first_imported:
                         try:
-                            # Check takes before
+                            # IMPORTANT: Clear any existing takes from the warmup clip first
+                            # This ensures AddTake can succeed (which is what primes the API)
                             takes_before = warmup_item.GetTakesCount() if hasattr(warmup_item, 'GetTakesCount') else 0
                             logger.info(f"   Warmup clip takes before: {takes_before}")
 
-                            # Try AddTake to prime the API
+                            if takes_before > 0:
+                                logger.info(f"   Clearing {takes_before} existing take(s) from warmup clip...")
+                                for i in range(takes_before, 0, -1):
+                                    try:
+                                        del_result = warmup_item.DeleteTakeByIndex(i)
+                                        logger.info(f"   Deleted take {i}: {del_result}")
+                                    except Exception as del_e:
+                                        logger.warning(f"   Could not delete take {i}: {del_e}")
+
+                                takes_after_clear = warmup_item.GetTakesCount() if hasattr(warmup_item, 'GetTakesCount') else 0
+                                logger.info(f"   Takes after clearing: {takes_after_clear}")
+
+                            # Now try AddTake - should succeed and prime the API
                             warmup_result = warmup_item.AddTake(first_imported, 0, 100)
 
                             # Check takes after
                             takes_after = warmup_item.GetTakesCount() if hasattr(warmup_item, 'GetTakesCount') else 0
                             logger.info(f"   Warmup AddTake result: {warmup_result}, takes after: {takes_after}")
+
+                            if warmup_result:
+                                logger.info(f"   ✅ Warmup succeeded - API should be primed!")
+                            else:
+                                logger.warning(f"   ⚠️ Warmup AddTake returned False - API may not be primed")
                         except Exception as warmup_e:
                             logger.info(f"   Warmup exception: {warmup_e}")
                     else:
