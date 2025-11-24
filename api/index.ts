@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
-import { googleDriveOAuth as importedDriveOAuth } from './GoogleDriveOAuth';
+import { googleDriveOAuth as importedDriveOAuth } from './GoogleDriveOAuth.js';
 
 // Slot template configuration
 interface SlotConfig {
