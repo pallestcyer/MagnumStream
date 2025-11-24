@@ -506,25 +506,40 @@ export class GoogleDriveOAuth {
    */
   async getPhotosFolderId(customerFolderId: string): Promise<string | null> {
     if (!this.isAuthenticated) {
+      console.error('❌ getPhotosFolderId: Not authenticated');
+      return null;
+    }
+
+    if (!customerFolderId) {
+      console.error('❌ getPhotosFolderId: customerFolderId is null or undefined');
       return null;
     }
 
     try {
       const drive = google.drive({ version: 'v3', auth: this.oauth2Client });
 
+      console.log(`🔍 Searching for Photos folder in parent: ${customerFolderId}`);
+      const query = `name='Photos' and '${customerFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+      console.log(`📝 Query: ${query}`);
+
       const result = await drive.files.list({
-        q: `name='Photos' and '${customerFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+        q: query,
         fields: 'files(id, name)',
         spaces: 'drive'
       });
 
       if (result.data.files && result.data.files.length > 0) {
+        console.log(`✅ Found Photos folder: ${result.data.files[0].id}`);
         return result.data.files[0].id!;
       }
 
+      console.warn(`⚠️ No Photos folder found in parent: ${customerFolderId}`);
       return null;
-    } catch (error) {
-      console.error('❌ Failed to get Photos folder:', error);
+    } catch (error: any) {
+      console.error('❌ Failed to get Photos folder:', error.message || error);
+      if (error.response) {
+        console.error('   Response:', JSON.stringify(error.response.data, null, 2));
+      }
       return null;
     }
   }
@@ -534,7 +549,14 @@ export class GoogleDriveOAuth {
    */
   extractFolderIdFromUrl(folderUrl: string): string | null {
     // URL format: https://drive.google.com/drive/folders/FOLDER_ID
+    if (!folderUrl) {
+      console.error('❌ extractFolderIdFromUrl: folderUrl is null or undefined');
+      return null;
+    }
     const match = folderUrl.match(/folders\/([a-zA-Z0-9_-]+)/);
+    if (!match) {
+      console.error(`❌ extractFolderIdFromUrl: No match found for URL: ${folderUrl}`);
+    }
     return match ? match[1] : null;
   }
 

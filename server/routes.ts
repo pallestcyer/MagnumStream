@@ -627,10 +627,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Extract the customer folder ID from the URL
+      console.log(`📁 Drive folder URL: ${recording.driveFolderUrl}`);
       const customerFolderId = googleDriveOAuth.extractFolderIdFromUrl(recording.driveFolderUrl);
       if (!customerFolderId) {
-        return res.status(400).json({ error: "Invalid Drive folder URL" });
+        console.error(`❌ Could not extract folder ID from URL: ${recording.driveFolderUrl}`);
+        return res.status(400).json({
+          error: "Invalid Drive folder URL",
+          url: recording.driveFolderUrl,
+          help: "Expected format: https://drive.google.com/drive/folders/FOLDER_ID"
+        });
       }
+      console.log(`✅ Extracted folder ID: ${customerFolderId}`);
 
       // Get the Photos subfolder ID
       const photosFolderId = await googleDriveOAuth.getPhotosFolderId(customerFolderId);
