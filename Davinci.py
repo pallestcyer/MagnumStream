@@ -938,8 +938,14 @@ class DaVinciAutomation:
 
                         # Get the new clip's source frame range
                         new_clip_props = new_media_item.GetClipProperty() if new_media_item else {}
-                        source_start = int(new_clip_props.get('Start', 0))
-                        source_end = int(new_clip_props.get('End', new_clip_props.get('Frames', 100) - 1))
+                        source_start = int(new_clip_props.get('Start', '0'))
+                        # Handle string values from DaVinci - 'End' and 'Frames' are returned as strings
+                        end_val = new_clip_props.get('End')
+                        if end_val:
+                            source_end = int(end_val)
+                        else:
+                            frames_val = new_clip_props.get('Frames', '100')
+                            source_end = int(frames_val) - 1
                         logger.info(f"   New clip source range: {source_start} - {source_end}")
 
                         # Delete the existing timeline item

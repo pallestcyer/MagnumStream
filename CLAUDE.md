@@ -1,0 +1,1 @@
+- We have a business mac we load the plist on to handle the ffmpeg and davinci actions. The frontend is pushed on git and we use Vercel for it
