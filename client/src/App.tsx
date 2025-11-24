@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -20,6 +21,56 @@ import ChatPage from "@/pages/ChatPage";
 import IssuesPage from "@/pages/IssuesPage";
 import ProjectsPage from "@/pages/ProjectsPage";
 import NotFound from "@/pages/not-found";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+
+const ACCESS_CODE = "1414";
+
+function PasscodeGate({ onSuccess }: { onSuccess: () => void }) {
+  const [code, setCode] = useState("");
+  const [error, setError] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (code === ACCESS_CODE) {
+      sessionStorage.setItem("magnum_authenticated", "true");
+      onSuccess();
+    } else {
+      setError(true);
+      setCode("");
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="w-full max-w-sm p-8">
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-bold text-foreground">MagnumStream</h1>
+          <p className="text-muted-foreground mt-2">Enter access code to continue</p>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input
+            type="password"
+            placeholder="Access code"
+            value={code}
+            onChange={(e) => {
+              setCode(e.target.value);
+              setError(false);
+            }}
+            className={`text-center text-2xl tracking-widest ${error ? "border-red-500" : ""}`}
+            autoFocus
+          />
+          {error && (
+            <p className="text-red-500 text-sm text-center">Incorrect code</p>
+          )}
+          <Button type="submit" className="w-full">
+            Enter
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 function Router() {
   return (
@@ -43,10 +94,18 @@ function Router() {
 }
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return sessionStorage.getItem("magnum_authenticated") === "true";
+  });
+
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
   };
+
+  if (!isAuthenticated) {
+    return <PasscodeGate onSuccess={() => setIsAuthenticated(true)} />;
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
