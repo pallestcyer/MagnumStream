@@ -150,6 +150,109 @@ export class GoogleDriveOAuth {
       return false;
     }
   }
+
+  /**
+   * Extract folder ID from a Google Drive folder URL
+   */
+  extractFolderIdFromUrl(folderUrl: string): string | null {
+    if (!folderUrl) {
+      console.error('❌ extractFolderIdFromUrl: folderUrl is null or undefined');
+      return null;
+    }
+    const match = folderUrl.match(/folders\/([a-zA-Z0-9_-]+)/);
+    if (!match) {
+      console.error(`❌ extractFolderIdFromUrl: No match found for URL: ${folderUrl}`);
+    }
+    return match ? match[1] : null;
+  }
+
+  /**
+   * Get the Photos folder ID from a project's customer folder
+   */
+  async getPhotosFolderId(customerFolderId: string): Promise<string | null> {
+    if (!this.isAuthenticated) {
+      console.error('❌ getPhotosFolderId: Not authenticated');
+      return null;
+    }
+
+    if (!customerFolderId) {
+      console.error('❌ getPhotosFolderId: customerFolderId is null or undefined');
+      return null;
+    }
+
+    try {
+      const drive = google.drive({ version: 'v3', auth: this.oauth2Client });
+
+      console.log(`🔍 Searching for Photos folder in parent: ${customerFolderId}`);
+      const query = `name='Photos' and '${customerFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+      console.log(`📝 Query: ${query}`);
+
+      const result = await drive.files.list({
+        q: query,
+        fields: 'files(id, name)',
+        spaces: 'drive'
+      });
+
+      if (result.data.files && result.data.files.length > 0) {
+        console.log(`✅ Found Photos folder: ${result.data.files[0].id}`);
+        return result.data.files[0].id!;
+      }
+
+      console.warn(`⚠️ No Photos folder found in parent: ${customerFolderId}`);
+      return null;
+    } catch (error: any) {
+      console.error('❌ Failed to get Photos folder:', error.message || error);
+      if (error.response) {
+        console.error('   Response:', JSON.stringify(error.response.data, null, 2));
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Upload a file to a specific folder from a buffer
+   */
+  async uploadFileToFolder(
+    folderId: string,
+    fileName: string,
+    fileBuffer: Buffer,
+    mimeType: string
+  ): Promise<{ fileId: string; webViewLink: string } | null> {
+    if (!this.isAuthenticated) {
+      console.warn('❌ Google Drive OAuth not authenticated - cannot upload file');
+      return null;
+    }
+
+    try {
+      const drive = google.drive({ version: 'v3', auth: this.oauth2Client });
+
+      const response = await drive.files.create({
+        requestBody: {
+          name: fileName,
+          parents: [folderId],
+          mimeType: mimeType
+        },
+        media: {
+          mimeType: mimeType,
+          body: require('stream').Readable.from(fileBuffer)
+        },
+        fields: 'id, webViewLink'
+      });
+
+      if (response.data.id && response.data.webViewLink) {
+        console.log(`✅ Uploaded file ${fileName} to Drive (ID: ${response.data.id})`);
+        return {
+          fileId: response.data.id,
+          webViewLink: response.data.webViewLink
+        };
+      }
+
+      return null;
+    } catch (error: any) {
+      console.error(`❌ Failed to upload file ${fileName}:`, error.message || error);
+      return null;
+    }
+  }
 }
 
 // Export singleton instance for Vercel

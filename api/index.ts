@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import 'dotenv/config';
 import express from 'express';
+import multer from 'multer';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 import { google } from 'googleapis';
@@ -641,6 +642,87 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       });
 
+      // Photo upload endpoint
+      const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } }); // 50MB limit
+
+      app.post('/api/recordings/:recordingId/upload-photos', upload.array('photos', 50), async (req: any, res) => {
+        try {
+          const { recordingId } = req.params;
+          const files = req.files as Express.Multer.File[];
+
+          if (!files || files.length === 0) {
+            return res.status(400).json({ error: "No photos provided" });
+          }
+
+          // Get the recording to find the drive folder URL
+          const recording = await storage.getFlightRecording(recordingId);
+          if (!recording) {
+            return res.status(404).json({ error: "Recording not found" });
+          }
+
+          if (!recording.driveFolderUrl) {
+            return res.status(400).json({ error: "No Google Drive folder associated with this project" });
+          }
+
+          if (!driveOAuth.isReady()) {
+            return res.status(503).json({ error: "Google Drive not authenticated" });
+          }
+
+          // Extract the customer folder ID from the URL
+          console.log(`📁 Drive folder URL: ${recording.driveFolderUrl}`);
+          const customerFolderId = driveOAuth.extractFolderIdFromUrl(recording.driveFolderUrl);
+          if (!customerFolderId) {
+            console.error(`❌ Could not extract folder ID from URL: ${recording.driveFolderUrl}`);
+            return res.status(400).json({
+              error: "Invalid Drive folder URL",
+              url: recording.driveFolderUrl,
+              help: "Expected format: https://drive.google.com/drive/folders/FOLDER_ID"
+            });
+          }
+          console.log(`✅ Extracted folder ID: ${customerFolderId}`);
+
+          // Get the Photos subfolder ID
+          const photosFolderId = await driveOAuth.getPhotosFolderId(customerFolderId);
+          if (!photosFolderId) {
+            return res.status(400).json({ error: "Photos folder not found in Drive" });
+          }
+
+          console.log(`📸 Uploading ${files.length} photos for recording ${recordingId}`);
+
+          // Upload each photo
+          const uploadResults = [];
+          for (const file of files) {
+            const result = await driveOAuth.uploadFileToFolder(
+              photosFolderId,
+              file.originalname,
+              file.buffer,
+              file.mimetype
+            );
+            if (result) {
+              uploadResults.push(result);
+            }
+          }
+
+          // Mark photos as uploaded in the database and store the photos folder ID
+          await storage.updateFlightRecording(recordingId, {
+            photosUploaded: true,
+            photosFolderId: photosFolderId
+          });
+
+          console.log(`✅ Uploaded ${uploadResults.length}/${files.length} photos`);
+
+          res.json({
+            success: true,
+            uploaded: uploadResults.length,
+            total: files.length,
+            files: uploadResults
+          });
+
+        } catch (error: any) {
+          console.error('❌ Photo upload error:', error);
+          res.status(500).json({ error: error.message });
+        }
+      });
 
       // Google Drive OAuth endpoints (handled by Vercel using env vars)
       app.get('/api/drive/auth/url', async (req, res) => {
