@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
+import { Readable } from 'stream';
 
 /**
  * Simplified GoogleDriveOAuth for Vercel serverless environment
@@ -234,7 +235,7 @@ export class GoogleDriveOAuth {
         },
         media: {
           mimeType: mimeType,
-          body: require('stream').Readable.from(fileBuffer)
+          body: Readable.from(fileBuffer)
         },
         fields: 'id, webViewLink'
       });
