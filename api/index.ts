@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
-import { GoogleDriveOAuth as GoogleDriveOAuthClass } from './GoogleDriveOAuth';
+import { googleDriveOAuth as importedDriveOAuth } from './GoogleDriveOAuth';
 
 // Slot template configuration
 interface SlotConfig {
@@ -411,7 +411,7 @@ class VideoOperations {
 let app: express.Application | null = null;
 const storage = new DatabaseStorage();
 const videoOps = new VideoOperations();
-const driveOAuth = new GoogleDriveOAuthClass();
+const driveOAuth = importedDriveOAuth;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
