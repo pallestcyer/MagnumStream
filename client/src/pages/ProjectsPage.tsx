@@ -465,19 +465,19 @@ export default function ProjectsPage() {
     switch (status) {
       case 'completed':
         return {
-          label: 'Complete',
+          label: 'Video Complete',
           icon: CheckCircle2,
           className: 'border-green-500/50 text-green-500 hover:bg-green-500/10',
         };
       case 'in_progress':
         return {
-          label: 'Continue',
+          label: 'Continue Video',
           icon: Edit3,
           className: 'border-orange-500/50 text-orange-500 hover:bg-orange-500/10',
         };
       case 'recorded':
         return {
-          label: 'Edit',
+          label: 'Edit Video',
           icon: PlayCircle,
           className: 'border-blue-500/50 text-blue-500 hover:bg-blue-500/10',
         };
@@ -780,7 +780,7 @@ export default function ProjectsPage() {
                   ) : (
                     <Image className="w-4 h-4 mr-1" />
                   )}
-                  {photosCompleted ? 'Complete' : 'Photos'}
+                  {photosCompleted ? 'Photos Complete' : 'Photos'}
                 </Button>
               );
             })()}
