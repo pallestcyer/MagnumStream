@@ -711,22 +711,56 @@ class DaVinciAutomation:
                 if warmup_track_items:
                     for item in warmup_track_items:
                         media = item.GetMediaPoolItem()
-                        clip_name = media.GetName() if media else "Unknown"
+                        clip_name = media.GetName() if media else "Unknown (offline)"
                         warmup_items.append({'item': item, 'media': media, 'name': clip_name, 'track': warmup_track})
                         logger.info(f"🔥 Found warmup clip on V{warmup_track}: '{clip_name}'")
 
             if warmup_items:
                 logger.info(f"🔥 WARMUP PHASE: Priming AddTake API with {len(warmup_items)} warmup clip(s)")
-                for warmup_info in warmup_items:
-                    warmup_item = warmup_info['item']
-                    logger.info(f"   Processing warmup clip: '{warmup_info['name']}' on V{warmup_info['track']}")
 
-                    # Get the first imported clip to use for warmup
-                    first_imported = list(imported_clips.values())[0]['media_item'] if imported_clips else None
-                    logger.info(f"   Using imported clip for warmup: {first_imported.GetName() if first_imported else 'None'}")
+                # Get the first imported clip to use for warmup
+                first_imported = list(imported_clips.values())[0]['media_item'] if imported_clips else None
+                first_imported_path = list(imported_clips.values())[0]['path'] if imported_clips else None
+                logger.info(f"   Using imported clip for warmup: {first_imported.GetName() if first_imported else 'None'}")
+
+                warmup_succeeded = False
+
+                for warmup_info in warmup_items:
+                    if warmup_succeeded:
+                        logger.info(f"   Skipping additional warmup clips (already primed)")
+                        break
+
+                    warmup_item = warmup_info['item']
+                    warmup_media = warmup_info['media']
+                    logger.info(f"   Processing warmup clip: '{warmup_info['name']}' on V{warmup_info['track']}")
 
                     if first_imported:
                         try:
+                            # CRITICAL FIX: If warmup media is offline/missing, restore it first
+                            # The export/import to create working copy can break media references
+                            # We use MediaPoolItem.ReplaceClip to restore the warmup clip with valid media
+                            # This is SAFE because the warmup clip is sacrificial (not part of final render)
+                            if warmup_media is None or warmup_info['name'] == "Unknown (offline)":
+                                logger.warning(f"   ⚠️ Warmup clip media is offline! Attempting to restore...")
+                                # We can't restore a None media pool item, so try AddTake anyway
+                                # and hope the API still gets primed by the attempt
+                            else:
+                                # Check if the warmup media pool item is valid by trying to get its name
+                                try:
+                                    test_name = warmup_media.GetName()
+                                    logger.info(f"   Warmup media pool item is valid: '{test_name}'")
+
+                                    # RESTORE APPROACH: Use ReplaceClip on the warmup's media pool item
+                                    # to ensure it points to valid media (use the first imported clip's file)
+                                    if first_imported_path:
+                                        logger.info(f"   Restoring warmup media with: {first_imported_path}")
+                                        restore_result = warmup_media.ReplaceClip(first_imported_path)
+                                        logger.info(f"   ReplaceClip result: {restore_result}")
+                                        if restore_result:
+                                            logger.info(f"   ✅ Warmup media restored successfully")
+                                except Exception as test_e:
+                                    logger.warning(f"   Warmup media pool item may be invalid: {test_e}")
+
                             # IMPORTANT: Clear any existing takes from the warmup clip first
                             # This ensures AddTake can succeed (which is what primes the API)
                             takes_before = warmup_item.GetTakesCount() if hasattr(warmup_item, 'GetTakesCount') else 0
@@ -753,14 +787,84 @@ class DaVinciAutomation:
 
                             if warmup_result:
                                 logger.info(f"   ✅ Warmup succeeded - API should be primed!")
+                                warmup_succeeded = True
                             else:
-                                logger.warning(f"   ⚠️ Warmup AddTake returned False - API may not be primed")
+                                logger.warning(f"   ⚠️ Warmup AddTake returned False - trying next warmup clip")
                         except Exception as warmup_e:
-                            logger.info(f"   Warmup exception: {warmup_e}")
+                            logger.warning(f"   Warmup exception: {warmup_e}")
                     else:
                         logger.warning(f"   No imported clip available for warmup!")
+
+                if not warmup_succeeded:
+                    logger.warning(f"   ⚠️ All warmup attempts failed - trying to create fresh warmup clip")
+                    # FALLBACK: Create a fresh warmup clip programmatically
+                    # This handles the case where existing warmup clips are completely broken
+                    try:
+                        if first_imported:
+                            logger.info(f"   Creating fresh warmup clip on V1...")
+                            # Add the first imported clip to V1 at frame 0
+                            warmup_clip_info = {
+                                "mediaPoolItem": first_imported,
+                                "startFrame": 0,
+                                "endFrame": 50,  # Short clip
+                                "mediaType": 1,  # Video only
+                                "trackIndex": 1,  # V1
+                                "recordFrame": 0  # Timeline position
+                            }
+                            fresh_warmup = self.media_pool.AppendToTimeline([warmup_clip_info])
+                            if fresh_warmup and len(fresh_warmup) > 0:
+                                fresh_warmup_item = fresh_warmup[0]
+                                logger.info(f"   Fresh warmup clip created, attempting AddTake...")
+                                # Use the second imported clip (if available) for AddTake
+                                second_imported = None
+                                if len(imported_clips) > 1:
+                                    second_imported = list(imported_clips.values())[1]['media_item']
+                                else:
+                                    second_imported = first_imported  # Use same clip if only one
+
+                                fresh_warmup_result = fresh_warmup_item.AddTake(second_imported, 0, 50)
+                                logger.info(f"   Fresh warmup AddTake result: {fresh_warmup_result}")
+                                if fresh_warmup_result:
+                                    logger.info(f"   ✅ Fresh warmup succeeded - API should be primed!")
+                                    warmup_succeeded = True
+                            else:
+                                logger.warning(f"   Could not create fresh warmup clip")
+                    except Exception as fresh_e:
+                        logger.warning(f"   Fresh warmup creation failed: {fresh_e}")
+
+                if not warmup_succeeded:
+                    logger.warning(f"   ⚠️ All warmup methods failed - first real slot may fail AddTake")
             else:
-                logger.info(f"ℹ️ No warmup clips found on V1/V2 - first slot may need fallback method")
+                logger.info(f"ℹ️ No warmup clips found on V1/V2 - creating fresh warmup clip")
+                # No existing warmup clips - create one fresh
+                first_imported = list(imported_clips.values())[0]['media_item'] if imported_clips else None
+                if first_imported:
+                    try:
+                        logger.info(f"   Creating fresh warmup clip on V1...")
+                        warmup_clip_info = {
+                            "mediaPoolItem": first_imported,
+                            "startFrame": 0,
+                            "endFrame": 50,
+                            "mediaType": 1,
+                            "trackIndex": 1,
+                            "recordFrame": 0
+                        }
+                        fresh_warmup = self.media_pool.AppendToTimeline([warmup_clip_info])
+                        if fresh_warmup and len(fresh_warmup) > 0:
+                            fresh_warmup_item = fresh_warmup[0]
+                            # Use second imported clip for AddTake if available
+                            second_imported = None
+                            if len(imported_clips) > 1:
+                                second_imported = list(imported_clips.values())[1]['media_item']
+                            else:
+                                second_imported = first_imported
+
+                            fresh_warmup_result = fresh_warmup_item.AddTake(second_imported, 0, 50)
+                            logger.info(f"   Fresh warmup AddTake result: {fresh_warmup_result}")
+                            if fresh_warmup_result:
+                                logger.info(f"   ✅ Fresh warmup succeeded - API should be primed!")
+                    except Exception as fresh_e:
+                        logger.warning(f"   Fresh warmup creation failed: {fresh_e}")
 
             # STEP 3: Replace each clip by matching slot numbers
             # CRITICAL: We use AddTake/SelectTake/FinalizeTake which replaces per-timeline-instance
