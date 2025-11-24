@@ -719,14 +719,28 @@ class DaVinciAutomation:
                 logger.info(f"🔥 WARMUP PHASE: Priming AddTake API with {len(warmup_items)} warmup clip(s)")
                 for warmup_info in warmup_items:
                     warmup_item = warmup_info['item']
-                    if warmup_info['media']:
+                    logger.info(f"   Processing warmup clip: '{warmup_info['name']}' on V{warmup_info['track']}")
+
+                    # Get the first imported clip to use for warmup
+                    first_imported = list(imported_clips.values())[0]['media_item'] if imported_clips else None
+                    logger.info(f"   Using imported clip for warmup: {first_imported.GetName() if first_imported else 'None'}")
+
+                    if first_imported:
                         try:
-                            # Try AddTake with the first imported clip to prime the API
-                            first_imported = list(imported_clips.values())[0]['media_item'] if imported_clips else warmup_info['media']
+                            # Check takes before
+                            takes_before = warmup_item.GetTakesCount() if hasattr(warmup_item, 'GetTakesCount') else 0
+                            logger.info(f"   Warmup clip takes before: {takes_before}")
+
+                            # Try AddTake to prime the API
                             warmup_result = warmup_item.AddTake(first_imported, 0, 100)
-                            logger.info(f"   Warmup AddTake on V{warmup_info['track']} result: {warmup_result} (expected to fail)")
+
+                            # Check takes after
+                            takes_after = warmup_item.GetTakesCount() if hasattr(warmup_item, 'GetTakesCount') else 0
+                            logger.info(f"   Warmup AddTake result: {warmup_result}, takes after: {takes_after}")
                         except Exception as warmup_e:
-                            logger.info(f"   Warmup exception (expected): {warmup_e}")
+                            logger.info(f"   Warmup exception: {warmup_e}")
+                    else:
+                        logger.warning(f"   No imported clip available for warmup!")
             else:
                 logger.info(f"ℹ️ No warmup clips found on V1/V2 - first slot may need fallback method")
 
