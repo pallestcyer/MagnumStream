@@ -157,6 +157,41 @@ class DatabaseStorage {
     };
   }
 
+  async getFlightRecording(id: string) {
+    const { data: result, error } = await (supabase as any)
+      .from('flight_recordings')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+
+    // Transform the result to match the client expectations
+    return {
+      id: result.id,
+      projectName: result.project_name,
+      pilotName: result.pilot_name,
+      pilotEmail: result.pilot_email,
+      flightPilot: result.flight_pilot,
+      staffMember: result.staff_member,
+      flightDate: result.flight_date,
+      flightTime: result.flight_time,
+      exportStatus: result.export_status,
+      driveFileId: result.drive_file_id,
+      driveFileUrl: result.drive_file_url,
+      driveFolderUrl: result.drive_folder_url,
+      driveFolderId: result.drive_folder_id,
+      videoFolderId: result.video_folder_id,
+      photosFolderId: result.photos_folder_id,
+      localVideoPath: result.local_video_path,
+      thumbnailUrl: result.thumbnail_url,
+      smsPhoneNumber: result.sms_phone_number,
+      sold: result.sold,
+      photosUploaded: result.photos_uploaded,
+      createdAt: new Date(result.created_at)
+    };
+  }
+
   async getAllFlightRecordings() {
     const { data, error } = await (supabase as any)
       .from('flight_recordings')
