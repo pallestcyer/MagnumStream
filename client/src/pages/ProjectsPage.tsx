@@ -610,8 +610,9 @@ export default function ProjectsPage() {
         formData.append('photos', file);
       });
 
-      // Upload photos to local Mac server (has Google Drive OAuth)
-      const response = await fetch(`http://localhost:3001/api/recordings/${photosProject.id}/upload-photos`, {
+      // Upload photos via Vercel API (works from anywhere - iPad, iPhone, etc.)
+      // Vercel uses GOOGLE_REFRESH_TOKEN env var for Google Drive authentication
+      const response = await fetch(`/api/recordings/${photosProject.id}/upload-photos`, {
         method: 'POST',
         body: formData,
       });
