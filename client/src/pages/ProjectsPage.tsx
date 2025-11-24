@@ -90,8 +90,10 @@ export default function ProjectsPage() {
     },
     // Poll every 5 seconds to update render status
     refetchInterval: 5000,
-    // Also refetch when window regains focus
+    // Refetch when window regains focus
     refetchOnWindowFocus: true,
+    // Always refetch when component mounts (immediate status update)
+    refetchOnMount: 'always',
   });
 
   const createProjectMutation = useMutation({
