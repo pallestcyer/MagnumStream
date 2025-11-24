@@ -653,10 +653,14 @@ class DaVinciAutomation:
             timeline_items = self.timeline.GetItemListInTrack('video', track_index)
             logger.info(f"🔍 Found {len(timeline_items)} items on video track V{track_index}")
 
-            # VALIDATION: Ensure we have exactly 14 items (matching our template)
-            if len(timeline_items) != 14:
-                logger.warning(f"⚠️ Expected 14 timeline items but found {len(timeline_items)}")
-                logger.warning(f"   Template may have been modified or contains extra/missing clips")
+            # VALIDATION: We expect 14 slots + optional warmup clip (15 total)
+            if len(timeline_items) < 14:
+                logger.warning(f"⚠️ Expected at least 14 timeline items but found {len(timeline_items)}")
+                logger.warning(f"   Template may have missing clips")
+            elif len(timeline_items) == 15:
+                logger.info(f"✅ Found 15 timeline items (14 slots + 1 warmup clip)")
+            elif len(timeline_items) > 15:
+                logger.warning(f"⚠️ Found {len(timeline_items)} items, expected 14-15")
 
             # Build frame_position -> timeline_item mapping
             frame_to_item = {}
@@ -698,6 +702,32 @@ class DaVinciAutomation:
                 return False
 
             logger.info(f"✅ All 14 slots mapped to timeline positions")
+
+            # WARMUP PHASE: Find any timeline items NOT mapped to slots (warmup clips)
+            # These are extra clips added to the template specifically to "warm up" the AddTake API
+            slot_frames = set(slot_to_item[s]['start_frame'] for s in slot_to_item)
+            warmup_items = []
+            for frame, item_info in frame_to_item.items():
+                if frame not in slot_frames:
+                    warmup_items.append(item_info)
+                    logger.info(f"🔥 Found warmup clip at frame {frame}: '{item_info['clip_name']}'")
+
+            if warmup_items:
+                logger.info(f"🔥 WARMUP PHASE: Priming AddTake API with {len(warmup_items)} warmup clip(s)")
+                for warmup_info in warmup_items:
+                    warmup_item = warmup_info['item']
+                    warmup_media = warmup_item.GetMediaPoolItem()
+                    if warmup_media:
+                        try:
+                            # Try AddTake with ANY imported clip (just to prime the API)
+                            # We'll use the first imported clip for warmup
+                            first_imported = list(imported_clips.values())[0]['media_item'] if imported_clips else warmup_media
+                            warmup_result = warmup_item.AddTake(first_imported, 0, 100)
+                            logger.info(f"   Warmup AddTake result: {warmup_result} (expected to fail/be ignored)")
+                        except Exception as warmup_e:
+                            logger.info(f"   Warmup exception (expected): {warmup_e}")
+            else:
+                logger.info(f"ℹ️ No warmup clips found - first slot may need fallback method")
 
             # STEP 3: Replace each clip by matching slot numbers
             # CRITICAL: We use AddTake/SelectTake/FinalizeTake which replaces per-timeline-instance
