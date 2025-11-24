@@ -12,7 +12,6 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import {
-  History,
   BookOpen,
   MessageSquare,
   AlertCircle,
@@ -25,11 +24,6 @@ const menuItems = [
     title: "Projects",
     url: "/",
     icon: FolderKanban,
-  },
-  {
-    title: "History",
-    url: "/history",
-    icon: History,
   },
   {
     title: "Manual",

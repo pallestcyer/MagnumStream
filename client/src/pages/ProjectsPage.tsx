@@ -45,7 +45,7 @@ const getRoundedTime = () => {
   now.setMilliseconds(0);
   return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 };
-import { Plus, Clock, Plane, Mail, Video, Image, DollarSign, X, CheckCircle2, Edit3, PlayCircle, Upload, Trash2, ExternalLink, FileVideo, Play } from "lucide-react";
+import { Plus, Clock, Plane, Mail, Video, Image, DollarSign, X, CheckCircle2, Edit3, PlayCircle, Upload, Trash2, ExternalLink, FileVideo, Play, Search } from "lucide-react";
 import type { FlightRecording } from "@shared/schema";
 import { BUNDLE_OPTIONS } from "@shared/schema";
 
@@ -63,6 +63,7 @@ export default function ProjectsPage() {
   const [flightTime, setFlightTime] = useState("");
   const [pilotName, setPilotName] = useState("");
   const [email, setEmail] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Sale dialog state
   const [saleEmails, setSaleEmails] = useState<string[]>([]);
@@ -633,9 +634,28 @@ export default function ProjectsPage() {
     }
   };
 
-  // Split projects into unsold (active) and sold
-  const unsoldProjects = projects.filter((p) => !p.sold);
-  const soldProjects = projects.filter((p) => p.sold);
+  // Filter projects based on search query
+  const filterProjects = (projectList: FlightRecording[]) => {
+    if (!searchQuery.trim()) return projectList;
+
+    const query = searchQuery.toLowerCase();
+    return projectList.filter((project) => {
+      const matchesName = project.pilotName?.toLowerCase().includes(query);
+      const matchesEmail = project.pilotEmail?.toLowerCase().includes(query);
+      const matchesPilot = project.flightPilot?.toLowerCase().includes(query) ||
+                           getPilotName(project.flightPilot || "").toLowerCase().includes(query);
+      const matchesTime = project.flightTime?.includes(query);
+
+      return matchesName || matchesEmail || matchesPilot || matchesTime;
+    });
+  };
+
+  // Split projects into unsold (active) and sold, then filter
+  const allUnsoldProjects = projects.filter((p) => !p.sold);
+  const allSoldProjects = projects.filter((p) => p.sold);
+
+  const unsoldProjects = filterProjects(allUnsoldProjects);
+  const soldProjects = filterProjects(allSoldProjects);
 
   const renderProjectCard = (project: FlightRecording, isSold: boolean = false) => (
     <Card
@@ -796,11 +816,23 @@ export default function ProjectsPage() {
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-foreground">Projects</h1>
-        <p className="text-muted-foreground mt-1">
-          Manage your flight recording projects
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Projects</h1>
+          <p className="text-muted-foreground mt-1">
+            Manage your flight recording projects
+          </p>
+        </div>
+        <div className="relative w-80">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search projects..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 h-10"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
