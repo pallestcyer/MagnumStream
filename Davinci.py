@@ -74,7 +74,8 @@ dvr = load_davinci_api()
 # ============================================================================
 
 # Template Configuration
-TEMPLATE_PROJECT_NAME = "MAG_FERRARI-NEW"  # Your template project name in Resolve
+TEMPLATE_PROJECT_NAME = "MAG_FERRARI-NEW"  # Working project name (will be recreated each render)
+BACKUP_PROJECT_NAME = "MAG_FERRARI-NEW-BACKUP"  # Pristine backup (NEVER modified)
 
 # Mac-compatible paths (works with existing ClipGenerator structure)
 BASE_DIR = Path.home() / "MagnumStream"  # User's home directory
@@ -765,6 +766,22 @@ class DaVinciAutomation:
                     except:
                         pass
 
+                # Check for retiming (which prevents AddTake from working)
+                has_retiming = False
+                try:
+                    if hasattr(target_item, 'GetProperty'):
+                        # Check various retime-related properties
+                        retime_props = ['Speed', 'SpeedZoneCount', 'ReTimeProcess']
+                        for prop in retime_props:
+                            val = target_item.GetProperty(prop)
+                            if val is not None:
+                                logger.info(f"   {prop}: {val}")
+                                if prop == 'Speed' and val != 100 and val != 1.0:
+                                    has_retiming = True
+                                    logger.warning(f"   ⚠️ Clip has retiming (Speed={val}) - AddTake may fail!")
+                except Exception as prop_e:
+                    logger.debug(f"   Could not check retime properties: {prop_e}")
+
                 # METHOD 1: Use AddTake + SelectTake (preferred - per-instance replacement)
                 try:
                     logger.info(f"   Attempting AddTake method...")
@@ -794,34 +811,44 @@ class DaVinciAutomation:
                         logger.info(f"   Takes before: {takes_count_before}")
 
                     # Add the new clip as a take
-                    # Try multiple parameter formats since API documentation is unclear
+                    # API signature: AddTake(mediaPoolItem, startFrame, endFrame)
+                    # Note: Retimed clips cannot use the take system!
                     add_result = None
 
-                    # Try 1: AddTake with MediaPoolItem
-                    logger.info(f"   Trying AddTake(MediaPoolItem)...")
+                    # Get the new clip's frame range
+                    new_clip_props = new_media_item.GetClipProperty() if new_media_item else {}
+                    new_start_frame = int(new_clip_props.get('Start', 0))
+                    new_end_frame = int(new_clip_props.get('End', new_clip_props.get('Frames', 100)))
+                    logger.info(f"   New clip frame range: {new_start_frame} - {new_end_frame}")
+
+                    # Check if target clip has retiming (which prevents AddTake from working)
+                    # Unfortunately there's no direct API to check this
+
+                    # Try 1: AddTake with full signature (mediaPoolItem, startFrame, endFrame)
+                    logger.info(f"   Trying AddTake(mediaPoolItem, startFrame, endFrame)...")
                     try:
-                        add_result = target_item.AddTake(new_media_item)
-                        logger.info(f"   AddTake(MediaPoolItem) result: {add_result} (type: {type(add_result)})")
+                        add_result = target_item.AddTake(new_media_item, new_start_frame, new_end_frame)
+                        logger.info(f"   AddTake(full signature) result: {add_result} (type: {type(add_result)})")
                     except Exception as e1:
-                        logger.warning(f"   AddTake(MediaPoolItem) exception: {e1}")
+                        logger.warning(f"   AddTake(full signature) exception: {e1}")
 
-                    # Try 2: AddTake with file path string if MediaPoolItem didn't work
+                    # Try 2: AddTake with just MediaPoolItem (some versions)
                     if not add_result:
-                        logger.info(f"   Trying AddTake(filepath string)...")
+                        logger.info(f"   Trying AddTake(MediaPoolItem only)...")
                         try:
-                            add_result = target_item.AddTake(new_clip_path)
-                            logger.info(f"   AddTake(filepath) result: {add_result}")
+                            add_result = target_item.AddTake(new_media_item)
+                            logger.info(f"   AddTake(MediaPoolItem) result: {add_result}")
                         except Exception as e2:
-                            logger.warning(f"   AddTake(filepath) exception: {e2}")
+                            logger.warning(f"   AddTake(MediaPoolItem) exception: {e2}")
 
-                    # Try 3: AddTake with mediaPoolItem=, startFrame=, endFrame= kwargs
+                    # Try 3: AddTake with 0, -1 for full clip range
                     if not add_result:
-                        logger.info(f"   Trying AddTake with kwargs...")
+                        logger.info(f"   Trying AddTake with 0, -1 range...")
                         try:
-                            add_result = target_item.AddTake(mediaPoolItem=new_media_item)
-                            logger.info(f"   AddTake(mediaPoolItem=) result: {add_result}")
+                            add_result = target_item.AddTake(new_media_item, 0, -1)
+                            logger.info(f"   AddTake(0, -1) result: {add_result}")
                         except Exception as e3:
-                            logger.warning(f"   AddTake(kwargs) exception: {e3}")
+                            logger.warning(f"   AddTake(0, -1) exception: {e3}")
 
                     logger.info(f"   Final AddTake result: {add_result}")
 
