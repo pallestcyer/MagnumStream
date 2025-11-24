@@ -923,7 +923,7 @@ class DaVinciAutomation:
 
                 # METHOD 3: Delete and Re-add (safest - doesn't modify media pool items)
                 # This deletes the existing timeline item and adds the new clip at the same position
-                # Note: This will lose any effects/transforms on the clip, but preserves template integrity
+                # We preserve transform/composite properties and reapply them to the new clip
                 if not replaced:
                     try:
                         logger.info(f"   Attempting Delete-and-Add method...")
@@ -935,6 +935,42 @@ class DaVinciAutomation:
                         track_index = 3  # V3 track
 
                         logger.info(f"   Existing clip: start={existing_start}, duration={existing_duration}, end={existing_end}")
+
+                        # PRESERVE CLIP PROPERTIES before deleting
+                        # These are the transform, composite, and other properties we want to keep
+                        preserved_properties = {}
+                        property_keys = [
+                            # Transform properties
+                            'Pan', 'Tilt', 'ZoomX', 'ZoomY', 'ZoomGang', 'RotationAngle',
+                            'AnchorPointX', 'AnchorPointY', 'Pitch', 'Yaw',
+                            'FlipX', 'FlipY',
+                            # Crop properties
+                            'CropLeft', 'CropRight', 'CropTop', 'CropBottom', 'CropRetain',
+                            # Composite properties
+                            'Opacity', 'CompositeMode',
+                            # Dynamic Zoom
+                            'DynamicZoomEase',
+                            # Distortion/Lens
+                            'DistortionAmount', 'LensCorrection',
+                            # Stabilization
+                            'StabilizationMode',
+                            # Scaling
+                            'ResizeFilter', 'ScalingPreset',
+                        ]
+
+                        logger.info(f"   Preserving clip properties...")
+                        for prop_key in property_keys:
+                            try:
+                                prop_value = target_item.GetProperty(prop_key)
+                                if prop_value is not None:
+                                    preserved_properties[prop_key] = prop_value
+                            except:
+                                pass  # Property might not exist or be readable
+
+                        if preserved_properties:
+                            logger.info(f"   Preserved {len(preserved_properties)} properties: {list(preserved_properties.keys())}")
+                        else:
+                            logger.info(f"   No properties to preserve (using defaults)")
 
                         # Get the new clip's source frame range
                         new_clip_props = new_media_item.GetClipProperty() if new_media_item else {}
@@ -969,10 +1005,25 @@ class DaVinciAutomation:
                             logger.info(f"   AppendToTimeline result: {append_result}")
 
                             if append_result and len(append_result) > 0:
+                                new_timeline_item = append_result[0]
+
+                                # RESTORE PRESERVED PROPERTIES to the new clip
+                                if preserved_properties and new_timeline_item:
+                                    logger.info(f"   Restoring {len(preserved_properties)} properties to new clip...")
+                                    restore_count = 0
+                                    for prop_key, prop_value in preserved_properties.items():
+                                        try:
+                                            set_result = new_timeline_item.SetProperty(prop_key, prop_value)
+                                            if set_result:
+                                                restore_count += 1
+                                        except Exception as prop_err:
+                                            logger.debug(f"   Could not restore {prop_key}: {prop_err}")
+                                    logger.info(f"   Restored {restore_count}/{len(preserved_properties)} properties")
+
                                 replaced_slots.append(slot_number)
                                 replaced = True
                                 replacement_methods[slot_number] = "Delete-and-Add"
-                                logger.info(f"✅ Slot {slot_number}: Delete-and-Add succeeded")
+                                logger.info(f"✅ Slot {slot_number}: Delete-and-Add succeeded (with property preservation)")
                             else:
                                 logger.warning(f"   AppendToTimeline returned empty/None")
                                 # Try without recordFrame as fallback
