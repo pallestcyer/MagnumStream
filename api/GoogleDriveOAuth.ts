@@ -211,6 +211,25 @@ export class GoogleDriveOAuth {
   }
 
   /**
+   * Get a fresh access token for direct uploads from client
+   * This allows the client to upload directly to Google Drive, bypassing Vercel's payload limit
+   */
+  async getAccessToken(): Promise<string | null> {
+    if (!this.isAuthenticated) {
+      console.error('❌ getAccessToken: Not authenticated');
+      return null;
+    }
+
+    try {
+      const { token } = await this.oauth2Client.getAccessToken();
+      return token || null;
+    } catch (error: any) {
+      console.error('❌ Failed to get access token:', error.message || error);
+      return null;
+    }
+  }
+
+  /**
    * Upload a file to a specific folder from a buffer
    */
   async uploadFileToFolder(

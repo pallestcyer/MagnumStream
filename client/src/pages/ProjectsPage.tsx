@@ -582,6 +582,8 @@ export default function ProjectsPage() {
 
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
 
+  const [uploadProgress, setUploadProgress] = useState<string>("");
+
   const handleUploadPhotos = async () => {
     if (!photosProject || uploadedPhotos.length === 0) {
       toast({
@@ -602,33 +604,89 @@ export default function ProjectsPage() {
     }
 
     setIsUploadingPhotos(true);
+    setUploadProgress("Getting upload credentials...");
 
     try {
-      // Create FormData with all photos
-      const formData = new FormData();
-      uploadedPhotos.forEach((file) => {
-        formData.append('photos', file);
-      });
+      // Step 1: Get upload session (access token + folder ID) from Vercel
+      const sessionResponse = await fetch(`/api/recordings/${photosProject.id}/photo-upload-session`);
+      const sessionText = await sessionResponse.text();
 
-      // Upload photos via Vercel API (works from anywhere - iPad, iPhone, etc.)
-      // Vercel uses GOOGLE_REFRESH_TOKEN env var for Google Drive authentication
-      const response = await fetch(`/api/recordings/${photosProject.id}/upload-photos`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to upload photos');
+      let session;
+      try {
+        session = JSON.parse(sessionText);
+      } catch {
+        throw new Error(sessionText || 'Failed to get upload session');
       }
+
+      if (!sessionResponse.ok) {
+        throw new Error(session.error || 'Failed to get upload session');
+      }
+
+      const { photosFolderId, accessToken } = session;
+
+      // Step 2: Upload each photo directly to Google Drive (bypasses Vercel payload limit)
+      let uploadedCount = 0;
+      const errors: string[] = [];
+
+      for (let i = 0; i < uploadedPhotos.length; i++) {
+        const file = uploadedPhotos[i];
+        setUploadProgress(`Uploading ${i + 1}/${uploadedPhotos.length}: ${file.name}`);
+
+        try {
+          // Create metadata for the file
+          const metadata = {
+            name: file.name,
+            parents: [photosFolderId]
+          };
+
+          // Use multipart upload to Google Drive API directly
+          const form = new FormData();
+          form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+          form.append('file', file);
+
+          const uploadResponse = await fetch(
+            'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`
+              },
+              body: form
+            }
+          );
+
+          if (uploadResponse.ok) {
+            uploadedCount++;
+          } else {
+            const errorData = await uploadResponse.json().catch(() => ({}));
+            errors.push(`${file.name}: ${errorData.error?.message || 'Upload failed'}`);
+          }
+        } catch (uploadError: any) {
+          errors.push(`${file.name}: ${uploadError.message}`);
+        }
+      }
+
+      // Step 3: Mark photos as uploaded in the database
+      setUploadProgress("Finishing up...");
+      await fetch(`/api/recordings/${photosProject.id}/photos-complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uploadedCount, photosFolderId })
+      });
 
       // Refresh the recordings list
       queryClient.invalidateQueries({ queryKey: ["/api/recordings"] });
 
+      if (errors.length > 0 && uploadedCount === 0) {
+        throw new Error(`All uploads failed: ${errors[0]}`);
+      }
+
       toast({
         title: "Photos Uploaded",
-        description: `Successfully uploaded ${result.uploaded} photo(s) to Google Drive.`,
+        description: errors.length > 0
+          ? `Uploaded ${uploadedCount}/${uploadedPhotos.length} photo(s). ${errors.length} failed.`
+          : `Successfully uploaded ${uploadedCount} photo(s) to Google Drive.`,
+        variant: errors.length > 0 ? "destructive" : "default",
       });
       handleClosePhotosDialog();
     } catch (error: any) {
@@ -639,6 +697,7 @@ export default function ProjectsPage() {
       });
     } finally {
       setIsUploadingPhotos(false);
+      setUploadProgress("");
     }
   };
 
@@ -1289,7 +1348,9 @@ export default function ProjectsPage() {
               disabled={uploadedPhotos.length === 0 || isUploadingPhotos}
               className="bg-gradient-purple-blue hover:opacity-90"
             >
-              {isUploadingPhotos ? "Uploading..." : `Upload ${uploadedPhotos.length > 0 ? `(${uploadedPhotos.length})` : ''}`}
+              {isUploadingPhotos
+                ? (uploadProgress || "Uploading...")
+                : `Upload ${uploadedPhotos.length > 0 ? `(${uploadedPhotos.length})` : ''}`}
             </Button>
           </DialogFooter>
         </DialogContent>

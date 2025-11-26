@@ -626,7 +626,94 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       });
 
-      // Photo upload endpoint
+      // Direct photo upload endpoints (bypasses Vercel payload limit)
+      // Step 1: Get upload credentials for direct-to-Drive uploads
+      app.get('/api/recordings/:recordingId/photo-upload-session', async (req, res) => {
+        try {
+          const { recordingId } = req.params;
+
+          // Get the recording to find the drive folder URL
+          const recording = await storage.getFlightRecording(recordingId);
+          if (!recording) {
+            return res.status(404).json({ error: "Recording not found" });
+          }
+
+          if (!recording.driveFolderUrl) {
+            return res.status(400).json({ error: "No Google Drive folder associated with this project" });
+          }
+
+          if (!driveOAuth.isReady()) {
+            return res.status(503).json({ error: "Google Drive not authenticated" });
+          }
+
+          // Extract the customer folder ID from the URL
+          const customerFolderId = driveOAuth.extractFolderIdFromUrl(recording.driveFolderUrl);
+          if (!customerFolderId) {
+            return res.status(400).json({
+              error: "Invalid Drive folder URL",
+              help: "Expected format: https://drive.google.com/drive/folders/FOLDER_ID"
+            });
+          }
+
+          // Get the Photos subfolder ID
+          const photosFolderId = await driveOAuth.getPhotosFolderId(customerFolderId);
+          if (!photosFolderId) {
+            return res.status(400).json({ error: "Photos folder not found in Drive" });
+          }
+
+          // Get a fresh access token for the client to use
+          const accessToken = await driveOAuth.getAccessToken();
+          if (!accessToken) {
+            return res.status(503).json({ error: "Failed to get access token" });
+          }
+
+          console.log(`📸 Photo upload session created for recording ${recordingId}`);
+          console.log(`📁 Photos folder ID: ${photosFolderId}`);
+
+          res.json({
+            photosFolderId,
+            accessToken,
+            // Token expires in ~1 hour, but uploads should be quick
+            expiresIn: 3600
+          });
+
+        } catch (error: any) {
+          console.error('❌ Photo upload session error:', error);
+          res.status(500).json({ error: error.message });
+        }
+      });
+
+      // Step 2: Mark photos as uploaded after direct upload completes
+      app.post('/api/recordings/:recordingId/photos-complete', async (req, res) => {
+        try {
+          const { recordingId } = req.params;
+          const { uploadedCount, photosFolderId } = req.body;
+
+          const recording = await storage.getFlightRecording(recordingId);
+          if (!recording) {
+            return res.status(404).json({ error: "Recording not found" });
+          }
+
+          // Update the recording to mark photos as uploaded
+          await storage.updateFlightRecording(recordingId, {
+            photosUploaded: true,
+            photosFolderId: photosFolderId || recording.photosFolderId
+          });
+
+          console.log(`✅ Marked ${uploadedCount} photos as uploaded for recording ${recordingId}`);
+
+          res.json({
+            success: true,
+            uploaded: uploadedCount
+          });
+
+        } catch (error: any) {
+          console.error('❌ Photos complete error:', error);
+          res.status(500).json({ error: error.message });
+        }
+      });
+
+      // Legacy photo upload endpoint (kept for backward compatibility, but will hit Vercel payload limit)
       const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } }); // 50MB limit
 
       app.post('/api/recordings/:recordingId/upload-photos', upload.array('photos', 50), async (req: any, res) => {
