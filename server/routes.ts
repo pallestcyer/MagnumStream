@@ -307,13 +307,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const updates = req.body;
-      
-      const recording = await storage.updateFlightRecording(id, updates);
-      
-      if (!recording) {
+
+      // Get the current recording to compare old values
+      const currentRecording = await storage.getFlightRecording(id);
+      if (!currentRecording) {
         return res.status(404).json({ error: "Recording not found" });
       }
-      
+
+      // Check if we need to update Google Drive folder names
+      const folderRelevantFields = ['pilotName', 'flightPilot', 'flightTime'];
+      const hasFolderChanges = folderRelevantFields.some(
+        field => updates[field] !== undefined && updates[field] !== currentRecording[field as keyof typeof currentRecording]
+      );
+
+      if (hasFolderChanges && currentRecording.driveFolderId && googleDriveOAuth.isReady()) {
+        try {
+          const folderResult = await googleDriveOAuth.updateProjectFolders(
+            currentRecording.driveFolderId,
+            {
+              pilotName: updates.pilotName,
+              flightPilot: updates.flightPilot,
+              flightTime: updates.flightTime
+            },
+            {
+              pilotName: currentRecording.pilotName,
+              flightPilot: currentRecording.flightPilot,
+              flightTime: currentRecording.flightTime
+            }
+          );
+          if (folderResult.success && folderResult.message !== 'No folder changes needed') {
+            console.log(`📁 Drive folder update: ${folderResult.message}`);
+          }
+        } catch (driveError: any) {
+          console.warn('⚠️ Failed to update Drive folders (non-fatal):', driveError.message);
+          // Don't fail the update if folder rename fails
+        }
+      }
+
+      const recording = await storage.updateFlightRecording(id, updates);
       res.json(recording);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

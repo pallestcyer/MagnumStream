@@ -440,7 +440,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       app.patch('/api/recordings/:id', async (req, res) => {
         try {
-          const recording = await storage.updateFlightRecording(req.params.id, req.body);
+          const { id } = req.params;
+          const updates = req.body;
+
+          // Get the current recording to compare old values
+          const currentRecording = await storage.getFlightRecording(id);
+          if (!currentRecording) {
+            return res.status(404).json({ error: 'Recording not found' });
+          }
+
+          // Check if we need to update Google Drive folder names
+          const folderRelevantFields = ['pilotName', 'flightPilot', 'flightTime'];
+          const hasFolderChanges = folderRelevantFields.some(
+            field => updates[field] !== undefined && updates[field] !== currentRecording[field as keyof typeof currentRecording]
+          );
+
+          if (hasFolderChanges && currentRecording.driveFolderId && driveOAuth.isReady()) {
+            try {
+              const folderResult = await driveOAuth.updateProjectFolders(
+                currentRecording.driveFolderId,
+                {
+                  pilotName: updates.pilotName,
+                  flightPilot: updates.flightPilot,
+                  flightTime: updates.flightTime
+                },
+                {
+                  pilotName: currentRecording.pilotName,
+                  flightPilot: currentRecording.flightPilot,
+                  flightTime: currentRecording.flightTime
+                }
+              );
+              if (folderResult.success && folderResult.message !== 'No folder changes needed') {
+                console.log(`📁 Drive folder update: ${folderResult.message}`);
+              }
+            } catch (driveError: any) {
+              console.warn('⚠️ Failed to update Drive folders (non-fatal):', driveError.message);
+              // Don't fail the update if folder rename fails
+            }
+          }
+
+          const recording = await storage.updateFlightRecording(id, updates);
           res.json(recording);
         } catch (error) {
           res.status(500).json({ error: 'Failed to update recording' });

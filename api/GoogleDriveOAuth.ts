@@ -273,6 +273,243 @@ export class GoogleDriveOAuth {
       return null;
     }
   }
+
+  /**
+   * Rename a folder in Google Drive
+   */
+  async renameFolder(folderId: string, newName: string): Promise<boolean> {
+    if (!this.isAuthenticated) {
+      console.error('❌ renameFolder: Not authenticated');
+      return false;
+    }
+
+    try {
+      const drive = google.drive({ version: 'v3', auth: this.oauth2Client });
+
+      await drive.files.update({
+        fileId: folderId,
+        requestBody: {
+          name: newName
+        }
+      });
+
+      console.log(`✅ Renamed folder ${folderId} to "${newName}"`);
+      return true;
+    } catch (error: any) {
+      console.error(`❌ Failed to rename folder ${folderId}:`, error.message || error);
+      return false;
+    }
+  }
+
+  /**
+   * Get the parent folder ID of a folder
+   */
+  async getParentFolderId(folderId: string): Promise<string | null> {
+    if (!this.isAuthenticated) {
+      console.error('❌ getParentFolderId: Not authenticated');
+      return null;
+    }
+
+    try {
+      const drive = google.drive({ version: 'v3', auth: this.oauth2Client });
+
+      const result = await drive.files.get({
+        fileId: folderId,
+        fields: 'parents'
+      });
+
+      if (result.data.parents && result.data.parents.length > 0) {
+        return result.data.parents[0];
+      }
+
+      return null;
+    } catch (error: any) {
+      console.error(`❌ Failed to get parent folder:`, error.message || error);
+      return null;
+    }
+  }
+
+  /**
+   * Move a folder to a new parent folder
+   */
+  async moveFolderToParent(folderId: string, newParentId: string): Promise<boolean> {
+    if (!this.isAuthenticated) {
+      console.error('❌ moveFolderToParent: Not authenticated');
+      return false;
+    }
+
+    try {
+      const drive = google.drive({ version: 'v3', auth: this.oauth2Client });
+
+      // Get current parents
+      const file = await drive.files.get({
+        fileId: folderId,
+        fields: 'parents'
+      });
+
+      const previousParents = file.data.parents?.join(',') || '';
+
+      // Move to new parent
+      await drive.files.update({
+        fileId: folderId,
+        addParents: newParentId,
+        removeParents: previousParents,
+        fields: 'id, parents'
+      });
+
+      console.log(`✅ Moved folder ${folderId} to new parent ${newParentId}`);
+      return true;
+    } catch (error: any) {
+      console.error(`❌ Failed to move folder:`, error.message || error);
+      return false;
+    }
+  }
+
+  /**
+   * Find or create a folder under a parent
+   */
+  async findOrCreateFolder(parentId: string, folderName: string): Promise<string | null> {
+    if (!this.isAuthenticated) {
+      console.error('❌ findOrCreateFolder: Not authenticated');
+      return null;
+    }
+
+    try {
+      const drive = google.drive({ version: 'v3', auth: this.oauth2Client });
+
+      // First, try to find existing folder
+      const query = `name='${folderName}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+      const result = await drive.files.list({
+        q: query,
+        fields: 'files(id, name)',
+        spaces: 'drive'
+      });
+
+      if (result.data.files && result.data.files.length > 0) {
+        console.log(`📁 Found existing folder "${folderName}": ${result.data.files[0].id}`);
+        return result.data.files[0].id!;
+      }
+
+      // Create new folder
+      const folderResult = await drive.files.create({
+        requestBody: {
+          name: folderName,
+          mimeType: 'application/vnd.google-apps.folder',
+          parents: [parentId]
+        },
+        fields: 'id'
+      });
+
+      console.log(`📁 Created new folder "${folderName}": ${folderResult.data.id}`);
+      return folderResult.data.id!;
+    } catch (error: any) {
+      console.error(`❌ Failed to find/create folder:`, error.message || error);
+      return null;
+    }
+  }
+
+  /**
+   * Update project folder names when project details change
+   * @param customerFolderId - The ID of the customer folder (stored in recording.driveFolderId)
+   * @param updates - Object containing the new values
+   * @param oldValues - Object containing the old values for comparison
+   * @returns Object with updated folder IDs if any renames occurred
+   *
+   * Folder structure: Year/Month/Day/FlightTime-PilotInitials/CustomerName/
+   * - Customer name change: renames the customer folder
+   * - Flight time/pilot change: MOVES customer folder to new/existing flight folder (doesn't affect other customers)
+   */
+  async updateProjectFolders(
+    customerFolderId: string,
+    updates: {
+      pilotName?: string;      // Customer name - affects customer folder
+      flightPilot?: string;    // Pilot initials - affects flight folder
+      flightTime?: string;     // Flight time - affects flight folder
+    },
+    oldValues: {
+      pilotName?: string;
+      flightPilot?: string;
+      flightTime?: string;
+    }
+  ): Promise<{ success: boolean; message: string }> {
+    if (!this.isAuthenticated) {
+      return { success: false, message: 'Not authenticated' };
+    }
+
+    if (!customerFolderId) {
+      return { success: false, message: 'No customer folder ID provided' };
+    }
+
+    try {
+      const results: string[] = [];
+
+      // Check if customer folder name needs updating (pilotName = customer name)
+      if (updates.pilotName && updates.pilotName !== oldValues.pilotName) {
+        const sanitizedName = updates.pilotName.replace(/[/\\:*?"<>|]/g, '_');
+        const renamed = await this.renameFolder(customerFolderId, sanitizedName);
+        if (renamed) {
+          results.push(`Customer folder renamed to "${sanitizedName}"`);
+        }
+      }
+
+      // Check if flight folder needs changing (flightTime or flightPilot changed)
+      // This MOVES the customer folder to a new flight folder, doesn't rename the shared one
+      const flightTimeChanged = updates.flightTime && updates.flightTime !== oldValues.flightTime;
+      const pilotChanged = updates.flightPilot && updates.flightPilot !== oldValues.flightPilot;
+
+      if (flightTimeChanged || pilotChanged) {
+        // Get the current flight folder (parent of customer folder)
+        const currentFlightFolderId = await this.getParentFolderId(customerFolderId);
+
+        if (currentFlightFolderId) {
+          // Get the day folder (parent of flight folder)
+          const dayFolderId = await this.getParentFolderId(currentFlightFolderId);
+
+          if (dayFolderId) {
+            // Build the new flight folder name
+            const flightTime = updates.flightTime || oldValues.flightTime || '0000';
+            const flightNumber = flightTime.replace(':', '');
+
+            // Get pilot initials
+            const pilotName = updates.flightPilot || oldValues.flightPilot || '';
+            let pilotInitials: string;
+            if (pilotName.length <= 3 && /^[A-Z]+$/.test(pilotName)) {
+              pilotInitials = pilotName;
+            } else {
+              pilotInitials = pilotName
+                .replace('captain_', '')
+                .split(/[\s_]+/)
+                .map(word => word.charAt(0).toUpperCase())
+                .join('');
+            }
+
+            const newFlightFolderName = `${flightNumber}-${pilotInitials}`;
+
+            // Find or create the target flight folder under the day folder
+            const targetFlightFolderId = await this.findOrCreateFolder(dayFolderId, newFlightFolderName);
+
+            if (targetFlightFolderId && targetFlightFolderId !== currentFlightFolderId) {
+              // Move customer folder to the new flight folder
+              const moved = await this.moveFolderToParent(customerFolderId, targetFlightFolderId);
+              if (moved) {
+                results.push(`Customer moved to flight folder "${newFlightFolderName}"`);
+              }
+            }
+          }
+        }
+      }
+
+      if (results.length > 0) {
+        console.log(`📁 Folder updates: ${results.join(', ')}`);
+        return { success: true, message: results.join(', ') };
+      }
+
+      return { success: true, message: 'No folder changes needed' };
+    } catch (error: any) {
+      console.error('❌ Failed to update project folders:', error.message || error);
+      return { success: false, message: error.message || 'Unknown error' };
+    }
+  }
 }
 
 // Export singleton instance for Vercel
