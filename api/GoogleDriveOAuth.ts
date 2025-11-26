@@ -168,6 +168,147 @@ export class GoogleDriveOAuth {
   }
 
   /**
+   * Get the web URL for a folder from its ID
+   */
+  getFolderWebUrl(folderId: string): string {
+    return `https://drive.google.com/drive/folders/${folderId}`;
+  }
+
+  /**
+   * Find a folder by name in root of Drive
+   */
+  private async findFolderByName(drive: any, name: string): Promise<string | null> {
+    const query = `name='${name}' and 'root' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+
+    const result = await drive.files.list({
+      q: query,
+      fields: 'files(id, name)',
+      spaces: 'drive'
+    });
+
+    if (result.data.files && result.data.files.length > 0) {
+      console.log(`📁 Found folder "${name}" with ID: ${result.data.files[0].id}`);
+      return result.data.files[0].id!;
+    }
+
+    return null;
+  }
+
+  /**
+   * Get or create a folder under a parent
+   */
+  private async getOrCreateFolder(drive: any, name: string, parentId: string | null): Promise<string> {
+    const parent = parentId || 'root';
+    const query = `name='${name}' and '${parent}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+
+    const result = await drive.files.list({
+      q: query,
+      fields: 'files(id, name)',
+      spaces: 'drive'
+    });
+
+    if (result.data.files && result.data.files.length > 0) {
+      return result.data.files[0].id!;
+    }
+
+    // Create the folder
+    const folderResult = await drive.files.create({
+      requestBody: {
+        name: name,
+        mimeType: 'application/vnd.google-apps.folder',
+        parents: [parent]
+      },
+      fields: 'id'
+    });
+
+    console.log(`📁 Created folder: ${name}`);
+    return folderResult.data.id!;
+  }
+
+  /**
+   * Create project folder structure for a new project
+   * Structure: Magnum Media Purchases/Year/Month/Day/FlightNumber-PilotInitials/CustomerName/
+   *   ├── Video/
+   *   └── Photos/
+   */
+  async createProjectFolderStructure(
+    customerName: string,
+    pilotName: string,
+    flightTime: string,
+    flightDate?: Date
+  ): Promise<{ folderId: string; folderUrl: string; videoFolderId: string; photosFolderId: string } | null> {
+    if (!this.isAuthenticated) {
+      console.warn('❌ Google Drive OAuth not authenticated - cannot create project folder');
+      return null;
+    }
+
+    try {
+      const drive = google.drive({ version: 'v3', auth: this.oauth2Client });
+      const date = flightDate || new Date();
+
+      // Format date components
+      const year = date.getFullYear().toString();
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+      const month = `${(date.getMonth() + 1).toString().padStart(2, '0')}-${monthNames[date.getMonth()]}`;
+      const day = date.getDate().toString().padStart(2, '0');
+
+      // Get pilot initials
+      let pilotInitials: string;
+      if (pilotName.length <= 3 && /^[A-Z]+$/.test(pilotName)) {
+        pilotInitials = pilotName;
+      } else {
+        pilotInitials = pilotName
+          .replace('captain_', '')
+          .split(/[\s_]+/)
+          .map(word => word.charAt(0).toUpperCase())
+          .join('');
+      }
+
+      const flightNumber = flightTime ? flightTime.replace(':', '') : '0000';
+      const flightFolderName = `${flightNumber}-${pilotInitials}`;
+      const customerFolderName = customerName.replace(/[/\\:*?"<>|]/g, '_');
+
+      // Find the "Magnum Media Purchases" folder as the root parent
+      const rootFolderName = 'Magnum Media Purchases';
+      const rootFolderId = await this.findFolderByName(drive, rootFolderName);
+
+      if (!rootFolderId) {
+        console.error(`❌ Could not find "${rootFolderName}" folder in Google Drive. Please create it first.`);
+        throw new Error(`Root folder "${rootFolderName}" not found in Google Drive`);
+      }
+
+      console.log(`📁 Creating project folder structure inside "${rootFolderName}":`);
+      console.log(`   ${year}/${month}/${day}/${flightFolderName}/${customerFolderName}/`);
+
+      // Create folder hierarchy
+      const yearFolderId = await this.getOrCreateFolder(drive, year, rootFolderId);
+      const monthFolderId = await this.getOrCreateFolder(drive, month, yearFolderId);
+      const dayFolderId = await this.getOrCreateFolder(drive, day, monthFolderId);
+      const flightFolderId = await this.getOrCreateFolder(drive, flightFolderName, dayFolderId);
+      const customerFolderId = await this.getOrCreateFolder(drive, customerFolderName, flightFolderId);
+
+      // Create Video and Photos subfolders
+      const videoFolderId = await this.getOrCreateFolder(drive, 'Video', customerFolderId);
+      const photosFolderId = await this.getOrCreateFolder(drive, 'Photos', customerFolderId);
+
+      const folderUrl = this.getFolderWebUrl(customerFolderId);
+
+      console.log(`✅ Project folder structure created: ${folderUrl}`);
+
+      return {
+        folderId: customerFolderId,
+        folderUrl,
+        videoFolderId,
+        photosFolderId
+      };
+    } catch (error) {
+      console.error('❌ Failed to create project folder structure:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get the Photos folder ID from a project's customer folder
    */
   async getPhotosFolderId(customerFolderId: string): Promise<string | null> {

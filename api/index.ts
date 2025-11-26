@@ -431,7 +431,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       app.post('/api/recordings', async (req, res) => {
         try {
-          const recording = await storage.createFlightRecording(req.body);
+          const { pilotName, flightPilot, flightTime } = req.body;
+
+          // Create the recording in the database first
+          let recording = await storage.createFlightRecording(req.body);
+
+          // Try to create Google Drive folder structure if we have the required fields
+          if (driveOAuth.isReady() && pilotName && flightPilot && flightTime) {
+            try {
+              console.log(`📁 Creating Google Drive folder for project: ${pilotName}`);
+
+              const folderResult = await driveOAuth.createProjectFolderStructure(
+                pilotName,
+                flightPilot,
+                flightTime
+              );
+
+              if (folderResult) {
+                // Update recording with the folder URL and all folder IDs
+                recording = await storage.updateFlightRecording(recording.id, {
+                  driveFolderUrl: folderResult.folderUrl,
+                  driveFolderId: folderResult.folderId,
+                  videoFolderId: folderResult.videoFolderId,
+                  photosFolderId: folderResult.photosFolderId
+                });
+                console.log(`✅ Google Drive folder created: ${folderResult.folderUrl}`);
+              }
+            } catch (driveError: any) {
+              // Don't fail the recording creation if Drive folder creation fails
+              console.error(`⚠️ Failed to create Google Drive folder (non-fatal):`, driveError.message);
+            }
+          } else if (!driveOAuth.isReady()) {
+            console.log(`⚠️ Google Drive not authenticated - skipping folder creation`);
+          } else {
+            console.log(`⚠️ Missing required fields for folder creation (pilotName, flightPilot, or flightTime)`);
+          }
+
           res.json(recording);
         } catch (error) {
           res.status(500).json({ error: 'Failed to create recording' });
