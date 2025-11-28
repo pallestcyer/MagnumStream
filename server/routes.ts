@@ -435,6 +435,422 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Comprehensive admin dashboard analytics
+  app.get("/api/admin/analytics", async (req, res) => {
+    try {
+      const { from, to } = req.query;
+      const sales = await storage.getAllSales();
+      const recordings = await storage.getAllFlightRecordings();
+
+      // Date filtering
+      const fromDate = from ? new Date(from as string) : null;
+      const toDate = to ? new Date(to as string) : null;
+
+      const filteredRecordings = recordings.filter(r => {
+        if (!fromDate || !toDate) return true;
+        const recordingDate = r.createdAt;
+        return recordingDate >= fromDate && recordingDate <= toDate;
+      });
+
+      const filteredSales = sales.filter(s => {
+        if (!fromDate || !toDate) return true;
+        const saleDate = s.saleDate;
+        return saleDate >= fromDate && saleDate <= toDate;
+      });
+
+      // Get recording IDs that have sales
+      const recordingsWithSales = new Set(filteredSales.map(s => s.recordingId));
+
+      // Total counts
+      const totalGroups = filteredRecordings.length;
+      const totalSales = filteredSales.length;
+
+      // Media completion
+      const videoCompleted = filteredRecordings.filter(r =>
+        r.exportStatus === "completed" || r.driveFileUrl
+      ).length;
+      const photosCompleted = filteredRecordings.filter(r => r.photosUploaded).length;
+
+      // Bundle breakdown
+      const bundleCounts = {
+        video_photos: filteredSales.filter(s => s.bundle === "video_photos").length,
+        video_only: filteredSales.filter(s => s.bundle === "video_only").length,
+        photos_only: filteredSales.filter(s => s.bundle === "photos_only").length,
+      };
+
+      // Revenue by bundle
+      const bundleRevenue = {
+        video_photos: filteredSales.filter(s => s.bundle === "video_photos")
+          .reduce((sum, s) => sum + (s.saleAmount || 0), 0),
+        video_only: filteredSales.filter(s => s.bundle === "video_only")
+          .reduce((sum, s) => sum + (s.saleAmount || 0), 0),
+        photos_only: filteredSales.filter(s => s.bundle === "photos_only")
+          .reduce((sum, s) => sum + (s.saleAmount || 0), 0),
+      };
+
+      const totalRevenue = filteredSales.reduce((sum, s) => sum + (s.saleAmount || 0), 0);
+
+      // Missed opportunities
+      const missingVideo = filteredRecordings.filter(r =>
+        r.exportStatus !== "completed" && !r.driveFileUrl
+      ).length;
+      const missingPhotos = filteredRecordings.filter(r => !r.photosUploaded).length;
+      const missingBoth = filteredRecordings.filter(r =>
+        (r.exportStatus !== "completed" && !r.driveFileUrl) && !r.photosUploaded
+      ).length;
+
+      // Conversion rates
+      const projectsWithSales = recordingsWithSales.size;
+      const conversionRate = totalGroups > 0 ? (projectsWithSales / totalGroups) * 100 : 0;
+      const avgOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
+
+      // Conversion by media completion status
+      const completeMediaProjects = filteredRecordings.filter(r =>
+        (r.exportStatus === "completed" || r.driveFileUrl) && r.photosUploaded
+      );
+      const incompleteMediaProjects = filteredRecordings.filter(r =>
+        (r.exportStatus !== "completed" && !r.driveFileUrl) || !r.photosUploaded
+      );
+
+      const completeMediaWithSales = completeMediaProjects.filter(r => recordingsWithSales.has(r.id)).length;
+      const incompleteMediaWithSales = incompleteMediaProjects.filter(r => recordingsWithSales.has(r.id)).length;
+
+      const completeConversion = completeMediaProjects.length > 0
+        ? (completeMediaWithSales / completeMediaProjects.length) * 100 : 0;
+      const incompleteConversion = incompleteMediaProjects.length > 0
+        ? (incompleteMediaWithSales / incompleteMediaProjects.length) * 100 : 0;
+
+      // Daily revenue breakdown
+      const dailyRevenue = filteredSales.reduce((acc, sale) => {
+        const dateKey = sale.saleDate.toISOString().split('T')[0];
+        if (!acc[dateKey]) {
+          acc[dateKey] = { date: dateKey, revenue: 0, video: 0, photos: 0, combo: 0 };
+        }
+        acc[dateKey].revenue += sale.saleAmount || 0;
+        if (sale.bundle === "video_photos") acc[dateKey].combo += sale.saleAmount || 0;
+        else if (sale.bundle === "video_only") acc[dateKey].video += sale.saleAmount || 0;
+        else if (sale.bundle === "photos_only") acc[dateKey].photos += sale.saleAmount || 0;
+        return acc;
+      }, {} as Record<string, { date: string; revenue: number; video: number; photos: number; combo: number }>);
+
+      const revenueOverTime = Object.values(dailyRevenue).sort((a, b) =>
+        a.date.localeCompare(b.date)
+      );
+
+      // Ground Crew performance - based on who handled the sale (sales.staffMember)
+      const groundCrewPerformance: Record<string, {
+        name: string; revenue: number; combos: number; videos: number; photos: number; totalSales: number
+      }> = {};
+
+      filteredSales.forEach(sale => {
+        const staff = sale.staffMember;
+        if (!staff) return;
+        if (!groundCrewPerformance[staff]) {
+          groundCrewPerformance[staff] = { name: staff, revenue: 0, combos: 0, videos: 0, photos: 0, totalSales: 0 };
+        }
+        groundCrewPerformance[staff].revenue += sale.saleAmount || 0;
+        groundCrewPerformance[staff].totalSales += 1;
+        if (sale.bundle === "video_photos") groundCrewPerformance[staff].combos += 1;
+        else if (sale.bundle === "video_only") groundCrewPerformance[staff].videos += 1;
+        else if (sale.bundle === "photos_only") groundCrewPerformance[staff].photos += 1;
+      });
+
+      const groundCrewData = Object.values(groundCrewPerformance).sort((a, b) => b.revenue - a.revenue);
+
+      // Pilot performance - based on who flew the project (recordings.flightPilot)
+      // Need to join sales with recordings to attribute sales to pilots
+      const pilotPerformance: Record<string, {
+        name: string; revenue: number; combos: number; videos: number; photos: number; totalSales: number
+      }> = {};
+
+      // Create a map of recording ID to pilot
+      const recordingToPilot = new Map<string, string>();
+      filteredRecordings.forEach(r => {
+        if (r.flightPilot) {
+          recordingToPilot.set(r.id, r.flightPilot);
+        }
+      });
+
+      filteredSales.forEach(sale => {
+        const pilot = recordingToPilot.get(sale.recordingId);
+        if (!pilot) return;
+        if (!pilotPerformance[pilot]) {
+          pilotPerformance[pilot] = { name: pilot, revenue: 0, combos: 0, videos: 0, photos: 0, totalSales: 0 };
+        }
+        pilotPerformance[pilot].revenue += sale.saleAmount || 0;
+        pilotPerformance[pilot].totalSales += 1;
+        if (sale.bundle === "video_photos") pilotPerformance[pilot].combos += 1;
+        else if (sale.bundle === "video_only") pilotPerformance[pilot].videos += 1;
+        else if (sale.bundle === "photos_only") pilotPerformance[pilot].photos += 1;
+      });
+
+      const pilotData = Object.values(pilotPerformance).sort((a, b) => b.revenue - a.revenue);
+
+      // Combined staffData for backward compatibility (uses ground crew data)
+      const staffData = groundCrewData;
+
+      // Hourly analysis (based on flight time or sale time)
+      const hourlyData: Record<number, { hour: number; sales: number; total: number; revenue: number }> = {};
+      for (let h = 8; h <= 18; h++) {
+        hourlyData[h] = { hour: h, sales: 0, total: 0, revenue: 0 };
+      }
+
+      filteredRecordings.forEach(r => {
+        if (r.flightTime) {
+          const hour = parseInt(r.flightTime.split(':')[0], 10);
+          if (hourlyData[hour]) {
+            hourlyData[hour].total += 1;
+            if (recordingsWithSales.has(r.id)) {
+              hourlyData[hour].sales += 1;
+            }
+          }
+        }
+      });
+
+      filteredSales.forEach(s => {
+        const hour = s.saleDate.getHours();
+        if (hourlyData[hour]) {
+          hourlyData[hour].revenue += s.saleAmount || 0;
+        }
+      });
+
+      const timeAnalysis = Object.values(hourlyData).map(h => ({
+        ...h,
+        conversion: h.total > 0 ? (h.sales / h.total) * 100 : 0
+      }));
+
+      // Day of week analysis
+      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const dayData = dayNames.map(d => ({ day: d, sales: 0, total: 0, revenue: 0 }));
+
+      filteredRecordings.forEach(r => {
+        const day = r.createdAt.getDay();
+        dayData[day].total += 1;
+        if (recordingsWithSales.has(r.id)) {
+          dayData[day].sales += 1;
+        }
+      });
+
+      filteredSales.forEach(s => {
+        const day = s.saleDate.getDay();
+        dayData[day].revenue += s.saleAmount || 0;
+      });
+
+      const dayOfWeekAnalysis = dayData.map(d => ({
+        ...d,
+        conversion: d.total > 0 ? (d.sales / d.total) * 100 : 0
+      }));
+
+      // Package mix for pie chart
+      const packageMix = [
+        { name: "Video Only", value: bundleCounts.video_only, revenue: bundleRevenue.video_only },
+        { name: "Photos Only", value: bundleCounts.photos_only, revenue: bundleRevenue.photos_only },
+        { name: "Combo", value: bundleCounts.video_photos, revenue: bundleRevenue.video_photos },
+      ];
+
+      // Availability Paths - categorize recordings by media availability and track purchase outcomes
+      const availabilityCategories = {
+        both: {
+          name: "Both Available",
+          total: 0,
+          outcomes: { no_purchase: 0, combo: 0, video: 0, photos: 0 }
+        },
+        photos_only: {
+          name: "Photos Only Available",
+          total: 0,
+          outcomes: { no_purchase: 0, combo: 0, video: 0, photos: 0 }
+        },
+        video_only: {
+          name: "Video Only Available",
+          total: 0,
+          outcomes: { no_purchase: 0, combo: 0, video: 0, photos: 0 }
+        }
+      };
+
+      // Build a map of recording ID to sale bundle type
+      const recordingSaleMap = new Map<string, string>();
+      filteredSales.forEach(sale => {
+        recordingSaleMap.set(sale.recordingId, sale.bundle);
+      });
+
+      filteredRecordings.forEach(r => {
+        const hasVideo = r.exportStatus === "completed" || !!r.driveFileUrl;
+        const hasPhotos = r.photosUploaded;
+
+        let categoryKey: "both" | "photos_only" | "video_only" | null = null;
+        if (hasVideo && hasPhotos) categoryKey = "both";
+        else if (hasVideo && !hasPhotos) categoryKey = "video_only";
+        else if (!hasVideo && hasPhotos) categoryKey = "photos_only";
+
+        if (!categoryKey) return; // Neither available, skip
+
+        const cat = availabilityCategories[categoryKey];
+        cat.total++;
+
+        const saleBundleType = recordingSaleMap.get(r.id);
+        if (!saleBundleType) {
+          cat.outcomes.no_purchase++;
+        } else if (saleBundleType === "video_photos") {
+          cat.outcomes.combo++;
+        } else if (saleBundleType === "video_only") {
+          cat.outcomes.video++;
+        } else if (saleBundleType === "photos_only") {
+          cat.outcomes.photos++;
+        }
+      });
+
+      // Transform availability paths to final format
+      const availabilityPaths = Object.entries(availabilityCategories)
+        .filter(([_, data]) => data.total > 0)
+        .map(([key, data]) => {
+          const totalPurchases = data.outcomes.combo + data.outcomes.video + data.outcomes.photos;
+          const conversionRate = data.total > 0 ? (totalPurchases / data.total) * 100 : 0;
+
+          let validOutcomes: Array<{ label: string; value: number; percentage: number; color: string }> = [];
+
+          if (key === "both") {
+            validOutcomes = [
+              { label: "Combo Bought", value: data.outcomes.combo, percentage: data.total > 0 ? (data.outcomes.combo / data.total) * 100 : 0, color: "bg-emerald-500" },
+              { label: "Video Bought", value: data.outcomes.video, percentage: data.total > 0 ? (data.outcomes.video / data.total) * 100 : 0, color: "bg-amber-500" },
+              { label: "Photos Bought", value: data.outcomes.photos, percentage: data.total > 0 ? (data.outcomes.photos / data.total) * 100 : 0, color: "bg-blue-500" },
+              { label: "No Purchase", value: data.outcomes.no_purchase, percentage: data.total > 0 ? (data.outcomes.no_purchase / data.total) * 100 : 0, color: "bg-muted" },
+            ];
+          } else if (key === "video_only") {
+            validOutcomes = [
+              { label: "Video Bought", value: data.outcomes.video + data.outcomes.combo, percentage: data.total > 0 ? ((data.outcomes.video + data.outcomes.combo) / data.total) * 100 : 0, color: "bg-amber-500" },
+              { label: "No Purchase", value: data.outcomes.no_purchase, percentage: data.total > 0 ? (data.outcomes.no_purchase / data.total) * 100 : 0, color: "bg-muted" },
+            ];
+          } else if (key === "photos_only") {
+            validOutcomes = [
+              { label: "Photos Bought", value: data.outcomes.photos + data.outcomes.combo, percentage: data.total > 0 ? ((data.outcomes.photos + data.outcomes.combo) / data.total) * 100 : 0, color: "bg-blue-500" },
+              { label: "No Purchase", value: data.outcomes.no_purchase, percentage: data.total > 0 ? (data.outcomes.no_purchase / data.total) * 100 : 0, color: "bg-muted" },
+            ];
+          }
+
+          return {
+            id: key,
+            name: data.name,
+            total: data.total,
+            conversionRate,
+            outcomes: validOutcomes.filter(o => o.value > 0 || o.label === "No Purchase"),
+          };
+        });
+
+      // Sankey flow data for Availability Impact Flow diagram
+      const sankeyLinks: Record<string, number> = {};
+      const incrementSankeyLink = (from: string, to: string) => {
+        const key = `${from}|${to}`;
+        sankeyLinks[key] = (sankeyLinks[key] || 0) + 1;
+      };
+
+      filteredRecordings.forEach(r => {
+        const hasVideo = r.exportStatus === "completed" || !!r.driveFileUrl;
+        const hasPhotos = r.photosUploaded;
+
+        // Determine source (availability)
+        let source = "Neither Available";
+        if (hasVideo && hasPhotos) source = "Both Available";
+        else if (hasVideo) source = "Video Only Available";
+        else if (hasPhotos) source = "Photos Only Available";
+
+        // Determine target (outcome)
+        const saleBundleType = recordingSaleMap.get(r.id);
+        let target = "No Purchase";
+        if (saleBundleType === "video_photos") target = "Combo Bought";
+        else if (saleBundleType === "video_only") target = "Video Bought";
+        else if (saleBundleType === "photos_only") target = "Photos Bought";
+
+        incrementSankeyLink(source, target);
+      });
+
+      // Convert to Google Charts format: [From, To, Weight]
+      const sankeyData = Object.entries(sankeyLinks).map(([key, weight]) => {
+        const [from, to] = key.split("|");
+        return [from, to, weight];
+      });
+
+      // Incomplete projects list (for Completion page)
+      const incompleteProjects = filteredRecordings
+        .filter(r => (r.exportStatus !== "completed" && !r.driveFileUrl) || !r.photosUploaded)
+        .map(r => ({
+          id: r.id,
+          flightDate: r.flightDate || null,
+          flightTime: r.flightTime || null,
+          customerNames: [r.pilotName],
+          email: r.pilotEmail || "",
+          pilot: r.flightPilot || "Unknown",
+          groundCrew: r.staffMember || "",
+          videoCompleted: r.exportStatus === "completed" || !!r.driveFileUrl,
+          photosCompleted: r.photosUploaded,
+          packagePurchased: recordingsWithSales.has(r.id) ? "purchased" : null,
+        }));
+
+      // Non-purchasers list
+      const nonPurchasers = filteredRecordings
+        .filter(r => !recordingsWithSales.has(r.id))
+        .map(r => ({
+          id: r.id,
+          flightDate: r.flightDate || null,
+          flightTime: r.flightTime || null,
+          customerNames: [r.pilotName],
+          email: r.pilotEmail || "",
+          packagePurchased: null,
+          upsellOpportunity: "Full Combo",
+          potentialValue: 49.99,
+        }));
+
+      res.json({
+        // KPI Metrics
+        totalGroups,
+        totalSales,
+        totalRevenue,
+        conversionRate,
+        avgOrderValue,
+
+        // Media completion
+        videoCompleted,
+        photosCompleted,
+        videoCompletionRate: totalGroups > 0 ? (videoCompleted / totalGroups) * 100 : 0,
+        photoCompletionRate: totalGroups > 0 ? (photosCompleted / totalGroups) * 100 : 0,
+
+        // Bundle breakdown
+        bundleCounts,
+        bundleRevenue,
+        packageMix,
+
+        // Availability paths for Packages page
+        availabilityPaths,
+
+        // Sankey flow data for Availability Impact Flow
+        sankeyData,
+
+        // Missed opportunities
+        missingVideo,
+        missingPhotos,
+        missingBoth,
+        completeConversion,
+        incompleteConversion,
+
+        // Time-based data
+        revenueOverTime,
+        timeAnalysis,
+        dayOfWeekAnalysis,
+
+        // Staff performance
+        staffData,
+        groundCrewData,
+        pilotData,
+
+        // Lists for detail pages
+        incompleteProjects: incompleteProjects.slice(0, 50),
+        nonPurchasers: nonPurchasers.slice(0, 50),
+      });
+    } catch (error: any) {
+      console.error("Admin analytics error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Submit issue report
   app.post("/api/issues", async (req, res) => {
     try {
@@ -1719,8 +2135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add error handling middleware
-  app.use(notFoundHandler);
+  // Add error handling middleware (notFoundHandler removed - Vite handles frontend routes)
   app.use(errorHandler);
 
   const httpServer = createServer(app);
