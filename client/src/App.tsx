@@ -250,7 +250,7 @@ function App() {
               <div className="flex h-screen w-full">
                 <AppSidebar />
                 <div className="flex flex-col flex-1 overflow-hidden">
-                  <header className="flex items-center justify-between p-2 border-b border-border bg-card/30 backdrop-blur-md">
+                  <header className="flex items-center gap-2 p-2 border-b border-border bg-card/30 backdrop-blur-md">
                     <SidebarTrigger data-testid="button-sidebar-toggle" />
                     <Button
                       variant="outline"
