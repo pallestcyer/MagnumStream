@@ -1284,19 +1284,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const completeConversion = completeRecordings.length > 0 ? (completeSales / completeRecordings.length) * 100 : 0;
           const incompleteConversion = incompleteRecordings.length > 0 ? (incompleteSales / incompleteRecordings.length) * 100 : 0;
 
-          // Revenue over time with breakdown
-          const revenueByDateMap: Record<string, { revenue: number; video: number; photos: number; combo: number }> = {};
-          filteredSales.forEach((s: any) => {
-            const date = new Date(s.saleDate).toISOString().split('T')[0];
-            if (!revenueByDateMap[date]) {
-              revenueByDateMap[date] = { revenue: 0, video: 0, photos: 0, combo: 0 };
+          // Revenue over time with flights, conversions, and revenue
+          const dailyDataMap: Record<string, { revenue: number; flights: number; conversions: number; video: number; photos: number; combo: number }> = {};
+
+          // Count flights (recordings) per day using flightDate
+          filteredRecordings.forEach((r: any) => {
+            const date = r.flightDate || new Date(r.createdAt).toISOString().split('T')[0];
+            if (!dailyDataMap[date]) {
+              dailyDataMap[date] = { revenue: 0, flights: 0, conversions: 0, video: 0, photos: 0, combo: 0 };
             }
-            revenueByDateMap[date].revenue += s.saleAmount || 0;
-            if (s.bundle === 'combo') revenueByDateMap[date].combo += s.saleAmount || 0;
-            else if (s.bundle === 'video_only') revenueByDateMap[date].video += s.saleAmount || 0;
-            else if (s.bundle === 'photos_only') revenueByDateMap[date].photos += s.saleAmount || 0;
+            dailyDataMap[date].flights++;
           });
-          const revenueOverTime = Object.entries(revenueByDateMap)
+
+          // Count conversions and revenue per day
+          filteredSales.forEach((s: any) => {
+            // Find the recording to get its flight date
+            const recording = filteredRecordings.find((r: any) => r.id === s.recordingId);
+            const date = recording?.flightDate || new Date(s.saleDate).toISOString().split('T')[0];
+            if (!dailyDataMap[date]) {
+              dailyDataMap[date] = { revenue: 0, flights: 0, conversions: 0, video: 0, photos: 0, combo: 0 };
+            }
+            dailyDataMap[date].revenue += s.saleAmount || 0;
+            dailyDataMap[date].conversions++;
+            if (s.bundle === 'combo') dailyDataMap[date].combo += s.saleAmount || 0;
+            else if (s.bundle === 'video_only') dailyDataMap[date].video += s.saleAmount || 0;
+            else if (s.bundle === 'photos_only') dailyDataMap[date].photos += s.saleAmount || 0;
+          });
+
+          const revenueOverTime = Object.entries(dailyDataMap)
             .map(([date, data]) => ({ date, ...data }))
             .sort((a, b) => a.date.localeCompare(b.date));
 

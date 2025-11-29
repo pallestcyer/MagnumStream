@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { subDays, format } from "date-fns";
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { DollarSign, Users, TrendingUp, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -44,7 +44,7 @@ interface AnalyticsData {
   missingBoth: number;
   completeConversion: number;
   incompleteConversion: number;
-  revenueOverTime: Array<{ date: string; revenue: number; video: number; photos: number; combo: number }>;
+  revenueOverTime: Array<{ date: string; revenue: number; flights: number; conversions: number; video: number; photos: number; combo: number }>;
   timeAnalysis: Array<{ hour: number; sales: number; total: number; revenue: number; conversion: number }>;
   dayOfWeekAnalysis: Array<{ day: string; sales: number; total: number; revenue: number; conversion: number }>;
   staffData: Array<{ name: string; revenue: number; combos: number; videos: number; photos: number; totalSales: number }>;
@@ -194,17 +194,7 @@ export default function Overview() {
           <CardContent className="h-[350px]">
             {revenueOverTime.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={revenueOverTime}>
-                  <defs>
-                    <linearGradient id="colorVideo" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorPhotos" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
+                <LineChart data={revenueOverTime}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis
                     dataKey="date"
@@ -216,20 +206,34 @@ export default function Overview() {
                     dy={10}
                   />
                   <YAxis
+                    yAxisId="left"
                     stroke="hsl(var(--muted-foreground))"
                     fontSize={12}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(value) => `$${value}`}
                   />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
                   <Tooltip
                     contentStyle={{ backgroundColor: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "12px" }}
                     itemStyle={{ color: "hsl(var(--foreground))" }}
+                    formatter={(value: any, name: string) => {
+                      if (name === "Revenue") return [`$${value.toFixed(2)}`, name];
+                      return [value, name];
+                    }}
                   />
                   <Legend iconType="circle" wrapperStyle={{ paddingTop: "20px" }}/>
-                  <Area type="monotone" dataKey="video" stroke="hsl(var(--chart-1))" strokeWidth={3} fillOpacity={1} fill="url(#colorVideo)" name="Video Sales" />
-                  <Area type="monotone" dataKey="photos" stroke="hsl(var(--chart-2))" strokeWidth={3} fillOpacity={1} fill="url(#colorPhotos)" name="Photo Sales" />
-                </AreaChart>
+                  <Line yAxisId="left" type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={3} dot={false} name="Revenue" />
+                  <Line yAxisId="right" type="monotone" dataKey="conversions" stroke="#f97316" strokeWidth={3} dot={false} name="Conversions" />
+                  <Line yAxisId="right" type="monotone" dataKey="flights" stroke="#3b82f6" strokeWidth={3} dot={false} name="Flights" />
+                </LineChart>
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
