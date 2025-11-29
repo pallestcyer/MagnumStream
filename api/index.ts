@@ -1159,6 +1159,65 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               potentialValue: 49.99
             }));
 
+          // Calculate additional fields needed by Overview page
+          const videoCompleted = filteredRecordings.filter((r: any) => r.exportStatus === 'completed' || r.driveFileUrl).length;
+          const photosCompleted = filteredRecordings.filter((r: any) => r.photosUploaded).length;
+          const videoCompletionRate = totalSessions > 0 ? Math.round((videoCompleted / totalSessions) * 100) : 0;
+          const photoCompletionRate = totalSessions > 0 ? Math.round((photosCompleted / totalSessions) * 100) : 0;
+
+          // Bundle counts for funnel
+          const bundleCounts = {
+            video_photos: combos,
+            video_only: videoOnly,
+            photos_only: photosOnly
+          };
+
+          // Bundle revenue
+          const bundleRevenue = {
+            video_photos: filteredSales.filter((s: any) => s.bundle === 'combo').reduce((acc: number, s: any) => acc + (s.saleAmount || 0), 0),
+            video_only: filteredSales.filter((s: any) => s.bundle === 'video_only').reduce((acc: number, s: any) => acc + (s.saleAmount || 0), 0),
+            photos_only: filteredSales.filter((s: any) => s.bundle === 'photos_only').reduce((acc: number, s: any) => acc + (s.saleAmount || 0), 0)
+          };
+
+          // Package mix for pie chart
+          const packageMix = [
+            { name: 'Combo', value: combos, revenue: bundleRevenue.video_photos },
+            { name: 'Video Only', value: videoOnly, revenue: bundleRevenue.video_only },
+            { name: 'Photos Only', value: photosOnly, revenue: bundleRevenue.photos_only }
+          ];
+
+          // Conversion rates by media completeness
+          const completeRecordings = filteredRecordings.filter((r: any) => {
+            const hasVideo = r.exportStatus === 'completed' || r.driveFileUrl;
+            const hasPhotos = r.photosUploaded;
+            return hasVideo && hasPhotos;
+          });
+          const incompleteRecordings = filteredRecordings.filter((r: any) => {
+            const hasVideo = r.exportStatus === 'completed' || r.driveFileUrl;
+            const hasPhotos = r.photosUploaded;
+            return !hasVideo || !hasPhotos;
+          });
+          const completeSales = completeRecordings.filter((r: any) => filteredSales.find((s: any) => s.recordingId === r.id)).length;
+          const incompleteSales = incompleteRecordings.filter((r: any) => filteredSales.find((s: any) => s.recordingId === r.id)).length;
+          const completeConversion = completeRecordings.length > 0 ? (completeSales / completeRecordings.length) * 100 : 0;
+          const incompleteConversion = incompleteRecordings.length > 0 ? (incompleteSales / incompleteRecordings.length) * 100 : 0;
+
+          // Revenue over time with breakdown
+          const revenueByDateMap: Record<string, { revenue: number; video: number; photos: number; combo: number }> = {};
+          filteredSales.forEach((s: any) => {
+            const date = new Date(s.saleDate).toISOString().split('T')[0];
+            if (!revenueByDateMap[date]) {
+              revenueByDateMap[date] = { revenue: 0, video: 0, photos: 0, combo: 0 };
+            }
+            revenueByDateMap[date].revenue += s.saleAmount || 0;
+            if (s.bundle === 'combo') revenueByDateMap[date].combo += s.saleAmount || 0;
+            else if (s.bundle === 'video_only') revenueByDateMap[date].video += s.saleAmount || 0;
+            else if (s.bundle === 'photos_only') revenueByDateMap[date].photos += s.saleAmount || 0;
+          });
+          const revenueOverTime = Object.entries(revenueByDateMap)
+            .map(([date, data]) => ({ date, ...data }))
+            .sort((a, b) => a.date.localeCompare(b.date));
+
           res.json({
             totalSessions,
             totalSales,
@@ -1184,7 +1243,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             missingPhotos,
             missingBoth,
             nonPurchasers,
-            totalGroups: totalSessions
+            totalGroups: totalSessions,
+            // Additional fields for Overview page
+            videoCompleted,
+            photosCompleted,
+            videoCompletionRate,
+            photoCompletionRate,
+            bundleCounts,
+            bundleRevenue,
+            packageMix,
+            completeConversion,
+            incompleteConversion,
+            revenueOverTime
           });
         } catch (error: any) {
           console.error('Admin analytics error:', error);
