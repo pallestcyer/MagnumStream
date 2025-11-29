@@ -973,6 +973,225 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       });
 
+      // Admin analytics endpoint
+      app.get('/api/admin/analytics', async (req, res) => {
+        try {
+          const { from, to } = req.query;
+
+          // Fetch all recordings and sales
+          const recordings = await storage.getAllFlightRecordings();
+          const sales = await storage.getAllSales();
+
+          // Apply date filter
+          const fromDate = from ? new Date(from as string) : new Date(0);
+          const toDate = to ? new Date(to as string) : new Date();
+          toDate.setHours(23, 59, 59, 999);
+
+          const filteredRecordings = recordings.filter((r: any) => {
+            const date = new Date(r.createdAt);
+            return date >= fromDate && date <= toDate;
+          });
+
+          const recordingIds = new Set(filteredRecordings.map((r: any) => r.id));
+          const filteredSales = sales.filter((s: any) => recordingIds.has(s.recordingId));
+
+          // Calculate statistics
+          const totalSessions = filteredRecordings.length;
+          const totalSales = filteredSales.length;
+          const conversionRate = totalSessions > 0 ? Math.round((totalSales / totalSessions) * 100) : 0;
+          const totalRevenue = filteredSales.reduce((acc: number, s: any) => acc + (s.saleAmount || 0), 0);
+          const avgOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
+
+          // Package breakdown
+          const combos = filteredSales.filter((s: any) => s.bundle === 'combo').length;
+          const videoOnly = filteredSales.filter((s: any) => s.bundle === 'video_only').length;
+          const photosOnly = filteredSales.filter((s: any) => s.bundle === 'photos_only').length;
+
+          // Daily revenue
+          const dailyRevenueMap: Record<string, number> = {};
+          filteredSales.forEach((s: any) => {
+            const date = new Date(s.saleDate).toISOString().split('T')[0];
+            dailyRevenueMap[date] = (dailyRevenueMap[date] || 0) + (s.saleAmount || 0);
+          });
+          const dailyRevenue = Object.entries(dailyRevenueMap)
+            .map(([date, revenue]) => ({ date, revenue }))
+            .sort((a, b) => a.date.localeCompare(b.date));
+
+          // Availability paths
+          const availabilityPaths: Record<string, { sessions: number; conversions: number }> = {
+            'Both Available': { sessions: 0, conversions: 0 },
+            'Video Only Available': { sessions: 0, conversions: 0 },
+            'Photos Only Available': { sessions: 0, conversions: 0 },
+            'Neither Available': { sessions: 0, conversions: 0 }
+          };
+
+          filteredRecordings.forEach((r: any) => {
+            const hasVideo = r.exportStatus === 'completed' || r.driveFileUrl;
+            const hasPhotos = r.photosUploaded;
+
+            let path: string;
+            if (hasVideo && hasPhotos) path = 'Both Available';
+            else if (hasVideo) path = 'Video Only Available';
+            else if (hasPhotos) path = 'Photos Only Available';
+            else path = 'Neither Available';
+
+            availabilityPaths[path].sessions++;
+
+            const sale = filteredSales.find((s: any) => s.recordingId === r.id);
+            if (sale) availabilityPaths[path].conversions++;
+          });
+
+          // Sankey data
+          const sankeyLinks: Record<string, number> = {};
+          const incrementSankeyLink = (from: string, to: string) => {
+            const key = `${from}|${to}`;
+            sankeyLinks[key] = (sankeyLinks[key] || 0) + 1;
+          };
+
+          filteredRecordings.forEach((r: any) => {
+            const hasVideo = r.exportStatus === 'completed' || r.driveFileUrl;
+            const hasPhotos = r.photosUploaded;
+
+            let source: string;
+            if (hasVideo && hasPhotos) source = 'Both Available';
+            else if (hasVideo) source = 'Video Only';
+            else if (hasPhotos) source = 'Photos Only';
+            else source = 'Neither';
+
+            const sale = filteredSales.find((s: any) => s.recordingId === r.id);
+            if (sale) {
+              if (sale.bundle === 'combo') incrementSankeyLink(source, 'Bought Combo');
+              else if (sale.bundle === 'video_only') incrementSankeyLink(source, 'Bought Video');
+              else if (sale.bundle === 'photos_only') incrementSankeyLink(source, 'Bought Photos');
+            } else {
+              incrementSankeyLink(source, 'No Purchase');
+            }
+          });
+
+          const sankeyData = Object.entries(sankeyLinks).map(([key, weight]) => {
+            const [from, to] = key.split('|');
+            return [from, to, weight];
+          });
+
+          // Ground crew performance (based on sales.staffMember)
+          const groundCrewPerformance: Record<string, any> = {};
+          filteredSales.forEach((s: any) => {
+            const staff = s.staffMember || 'Unknown';
+            if (!groundCrewPerformance[staff]) {
+              groundCrewPerformance[staff] = { name: staff, revenue: 0, combos: 0, videos: 0, photos: 0, totalSales: 0 };
+            }
+            groundCrewPerformance[staff].revenue += s.saleAmount || 0;
+            groundCrewPerformance[staff].totalSales++;
+            if (s.bundle === 'combo') groundCrewPerformance[staff].combos++;
+            else if (s.bundle === 'video_only') groundCrewPerformance[staff].videos++;
+            else if (s.bundle === 'photos_only') groundCrewPerformance[staff].photos++;
+          });
+          const groundCrewData = Object.values(groundCrewPerformance).sort((a: any, b: any) => b.revenue - a.revenue);
+
+          // Pilot performance (based on recordings.flightPilot)
+          const pilotPerformance: Record<string, any> = {};
+          const recordingToPilot = new Map<string, string>();
+          filteredRecordings.forEach((r: any) => {
+            if (r.flightPilot) recordingToPilot.set(r.id, r.flightPilot);
+          });
+          filteredSales.forEach((s: any) => {
+            const pilot = recordingToPilot.get(s.recordingId) || 'Unknown';
+            if (!pilotPerformance[pilot]) {
+              pilotPerformance[pilot] = { name: pilot, revenue: 0, combos: 0, videos: 0, photos: 0, totalSales: 0 };
+            }
+            pilotPerformance[pilot].revenue += s.saleAmount || 0;
+            pilotPerformance[pilot].totalSales++;
+            if (s.bundle === 'combo') pilotPerformance[pilot].combos++;
+            else if (s.bundle === 'video_only') pilotPerformance[pilot].videos++;
+            else if (s.bundle === 'photos_only') pilotPerformance[pilot].photos++;
+          });
+          const pilotData = Object.values(pilotPerformance).sort((a: any, b: any) => b.revenue - a.revenue);
+
+          // Hourly distribution
+          const hourlyDistribution: Record<number, number> = {};
+          filteredSales.forEach((s: any) => {
+            const hour = new Date(s.saleDate).getHours();
+            hourlyDistribution[hour] = (hourlyDistribution[hour] || 0) + 1;
+          });
+          const hourlyData = Array.from({ length: 24 }, (_, i) => ({
+            hour: i,
+            sales: hourlyDistribution[i] || 0
+          }));
+
+          // Incomplete projects
+          const incompleteProjects = filteredRecordings
+            .filter((r: any) => {
+              const hasVideo = r.exportStatus === 'completed' || r.driveFileUrl;
+              const hasPhotos = r.photosUploaded;
+              return !hasVideo || !hasPhotos;
+            })
+            .map((r: any) => {
+              const sale = filteredSales.find((s: any) => s.recordingId === r.id);
+              return {
+                id: r.id,
+                flightDate: r.flightDate || null,
+                flightTime: r.flightTime || null,
+                customerNames: [r.pilotName],
+                email: r.pilotEmail || '',
+                pilot: r.flightPilot || 'Unknown',
+                groundCrew: r.staffMember || '',
+                videoCompleted: r.exportStatus === 'completed' || !!r.driveFileUrl,
+                photosCompleted: r.photosUploaded,
+                packagePurchased: sale?.bundle || null
+              };
+            });
+
+          const missingVideo = incompleteProjects.filter((p: any) => !p.videoCompleted).length;
+          const missingPhotos = incompleteProjects.filter((p: any) => !p.photosCompleted).length;
+          const missingBoth = incompleteProjects.filter((p: any) => !p.videoCompleted && !p.photosCompleted).length;
+
+          // Non-purchasers
+          const nonPurchasers = filteredRecordings
+            .filter((r: any) => !filteredSales.find((s: any) => s.recordingId === r.id))
+            .map((r: any) => ({
+              id: r.id,
+              flightDate: r.flightDate || null,
+              flightTime: r.flightTime || null,
+              customerNames: [r.pilotName],
+              email: r.pilotEmail || '',
+              packagePurchased: null,
+              upsellOpportunity: 'Full Package',
+              potentialValue: 49.99
+            }));
+
+          res.json({
+            totalSessions,
+            totalSales,
+            conversionRate,
+            totalRevenue,
+            avgOrderValue,
+            combos,
+            videoOnly,
+            photosOnly,
+            dailyRevenue,
+            availabilityPaths: Object.entries(availabilityPaths).map(([path, data]) => ({
+              path,
+              sessions: data.sessions,
+              conversions: data.conversions,
+              conversionRate: data.sessions > 0 ? Math.round((data.conversions / data.sessions) * 100) : 0
+            })),
+            sankeyData,
+            groundCrewData,
+            pilotData,
+            hourlyData,
+            incompleteProjects,
+            missingVideo,
+            missingPhotos,
+            missingBoth,
+            nonPurchasers,
+            totalGroups: totalSessions
+          });
+        } catch (error: any) {
+          console.error('Admin analytics error:', error);
+          res.status(500).json({ error: error.message });
+        }
+      });
+
       // Health check
       app.get('/api/health', (req, res) => {
         res.json({
