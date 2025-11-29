@@ -1107,15 +1107,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
           const pilotData = Object.values(pilotPerformance).sort((a: any, b: any) => b.revenue - a.revenue);
 
-          // Hourly distribution
-          const hourlyDistribution: Record<number, number> = {};
+          // Hourly distribution with full stats
+          const hourlyStats: Record<number, { sales: number; total: number; revenue: number }> = {};
+          // Count total sessions per hour based on recording creation time
+          filteredRecordings.forEach((r: any) => {
+            const hour = new Date(r.createdAt).getHours();
+            if (!hourlyStats[hour]) hourlyStats[hour] = { sales: 0, total: 0, revenue: 0 };
+            hourlyStats[hour].total++;
+          });
+          // Count sales and revenue per hour
           filteredSales.forEach((s: any) => {
             const hour = new Date(s.saleDate).getHours();
-            hourlyDistribution[hour] = (hourlyDistribution[hour] || 0) + 1;
+            if (!hourlyStats[hour]) hourlyStats[hour] = { sales: 0, total: 0, revenue: 0 };
+            hourlyStats[hour].sales++;
+            hourlyStats[hour].revenue += s.saleAmount || 0;
           });
           const hourlyData = Array.from({ length: 24 }, (_, i) => ({
             hour: i,
-            sales: hourlyDistribution[i] || 0
+            sales: hourlyStats[i]?.sales || 0,
+            total: hourlyStats[i]?.total || 0,
+            revenue: hourlyStats[i]?.revenue || 0,
+            conversion: hourlyStats[i]?.total > 0 ? (hourlyStats[i].sales / hourlyStats[i].total) * 100 : 0
+          }));
+
+          // TimeAnalysis format (filter to business hours 8-18)
+          const timeAnalysis = hourlyData.filter(h => h.hour >= 8 && h.hour <= 18);
+
+          // Day of week analysis
+          const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          const dayStats: Record<number, { sales: number; total: number; revenue: number }> = {};
+          filteredRecordings.forEach((r: any) => {
+            const day = new Date(r.createdAt).getDay();
+            if (!dayStats[day]) dayStats[day] = { sales: 0, total: 0, revenue: 0 };
+            dayStats[day].total++;
+          });
+          filteredSales.forEach((s: any) => {
+            const day = new Date(s.saleDate).getDay();
+            if (!dayStats[day]) dayStats[day] = { sales: 0, total: 0, revenue: 0 };
+            dayStats[day].sales++;
+            dayStats[day].revenue += s.saleAmount || 0;
+          });
+          const dayOfWeekAnalysis = dayNames.map((name, i) => ({
+            day: name,
+            sales: dayStats[i]?.sales || 0,
+            total: dayStats[i]?.total || 0,
+            revenue: dayStats[i]?.revenue || 0,
+            conversion: dayStats[i]?.total > 0 ? (dayStats[i].sales / dayStats[i].total) * 100 : 0
           }));
 
           // Incomplete projects
@@ -1228,15 +1265,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             videoOnly,
             photosOnly,
             dailyRevenue,
-            availabilityPaths: Object.entries(availabilityPaths).map(([path, data]) => ({
-              path,
-              sessions: data.sessions,
-              conversions: data.conversions,
-              conversionRate: data.sessions > 0 ? Math.round((data.conversions / data.sessions) * 100) : 0
-            })),
+            availabilityPaths: Object.entries(availabilityPaths).map(([path, data]) => {
+              // Calculate outcomes for each path
+              const pathRecordings = filteredRecordings.filter((r: any) => {
+                const hasVideo = r.exportStatus === 'completed' || r.driveFileUrl;
+                const hasPhotos = r.photosUploaded;
+                if (path === 'Both Available') return hasVideo && hasPhotos;
+                if (path === 'Video Only Available') return hasVideo && !hasPhotos;
+                if (path === 'Photos Only Available') return !hasVideo && hasPhotos;
+                return !hasVideo && !hasPhotos;
+              });
+
+              const pathSales = pathRecordings.map((r: any) => filteredSales.find((s: any) => s.recordingId === r.id)).filter(Boolean);
+              const comboCount = pathSales.filter((s: any) => s.bundle === 'combo').length;
+              const videoCount = pathSales.filter((s: any) => s.bundle === 'video_only').length;
+              const photosCount = pathSales.filter((s: any) => s.bundle === 'photos_only').length;
+              const noPurchaseCount = data.sessions - data.conversions;
+
+              const outcomes = [
+                { label: 'Bought Combo', value: comboCount, percentage: data.sessions > 0 ? (comboCount / data.sessions) * 100 : 0, color: 'bg-emerald-500' },
+                { label: 'Bought Video', value: videoCount, percentage: data.sessions > 0 ? (videoCount / data.sessions) * 100 : 0, color: 'bg-amber-500' },
+                { label: 'Bought Photos', value: photosCount, percentage: data.sessions > 0 ? (photosCount / data.sessions) * 100 : 0, color: 'bg-blue-500' },
+                { label: 'No Purchase', value: noPurchaseCount, percentage: data.sessions > 0 ? (noPurchaseCount / data.sessions) * 100 : 0, color: 'bg-muted-foreground/30' }
+              ].filter(o => o.value > 0).sort((a, b) => b.value - a.value);
+
+              const idMap: Record<string, string> = {
+                'Both Available': 'both',
+                'Video Only Available': 'video_only',
+                'Photos Only Available': 'photos_only',
+                'Neither Available': 'neither'
+              };
+
+              return {
+                id: idMap[path] || path.toLowerCase().replace(/ /g, '_'),
+                name: path,
+                path,
+                total: data.sessions,
+                sessions: data.sessions,
+                conversions: data.conversions,
+                conversionRate: data.sessions > 0 ? Math.round((data.conversions / data.sessions) * 100) : 0,
+                outcomes
+              };
+            }),
             sankeyData,
             groundCrewData,
             pilotData,
+            staffData: groundCrewData, // backwards compatibility
             hourlyData,
             incompleteProjects,
             missingVideo,
@@ -1254,7 +1328,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             packageMix,
             completeConversion,
             incompleteConversion,
-            revenueOverTime
+            revenueOverTime,
+            timeAnalysis,
+            dayOfWeekAnalysis
           });
         } catch (error: any) {
           console.error('Admin analytics error:', error);
