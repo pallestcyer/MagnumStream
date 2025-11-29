@@ -1200,19 +1200,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const missingPhotos = incompleteProjects.filter((p: any) => !p.photosCompleted).length;
           const missingBoth = incompleteProjects.filter((p: any) => !p.videoCompleted && !p.photosCompleted).length;
 
-          // Non-purchasers
+          // Non-purchasers - include video/photos status for upsell opportunities
           const nonPurchasers = filteredRecordings
             .filter((r: any) => !filteredSales.find((s: any) => s.recordingId === r.id))
-            .map((r: any) => ({
-              id: r.id,
-              flightDate: r.flightDate || null,
-              flightTime: r.flightTime || null,
-              customerNames: [r.pilotName],
-              email: r.pilotEmail || '',
-              packagePurchased: null,
-              upsellOpportunity: 'Full Package',
-              potentialValue: 49.99
-            }));
+            .map((r: any) => {
+              const hasVideo = r.exportStatus === 'completed' || !!r.driveFileUrl;
+              const hasPhotos = !!r.photosUploaded;
+
+              // Calculate upsell opportunity based on what's available
+              let upsellOpportunity = 'Full Package';
+              let potentialValue = 99.99; // combo price
+
+              if (hasVideo && hasPhotos) {
+                upsellOpportunity = 'Full Package';
+                potentialValue = 99.99;
+              } else if (hasVideo && !hasPhotos) {
+                upsellOpportunity = 'Video Only';
+                potentialValue = 49.99;
+              } else if (!hasVideo && hasPhotos) {
+                upsellOpportunity = 'Photos Only';
+                potentialValue = 29.99;
+              } else {
+                // Neither available - still show as opportunity but lower value
+                upsellOpportunity = 'Pending Media';
+                potentialValue = 0;
+              }
+
+              return {
+                id: r.id,
+                flightDate: r.flightDate || null,
+                flightTime: r.flightTime || null,
+                customerNames: [r.pilotName],
+                email: r.pilotEmail || '',
+                packagePurchased: null,
+                videoCompleted: hasVideo,
+                photosCompleted: hasPhotos,
+                upsellOpportunity,
+                potentialValue
+              };
+            })
+            .filter((p: any) => p.potentialValue > 0); // Only show items with available media
 
           // Calculate additional fields needed by Overview page
           const videoCompleted = filteredRecordings.filter((r: any) => r.exportStatus === 'completed' || r.driveFileUrl).length;
