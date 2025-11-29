@@ -7,6 +7,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { PilotProvider } from "@/contexts/PilotContext";
+import { PhotoUploadProvider } from "@/contexts/PhotoUploadContext";
+import { PhotoUploadProgress } from "@/components/PhotoUploadProgress";
 import InfoPage from "@/pages/InfoPage";
 import RecordingDashboard from "@/pages/RecordingDashboard";
 import EditorCruising from "@/pages/EditorCruising";
@@ -245,37 +247,40 @@ function App() {
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <PilotProvider>
-            <SidebarProvider style={style as React.CSSProperties}>
-              <div className="flex h-screen w-full">
-                <AppSidebar />
-                <div className="flex flex-col flex-1 overflow-hidden">
-                  <header className="flex items-center gap-2 p-2 border-b border-border bg-card/30 backdrop-blur-md">
-                    <SidebarTrigger data-testid="button-sidebar-toggle" />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleAdminClick}
-                      className="flex items-center gap-2"
-                    >
-                      <Shield className="w-4 h-4" />
-                      Admin
-                    </Button>
-                  </header>
-                  <main className="flex-1 overflow-auto">
-                    <Router />
-                  </main>
-                </div>
-              </div>
-            </SidebarProvider>
-            {showAdminGate && (
-              <AdminPasscodeGate
-                onSuccess={handleAdminSuccess}
-                onCancel={() => setShowAdminGate(false)}
-              />
-            )}
-            <Toaster />
-          </PilotProvider>
+          <PhotoUploadProvider>
+            <PilotProvider>
+                <SidebarProvider style={style as React.CSSProperties}>
+                  <div className="flex h-screen w-full">
+                    <AppSidebar />
+                    <div className="flex flex-col flex-1 overflow-hidden">
+                      <header className="flex items-center gap-2 p-2 border-b border-border bg-card/30 backdrop-blur-md">
+                        <SidebarTrigger data-testid="button-sidebar-toggle" />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleAdminClick}
+                          className="flex items-center gap-2"
+                        >
+                          <Shield className="w-4 h-4" />
+                          Admin
+                        </Button>
+                      </header>
+                      <main className="flex-1 overflow-auto">
+                        <Router />
+                      </main>
+                    </div>
+                  </div>
+                </SidebarProvider>
+                {showAdminGate && (
+                  <AdminPasscodeGate
+                    onSuccess={handleAdminSuccess}
+                    onCancel={() => setShowAdminGate(false)}
+                  />
+                )}
+                <Toaster />
+              </PilotProvider>
+              <PhotoUploadProgress />
+            </PhotoUploadProvider>
         </TooltipProvider>
       </QueryClientProvider>
     </ThemeProvider>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usePilot } from "@/contexts/PilotContext";
+import { usePhotoUpload } from "@/contexts/PhotoUploadContext";
 import { videoStorage } from "@/utils/videoStorage";
 import {
   Dialog,
@@ -53,6 +54,7 @@ export default function ProjectsPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { setPilotInfo } = usePilot();
+  const { startUpload } = usePhotoUpload();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSaleDialogOpen, setIsSaleDialogOpen] = useState(false);
@@ -580,11 +582,7 @@ export default function ProjectsPage() {
     setUploadedPhotos((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
-
-  const [uploadProgress, setUploadProgress] = useState<string>("");
-
-  const handleUploadPhotos = async () => {
+  const handleUploadPhotos = () => {
     if (!photosProject || uploadedPhotos.length === 0) {
       toast({
         title: "No Photos",
@@ -603,102 +601,16 @@ export default function ProjectsPage() {
       return;
     }
 
-    setIsUploadingPhotos(true);
-    setUploadProgress("Getting upload credentials...");
+    // Start upload in background via context
+    startUpload(
+      photosProject.id,
+      photosProject.pilotName || 'Unknown Project',
+      [...uploadedPhotos], // Copy array to avoid mutation issues
+      photosProject.driveFolderUrl
+    );
 
-    try {
-      // Step 1: Get upload session (access token + folder ID) from Vercel
-      const sessionResponse = await fetch(`/api/recordings/${photosProject.id}/photo-upload-session`);
-      const sessionText = await sessionResponse.text();
-
-      let session;
-      try {
-        session = JSON.parse(sessionText);
-      } catch {
-        throw new Error(sessionText || 'Failed to get upload session');
-      }
-
-      if (!sessionResponse.ok) {
-        throw new Error(session.error || 'Failed to get upload session');
-      }
-
-      const { photosFolderId, accessToken } = session;
-
-      // Step 2: Upload each photo directly to Google Drive (bypasses Vercel payload limit)
-      let uploadedCount = 0;
-      const errors: string[] = [];
-
-      for (let i = 0; i < uploadedPhotos.length; i++) {
-        const file = uploadedPhotos[i];
-        setUploadProgress(`Uploading ${i + 1}/${uploadedPhotos.length}: ${file.name}`);
-
-        try {
-          // Create metadata for the file
-          const metadata = {
-            name: file.name,
-            parents: [photosFolderId]
-          };
-
-          // Use multipart upload to Google Drive API directly
-          const form = new FormData();
-          form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-          form.append('file', file);
-
-          const uploadResponse = await fetch(
-            'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${accessToken}`
-              },
-              body: form
-            }
-          );
-
-          if (uploadResponse.ok) {
-            uploadedCount++;
-          } else {
-            const errorData = await uploadResponse.json().catch(() => ({}));
-            errors.push(`${file.name}: ${errorData.error?.message || 'Upload failed'}`);
-          }
-        } catch (uploadError: any) {
-          errors.push(`${file.name}: ${uploadError.message}`);
-        }
-      }
-
-      // Step 3: Mark photos as uploaded in the database
-      setUploadProgress("Finishing up...");
-      await fetch(`/api/recordings/${photosProject.id}/photos-complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uploadedCount, photosFolderId })
-      });
-
-      // Refresh the recordings list
-      queryClient.invalidateQueries({ queryKey: ["/api/recordings"] });
-
-      if (errors.length > 0 && uploadedCount === 0) {
-        throw new Error(`All uploads failed: ${errors[0]}`);
-      }
-
-      toast({
-        title: "Photos Uploaded",
-        description: errors.length > 0
-          ? `Uploaded ${uploadedCount}/${uploadedPhotos.length} photo(s). ${errors.length} failed.`
-          : `Successfully uploaded ${uploadedCount} photo(s) to Google Drive.`,
-        variant: errors.length > 0 ? "destructive" : "default",
-      });
-      handleClosePhotosDialog();
-    } catch (error: any) {
-      toast({
-        title: "Upload Failed",
-        description: error.message || "Failed to upload photos. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsUploadingPhotos(false);
-      setUploadProgress("");
-    }
+    // Close dialog immediately - upload continues in background
+    handleClosePhotosDialog();
   };
 
   // Filter projects based on search query
@@ -1340,17 +1252,15 @@ export default function ProjectsPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={handleClosePhotosDialog} disabled={isUploadingPhotos}>
+            <Button variant="outline" onClick={handleClosePhotosDialog}>
               Cancel
             </Button>
             <Button
               onClick={handleUploadPhotos}
-              disabled={uploadedPhotos.length === 0 || isUploadingPhotos}
+              disabled={uploadedPhotos.length === 0}
               className="bg-gradient-purple-blue hover:opacity-90"
             >
-              {isUploadingPhotos
-                ? (uploadProgress || "Uploading...")
-                : `Upload ${uploadedPhotos.length > 0 ? `(${uploadedPhotos.length})` : ''}`}
+              Upload {uploadedPhotos.length > 0 ? `(${uploadedPhotos.length})` : ''}
             </Button>
           </DialogFooter>
         </DialogContent>
