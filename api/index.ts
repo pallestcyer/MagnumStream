@@ -1107,17 +1107,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
           const pilotData = Object.values(pilotPerformance).sort((a: any, b: any) => b.revenue - a.revenue);
 
-          // Hourly distribution with full stats
+          // Helper to parse flight time string (e.g., "10:30 AM", "2:00 PM") to hour (0-23)
+          const parseFlightTimeToHour = (flightTime: string | null): number | null => {
+            if (!flightTime) return null;
+            const match = flightTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+            if (!match) return null;
+            let hour = parseInt(match[1], 10);
+            const period = match[3]?.toUpperCase();
+            if (period === 'PM' && hour !== 12) hour += 12;
+            if (period === 'AM' && hour === 12) hour = 0;
+            return hour;
+          };
+
+          // Hourly distribution with full stats - use flightTime for accurate analysis
           const hourlyStats: Record<number, { sales: number; total: number; revenue: number }> = {};
-          // Count total sessions per hour based on recording creation time
+          // Count total sessions per hour based on actual flight time
           filteredRecordings.forEach((r: any) => {
-            const hour = new Date(r.createdAt).getHours();
+            const hour = parseFlightTimeToHour(r.flightTime);
+            if (hour === null) return; // Skip if no valid flight time
             if (!hourlyStats[hour]) hourlyStats[hour] = { sales: 0, total: 0, revenue: 0 };
             hourlyStats[hour].total++;
           });
-          // Count sales and revenue per hour
+          // Count sales and revenue per hour - link back to recording's flight time
           filteredSales.forEach((s: any) => {
-            const hour = new Date(s.saleDate).getHours();
+            const recording = filteredRecordings.find((r: any) => r.id === s.recordingId);
+            const hour = recording ? parseFlightTimeToHour(recording.flightTime) : null;
+            if (hour === null) return; // Skip if no valid flight time
             if (!hourlyStats[hour]) hourlyStats[hour] = { sales: 0, total: 0, revenue: 0 };
             hourlyStats[hour].sales++;
             hourlyStats[hour].revenue += s.saleAmount || 0;
@@ -1133,16 +1148,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // TimeAnalysis format (filter to business hours 8-18)
           const timeAnalysis = hourlyData.filter(h => h.hour >= 8 && h.hour <= 18);
 
-          // Day of week analysis
+          // Day of week analysis - use flightDate for accurate analysis
           const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
           const dayStats: Record<number, { sales: number; total: number; revenue: number }> = {};
           filteredRecordings.forEach((r: any) => {
-            const day = new Date(r.createdAt).getDay();
+            if (!r.flightDate) return; // Skip if no flight date
+            const day = new Date(r.flightDate).getDay();
             if (!dayStats[day]) dayStats[day] = { sales: 0, total: 0, revenue: 0 };
             dayStats[day].total++;
           });
           filteredSales.forEach((s: any) => {
-            const day = new Date(s.saleDate).getDay();
+            const recording = filteredRecordings.find((r: any) => r.id === s.recordingId);
+            if (!recording?.flightDate) return; // Skip if no flight date
+            const day = new Date(recording.flightDate).getDay();
             if (!dayStats[day]) dayStats[day] = { sales: 0, total: 0, revenue: 0 };
             dayStats[day].sales++;
             dayStats[day].revenue += s.saleAmount || 0;
