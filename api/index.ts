@@ -1200,46 +1200,65 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const missingPhotos = incompleteProjects.filter((p: any) => !p.photosCompleted).length;
           const missingBoth = incompleteProjects.filter((p: any) => !p.videoCompleted && !p.photosCompleted).length;
 
-          // Non-purchasers - include video/photos status for upsell opportunities
-          const nonPurchasers = filteredRecordings
-            .filter((r: any) => !filteredSales.find((s: any) => s.recordingId === r.id))
-            .map((r: any) => {
-              const hasVideo = r.exportStatus === 'completed' || !!r.driveFileUrl;
-              const hasPhotos = !!r.photosUploaded;
+          // Upsell opportunities - includes non-purchasers AND partial purchasers (video_only, photos_only)
+          const upsellOpportunities: any[] = [];
 
-              // Calculate upsell opportunity based on what's available
-              let upsellOpportunity = 'Full Package';
-              let potentialValue = 99.99; // combo price
+          filteredRecordings.forEach((r: any) => {
+            const sale = filteredSales.find((s: any) => s.recordingId === r.id);
+            const hasVideo = r.exportStatus === 'completed' || !!r.driveFileUrl;
+            const hasPhotos = !!r.photosUploaded;
 
+            let currentStatus: string | null = null;
+            let upsellOpportunity: string | null = null;
+            let potentialValue = 0;
+
+            if (!sale) {
+              // No purchase - opportunity to sell full combo (if media available)
+              currentStatus = null; // No Purchase
               if (hasVideo && hasPhotos) {
-                upsellOpportunity = 'Full Package';
+                upsellOpportunity = 'Full Combo';
                 potentialValue = 99.99;
-              } else if (hasVideo && !hasPhotos) {
+              } else if (hasVideo) {
                 upsellOpportunity = 'Video Only';
                 potentialValue = 49.99;
-              } else if (!hasVideo && hasPhotos) {
+              } else if (hasPhotos) {
                 upsellOpportunity = 'Photos Only';
                 potentialValue = 29.99;
-              } else {
-                // Neither available - still show as opportunity but lower value
-                upsellOpportunity = 'Pending Media';
-                potentialValue = 0;
               }
+            } else if (sale.bundle === 'video_only') {
+              // Bought video only - opportunity to add photos
+              currentStatus = 'video_only';
+              if (hasPhotos) {
+                upsellOpportunity = 'Add Photos';
+                potentialValue = 29.99;
+              }
+            } else if (sale.bundle === 'photos_only') {
+              // Bought photos only - opportunity to add video
+              currentStatus = 'photos_only';
+              if (hasVideo) {
+                upsellOpportunity = 'Add Video';
+                potentialValue = 49.99;
+              }
+            }
+            // combo purchasers are not upsell opportunities
 
-              return {
+            if (upsellOpportunity && potentialValue > 0) {
+              upsellOpportunities.push({
                 id: r.id,
                 flightDate: r.flightDate || null,
                 flightTime: r.flightTime || null,
                 customerNames: [r.pilotName],
                 email: r.pilotEmail || '',
-                packagePurchased: null,
+                packagePurchased: currentStatus,
                 videoCompleted: hasVideo,
                 photosCompleted: hasPhotos,
                 upsellOpportunity,
                 potentialValue
-              };
-            })
-            .filter((p: any) => p.potentialValue > 0); // Only show items with available media
+              });
+            }
+          });
+
+          const nonPurchasers = upsellOpportunities;
 
           // Calculate additional fields needed by Overview page
           const videoCompleted = filteredRecordings.filter((r: any) => r.exportStatus === 'completed' || r.driveFileUrl).length;

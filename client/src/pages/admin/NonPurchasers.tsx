@@ -142,7 +142,7 @@ export default function NonPurchasers() {
                   <TableRow className="hover:bg-transparent border-none">
                     <TableHead className="text-muted-foreground">Flight Date</TableHead>
                     <TableHead className="text-muted-foreground">Customer</TableHead>
-                    <TableHead className="text-muted-foreground">Asset Status</TableHead>
+                    <TableHead className="text-muted-foreground">Current Status</TableHead>
                     <TableHead className="text-muted-foreground">Opportunity</TableHead>
                     <TableHead className="text-muted-foreground">Action</TableHead>
                   </TableRow>
@@ -163,30 +163,19 @@ export default function NonPurchasers() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex gap-2">
-                          <Badge
-                            variant={p.videoCompleted ? "default" : "outline"}
-                            className={cn(
-                              "rounded-full px-3 transition-colors",
-                              p.videoCompleted
-                                ? "bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-600"
-                                : "text-muted-foreground border-muted-foreground/30"
-                            )}
-                          >
-                            Video
+                        {p.packagePurchased === null ? (
+                          <Badge variant="secondary" className="bg-muted text-muted-foreground hover:bg-muted/80">
+                            No Purchase
                           </Badge>
-                          <Badge
-                            variant={p.photosCompleted ? "default" : "outline"}
-                            className={cn(
-                              "rounded-full px-3 transition-colors",
-                              p.photosCompleted
-                                ? "bg-orange-500 hover:bg-orange-600 text-white border-orange-600"
-                                : "text-muted-foreground border-muted-foreground/30"
-                            )}
-                          >
-                            Photos
+                        ) : p.packagePurchased === 'video_only' ? (
+                          <Badge variant="secondary" className="bg-orange-500/20 text-orange-700 dark:text-orange-300 hover:bg-orange-500/30">
+                            Bought Video
                           </Badge>
-                        </div>
+                        ) : (
+                          <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 hover:bg-yellow-500/30">
+                            Bought Photos
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         <span className="text-emerald-600 dark:text-emerald-400 font-medium text-sm flex items-center gap-1">
