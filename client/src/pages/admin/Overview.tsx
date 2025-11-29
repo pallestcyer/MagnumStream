@@ -16,7 +16,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { type DateRange } from "react-day-picker";
 
-const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))"];
+// Distinct colors for pie chart: Combo (emerald), Video Only (amber), Photos Only (blue)
+const PIE_COLORS = ["#10b981", "#f59e0b", "#3b82f6"];
 
 interface AnalyticsData {
   totalGroups: number;
@@ -248,9 +249,9 @@ export default function Overview() {
             <CardTitle className="text-lg font-medium text-muted-foreground">Sales Platform</CardTitle>
           </CardHeader>
           <CardContent className="h-[350px] relative">
-            <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
-              <span className="text-3xl font-bold text-foreground">{totalSales}</span>
-              <span className="text-xs text-muted-foreground uppercase tracking-wider">Total Sales</span>
+            <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none" style={{ marginBottom: '36px' }}>
+              <span className="text-5xl font-bold text-foreground">{totalSales}</span>
+              <span className="text-sm text-muted-foreground uppercase tracking-wider mt-1">Total Sales</span>
             </div>
             {packageMix.some(p => p.value > 0) ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -266,7 +267,7 @@ export default function Overview() {
                     stroke="none"
                   >
                     {packageMix.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip
