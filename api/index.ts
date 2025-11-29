@@ -1300,12 +1300,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               const photosCount = pathSales.filter((s: any) => s.bundle === 'photos_only').length;
               const noPurchaseCount = data.sessions - data.conversions;
 
-              const outcomes = [
-                { label: 'Bought Combo', value: comboCount, percentage: data.sessions > 0 ? (comboCount / data.sessions) * 100 : 0, color: 'bg-emerald-500' },
-                { label: 'Bought Video', value: videoCount, percentage: data.sessions > 0 ? (videoCount / data.sessions) * 100 : 0, color: 'bg-amber-500' },
-                { label: 'Bought Photos', value: photosCount, percentage: data.sessions > 0 ? (photosCount / data.sessions) * 100 : 0, color: 'bg-blue-500' },
-                { label: 'No Purchase', value: noPurchaseCount, percentage: data.sessions > 0 ? (noPurchaseCount / data.sessions) * 100 : 0, color: 'bg-muted-foreground/30' }
-              ].filter(o => o.value > 0).sort((a, b) => b.value - a.value);
+              // Build outcomes based on what's logically possible for each availability path
+              let outcomes: { label: string; value: number; percentage: number; color: string }[] = [];
+
+              if (path === 'Both Available') {
+                // All outcomes possible
+                outcomes = [
+                  { label: 'Bought Combo', value: comboCount, percentage: data.sessions > 0 ? (comboCount / data.sessions) * 100 : 0, color: 'bg-emerald-500' },
+                  { label: 'Bought Video', value: videoCount, percentage: data.sessions > 0 ? (videoCount / data.sessions) * 100 : 0, color: 'bg-amber-500' },
+                  { label: 'Bought Photos', value: photosCount, percentage: data.sessions > 0 ? (photosCount / data.sessions) * 100 : 0, color: 'bg-blue-500' },
+                  { label: 'No Purchase', value: noPurchaseCount, percentage: data.sessions > 0 ? (noPurchaseCount / data.sessions) * 100 : 0, color: 'bg-muted-foreground/30' }
+                ];
+              } else if (path === 'Video Only Available') {
+                // Only video purchase possible (combo counts as video since photos unavailable)
+                const videoPurchases = videoCount + comboCount;
+                outcomes = [
+                  { label: 'Bought Video', value: videoPurchases, percentage: data.sessions > 0 ? (videoPurchases / data.sessions) * 100 : 0, color: 'bg-amber-500' },
+                  { label: 'No Purchase', value: noPurchaseCount, percentage: data.sessions > 0 ? (noPurchaseCount / data.sessions) * 100 : 0, color: 'bg-muted-foreground/30' }
+                ];
+              } else if (path === 'Photos Only Available') {
+                // Only photos purchase possible (combo counts as photos since video unavailable)
+                const photosPurchases = photosCount + comboCount;
+                outcomes = [
+                  { label: 'Bought Photos', value: photosPurchases, percentage: data.sessions > 0 ? (photosPurchases / data.sessions) * 100 : 0, color: 'bg-blue-500' },
+                  { label: 'No Purchase', value: noPurchaseCount, percentage: data.sessions > 0 ? (noPurchaseCount / data.sessions) * 100 : 0, color: 'bg-muted-foreground/30' }
+                ];
+              }
+
+              // Filter out zero values and sort by value
+              outcomes = outcomes.filter(o => o.value > 0).sort((a, b) => b.value - a.value);
 
               const idMap: Record<string, string> = {
                 'Both Available': 'both',
