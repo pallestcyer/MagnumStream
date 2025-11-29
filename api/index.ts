@@ -1283,7 +1283,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             videoOnly,
             photosOnly,
             dailyRevenue,
-            availabilityPaths: Object.entries(availabilityPaths).map(([path, data]) => {
+            availabilityPaths: Object.entries(availabilityPaths).filter(([path]) => path !== 'Neither Available').map(([path, data]) => {
               // Calculate outcomes for each path
               const pathRecordings = filteredRecordings.filter((r: any) => {
                 const hasVideo = r.exportStatus === 'completed' || r.driveFileUrl;
