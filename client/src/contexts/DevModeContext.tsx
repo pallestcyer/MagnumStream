@@ -8,20 +8,11 @@ interface DevModeContextType {
 const DevModeContext = createContext<DevModeContextType | undefined>(undefined);
 
 export function DevModeProvider({ children }: { children: ReactNode }) {
-  const [isDevMode, setIsDevMode] = useState(() => {
-    return sessionStorage.getItem("magnum_dev_mode") === "true";
-  });
+  // Always start with dev mode OFF on page load
+  const [isDevMode, setIsDevMode] = useState(false);
 
   const toggleDevMode = () => {
-    setIsDevMode((prev) => {
-      const newValue = !prev;
-      if (newValue) {
-        sessionStorage.setItem("magnum_dev_mode", "true");
-      } else {
-        sessionStorage.removeItem("magnum_dev_mode");
-      }
-      return newValue;
-    });
+    setIsDevMode((prev) => !prev);
   };
 
   return (
