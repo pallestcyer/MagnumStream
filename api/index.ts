@@ -431,10 +431,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       app.post('/api/recordings', async (req, res) => {
         try {
-          const { pilotName, flightPilot, flightTime } = req.body;
+          let { pilotName, flightPilot, flightTime, flightDate } = req.body;
 
-          // Create the recording in the database first
-          let recording = await storage.createFlightRecording(req.body);
+          // Check for duplicate projects and auto-increment name if needed
+          if (pilotName && flightPilot && flightTime) {
+            const existingRecordings = await storage.getAllFlightRecordings();
+            const projectDate = flightDate ? new Date(flightDate) : new Date();
+            const projectDateStr = projectDate.toISOString().split('T')[0];
+
+            // Find projects with matching criteria (same name pattern, pilot, time, date)
+            const baseNameMatch = pilotName.match(/^(.+?)(?:\s+(\d+))?$/);
+            const baseName = baseNameMatch ? baseNameMatch[1].trim() : pilotName;
+
+            const duplicates = existingRecordings.filter((r: any) => {
+              // Extract base name from existing record (remove trailing numbers)
+              const existingMatch = r.pilotName?.match(/^(.+?)(?:\s+(\d+))?$/);
+              const existingBaseName = existingMatch ? existingMatch[1].trim() : r.pilotName;
+
+              // Check if it's a match
+              const existingDateStr = r.flightDate
+                ? new Date(r.flightDate).toISOString().split('T')[0]
+                : new Date(r.createdAt).toISOString().split('T')[0];
+
+              return (
+                existingBaseName === baseName &&
+                r.flightPilot === flightPilot &&
+                r.flightTime === flightTime &&
+                existingDateStr === projectDateStr
+              );
+            });
+
+            if (duplicates.length > 0) {
+              // Find the highest number suffix
+              let maxNumber = 1;
+              duplicates.forEach((r: any) => {
+                const match = r.pilotName?.match(/\s+(\d+)$/);
+                if (match) {
+                  maxNumber = Math.max(maxNumber, parseInt(match[1]));
+                }
+              });
+              // Auto-increment the name
+              pilotName = `${baseName} ${maxNumber + 1}`;
+              console.log(`📋 Duplicate detected - auto-renamed to: ${pilotName}`);
+            }
+          }
+
+          // Create the recording in the database with potentially modified name
+          let recording = await storage.createFlightRecording({ ...req.body, pilotName });
 
           // Try to create Google Drive folder structure if we have the required fields
           if (driveOAuth.isReady() && pilotName && flightPilot && flightTime) {
