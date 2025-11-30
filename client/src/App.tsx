@@ -9,6 +9,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { PilotProvider } from "@/contexts/PilotContext";
 import { PhotoUploadProvider } from "@/contexts/PhotoUploadContext";
 import { PhotoUploadProgress } from "@/components/PhotoUploadProgress";
+import { DevModeProvider, useDevMode } from "@/contexts/DevModeContext";
 import InfoPage from "@/pages/InfoPage";
 import RecordingDashboard from "@/pages/RecordingDashboard";
 import EditorCruising from "@/pages/EditorCruising";
@@ -26,7 +27,7 @@ import NotFound from "@/pages/not-found";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ThemeProvider } from "next-themes";
-import { Shield } from "lucide-react";
+import { Shield, Wrench } from "lucide-react";
 import AdminOverview from "@/pages/admin/Overview";
 import AdminPackages from "@/pages/admin/Packages";
 import AdminTimeAnalysis from "@/pages/admin/TimeAnalysis";
@@ -171,6 +172,35 @@ function AdminRouter() {
   );
 }
 
+function HeaderContent({ onAdminClick }: { onAdminClick: () => void }) {
+  const { isDevMode, toggleDevMode } = useDevMode();
+
+  return (
+    <header className="flex items-center gap-2 p-2 border-b border-border bg-card/30 backdrop-blur-md">
+      <SidebarTrigger data-testid="button-sidebar-toggle" />
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onAdminClick}
+        className="flex items-center gap-2"
+      >
+        <Shield className="w-4 h-4" />
+        Admin
+      </Button>
+      <div className="flex-1" />
+      <Button
+        variant={isDevMode ? "default" : "ghost"}
+        size="sm"
+        onClick={toggleDevMode}
+        className={`flex items-center gap-2 ${isDevMode ? "bg-orange-500 hover:bg-orange-600 text-white" : "text-muted-foreground"}`}
+      >
+        <Wrench className="w-4 h-4" />
+        {isDevMode ? "Dev Mode ON" : "Dev"}
+      </Button>
+    </header>
+  );
+}
+
 function App() {
   const [location, setLocation] = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -248,37 +278,28 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <PhotoUploadProvider>
-            <PilotProvider>
-                <SidebarProvider style={style as React.CSSProperties}>
-                  <div className="flex h-screen w-full">
-                    <AppSidebar />
-                    <div className="flex flex-col flex-1 overflow-hidden">
-                      <header className="flex items-center gap-2 p-2 border-b border-border bg-card/30 backdrop-blur-md">
-                        <SidebarTrigger data-testid="button-sidebar-toggle" />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleAdminClick}
-                          className="flex items-center gap-2"
-                        >
-                          <Shield className="w-4 h-4" />
-                          Admin
-                        </Button>
-                      </header>
-                      <main className="flex-1 overflow-auto">
-                        <Router />
-                      </main>
+            <DevModeProvider>
+              <PilotProvider>
+                  <SidebarProvider style={style as React.CSSProperties}>
+                    <div className="flex h-screen w-full">
+                      <AppSidebar />
+                      <div className="flex flex-col flex-1 overflow-hidden">
+                        <HeaderContent onAdminClick={handleAdminClick} />
+                        <main className="flex-1 overflow-auto">
+                          <Router />
+                        </main>
+                      </div>
                     </div>
-                  </div>
-                </SidebarProvider>
-                {showAdminGate && (
-                  <AdminPasscodeGate
-                    onSuccess={handleAdminSuccess}
-                    onCancel={() => setShowAdminGate(false)}
-                  />
-                )}
-                <Toaster />
-              </PilotProvider>
+                  </SidebarProvider>
+                  {showAdminGate && (
+                    <AdminPasscodeGate
+                      onSuccess={handleAdminSuccess}
+                      onCancel={() => setShowAdminGate(false)}
+                    />
+                  )}
+                  <Toaster />
+                </PilotProvider>
+              </DevModeProvider>
               <PhotoUploadProgress />
             </PhotoUploadProvider>
         </TooltipProvider>

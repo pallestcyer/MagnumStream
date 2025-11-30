@@ -46,7 +46,8 @@ const getRoundedTime = () => {
   now.setMilliseconds(0);
   return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 };
-import { Plus, Clock, Plane, Mail, Video, Image, DollarSign, X, CheckCircle2, Edit3, PlayCircle, Upload, Trash2, ExternalLink, FileVideo, Play, Search } from "lucide-react";
+import { Plus, Clock, Plane, Mail, Video, Image, DollarSign, X, CheckCircle2, Edit3, PlayCircle, Upload, Trash2, ExternalLink, FileVideo, Play, Search, RotateCcw } from "lucide-react";
+import { useDevMode } from "@/contexts/DevModeContext";
 import type { FlightRecording } from "@shared/schema";
 import { BUNDLE_OPTIONS } from "@shared/schema";
 
@@ -55,6 +56,7 @@ export default function ProjectsPage() {
   const [, setLocation] = useLocation();
   const { setPilotInfo } = usePilot();
   const { startUpload } = usePhotoUpload();
+  const { isDevMode } = useDevMode();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSaleDialogOpen, setIsSaleDialogOpen] = useState(false);
@@ -537,6 +539,32 @@ export default function ProjectsPage() {
     }
   };
 
+  const handleRedoVideo = (project: FlightRecording) => {
+    // Set up the session for re-editing a completed project
+    // This uses existing recordings but allows re-editing slot positions
+    videoStorage.setCurrentSession(project.pilotName, false); // false = not a new project, preserve data
+
+    // Store in localStorage
+    localStorage.setItem('pilotEmail', project.pilotEmail || '');
+    localStorage.setItem('staffMember', project.staffMember || '');
+    localStorage.setItem('currentRecordingId', project.id);
+
+    // Update PilotContext
+    setPilotInfo({
+      name: project.pilotName,
+      email: project.pilotEmail || '',
+      staffMember: project.staffMember || '',
+    });
+
+    toast({
+      title: "Re-editing Mode",
+      description: "Opening editor to modify slot positions. Re-render to create a new version.",
+    });
+
+    // Navigate to the editor (cruising is first scene)
+    setLocation('/editor/cruising');
+  };
+
   const handleOpenPhotosDialog = (project: FlightRecording) => {
     setPhotosProject(project);
     setUploadedPhotos([]);
@@ -714,19 +742,36 @@ export default function ProjectsPage() {
             {(() => {
               const videoInfo = getVideoButtonInfo(project.exportStatus);
               const VideoIcon = videoInfo.icon;
+              const isCompleted = project.exportStatus === 'completed';
               return (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`w-full ${videoInfo.className}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenVideo(project);
-                  }}
-                >
-                  <VideoIcon className="w-4 h-4 mr-1" />
-                  {videoInfo.label}
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={`flex-1 ${videoInfo.className}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenVideo(project);
+                    }}
+                  >
+                    <VideoIcon className="w-4 h-4 mr-1" />
+                    {videoInfo.label}
+                  </Button>
+                  {isDevMode && isCompleted && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 border-orange-500/50 text-orange-500 hover:bg-orange-500/10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRedoVideo(project);
+                      }}
+                      title="Re-edit video (Dev Mode)"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
               );
             })()}
             {(() => {
