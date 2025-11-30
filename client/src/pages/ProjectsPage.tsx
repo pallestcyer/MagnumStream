@@ -757,20 +757,30 @@ export default function ProjectsPage() {
                     <VideoIcon className="w-4 h-4 mr-1" />
                     {videoInfo.label}
                   </Button>
-                  {isDevMode && isCompleted && (
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 border-orange-500/50 text-orange-500 hover:bg-orange-500/10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRedoVideo(project);
-                      }}
-                      title="Re-edit video (Dev Mode)"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                    </Button>
-                  )}
+                  {isDevMode && isCompleted && (() => {
+                    // Check if project is older than 24 hours (source files may be deleted)
+                    const createdAt = new Date(project.createdAt);
+                    const hoursOld = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
+                    const isExpired = hoursOld > 24;
+
+                    return (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className={`h-8 w-8 shrink-0 ${isExpired ? 'opacity-40 cursor-not-allowed' : 'border-orange-500/50 text-orange-500 hover:bg-orange-500/10'}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!isExpired) {
+                            handleRedoVideo(project);
+                          }
+                        }}
+                        disabled={isExpired}
+                        title={isExpired ? "Source files expired (24h+)" : "Re-edit video"}
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                      </Button>
+                    );
+                  })()}
                 </div>
               );
             })()}
