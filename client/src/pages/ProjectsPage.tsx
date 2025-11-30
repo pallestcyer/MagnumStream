@@ -743,6 +743,8 @@ export default function ProjectsPage() {
               const videoInfo = getVideoButtonInfo(project.exportStatus);
               const VideoIcon = videoInfo.icon;
               const isCompleted = project.exportStatus === 'completed';
+              // Shorter labels in dev mode to make room for redo button
+              const videoLabel = isDevMode && isCompleted ? 'Video' : videoInfo.label;
               return (
                 <div className="flex gap-1">
                   <Button
@@ -755,7 +757,7 @@ export default function ProjectsPage() {
                     }}
                   >
                     <VideoIcon className="w-4 h-4 mr-1" />
-                    {videoInfo.label}
+                    {videoLabel}
                   </Button>
                   {isDevMode && isCompleted && (() => {
                     // Check if project is older than 24 hours (source files may be deleted)
@@ -806,7 +808,7 @@ export default function ProjectsPage() {
                   ) : (
                     <Image className="w-4 h-4 mr-1" />
                   )}
-                  {photosCompleted ? 'Photos Complete' : 'Photos'}
+                  {photosCompleted ? (isDevMode ? 'Photos' : 'Photos Complete') : 'Photos'}
                 </Button>
               );
             })()}
