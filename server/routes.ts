@@ -1139,12 +1139,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No video file provided" });
       }
       
-      // Create directory structure using sessionId instead of database recording
+      // Create directory structure using recordingId for unique folder names
+      // This prevents projects with same customer name from sharing folders
       const date = new Date().toISOString().split('T')[0];
       const sanitizedName = sessionId.replace(/[^a-zA-Z0-9_]/g, '_');
-      
+      const shortRecordingId = recordingId.slice(0, 8); // First 8 chars of UUID for uniqueness
+
       // Create project directory structure with expiration metadata
-      const projectDir = path.join('./projects', `${sanitizedName}_${date}`);
+      // Include recordingId in folder name to guarantee uniqueness
+      const projectDir = path.join('./projects', `${sanitizedName}_${date}_${shortRecordingId}`);
       const sourceDir = path.join(projectDir, 'source');
       
       await fs.mkdir(sourceDir, { recursive: true });
