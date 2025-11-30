@@ -99,30 +99,11 @@ export class ClipGenerator {
         }
       }
       
-      // Fallback: use the most recent project directory if no exact match found
-      console.warn(`⚠️ No exact match for ${recordingId}, using most recent project`);
-      const sortedDirs = projectDirs.sort((a, b) => {
-        const statA = require('fs').statSync(path.join(this.baseDir, a));
-        const statB = require('fs').statSync(path.join(this.baseDir, b));
-        return statB.mtime.getTime() - statA.mtime.getTime();
-      });
-      
-      if (sortedDirs.length > 0) {
-        const fallbackPath = path.join(this.baseDir, sortedDirs[0]);
-
-        // Create subdirectories
-        const clipsDir = path.join(fallbackPath, 'clips');
-        const davinciDir = path.join(fallbackPath, 'davinci');
-        const sourceDir = path.join(fallbackPath, 'source');
-        
-        await fs.mkdir(clipsDir, { recursive: true });
-        await fs.mkdir(davinciDir, { recursive: true });
-        await fs.mkdir(sourceDir, { recursive: true });
-        
-        return fallbackPath;
-      }
-      
-      throw new Error(`No project directory found for ${recordingId}`);
+      // No fallback - each project must have its own directory with correct recordingId
+      // Using "most recent" fallback was causing clips from different projects to mix!
+      console.error(`❌ No project directory found for recordingId: ${recordingId}`);
+      console.error(`   Available projects: ${projectDirs.join(', ')}`);
+      throw new Error(`No project directory found for recordingId: ${recordingId}. Ensure videos were uploaded for this project.`);
     } catch (error) {
       console.error(`❌ Error finding project directory:`, error);
       throw new Error(`Failed to locate project directory for ${recordingId}`);
