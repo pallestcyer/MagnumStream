@@ -290,7 +290,18 @@ export default function ProjectsPage() {
       setSaleEmails([""]);
     }
     setSaleStaffMember("");
-    setSelectedBundle("video_photos");
+
+    // Set default bundle based on what's available
+    const hasVideo = project.exportStatus === 'completed';
+    const hasPhotos = project.photosUploaded === true;
+    if (hasVideo && hasPhotos) {
+      setSelectedBundle("video_photos");
+    } else if (hasVideo) {
+      setSelectedBundle("video_only");
+    } else {
+      setSelectedBundle("photos_only");
+    }
+
     setIsSaleDialogOpen(true);
   };
 
@@ -816,7 +827,10 @@ export default function ProjectsPage() {
           {!isSold && (
             <div className="flex justify-end">
               {(() => {
-                const canCreateSale = project.exportStatus === 'completed';
+                // Allow sale if video is complete OR photos have been uploaded
+                const hasVideo = project.exportStatus === 'completed';
+                const hasPhotos = project.photosUploaded === true;
+                const canCreateSale = hasVideo || hasPhotos;
                 return (
                   <Button
                     size="sm"
@@ -1189,25 +1203,42 @@ export default function ProjectsPage() {
             {/* Bundle Selection */}
             <div>
               <Label htmlFor="sale-bundle-select">Bundle Selection *</Label>
-              <Select value={selectedBundle} onValueChange={setSelectedBundle}>
-                <SelectTrigger id="sale-bundle-select" className="h-12">
-                  <SelectValue placeholder="Select a bundle" />
-                </SelectTrigger>
-                <SelectContent>
-                  {BUNDLE_OPTIONS.map((bundle) => (
-                    <SelectItem key={bundle.value} value={bundle.value}>
-                      {bundle.label} - ${bundle.price}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                Price: ${BUNDLE_OPTIONS.find((b) => b.value === selectedBundle)?.price || 0}
-              </p>
+              {(() => {
+                // Filter bundles based on what's available
+                const hasVideo = saleProject?.exportStatus === 'completed';
+                const hasPhotos = saleProject?.photosUploaded === true;
+
+                const availableBundles = BUNDLE_OPTIONS.filter((bundle) => {
+                  if (bundle.value === 'video_photos') return hasVideo && hasPhotos;
+                  if (bundle.value === 'video_only') return hasVideo;
+                  if (bundle.value === 'photos_only') return hasPhotos;
+                  return false;
+                });
+
+                return (
+                  <>
+                    <Select value={selectedBundle} onValueChange={setSelectedBundle}>
+                      <SelectTrigger id="sale-bundle-select" className="h-12">
+                        <SelectValue placeholder="Select a bundle" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableBundles.map((bundle) => (
+                          <SelectItem key={bundle.value} value={bundle.value}>
+                            {bundle.label} - ${bundle.price}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Price: ${BUNDLE_OPTIONS.find((b) => b.value === selectedBundle)?.price || 0}
+                    </p>
+                  </>
+                );
+              })()}
             </div>
 
             <p className="text-xs text-muted-foreground">
-              This will mark the video as sold and add the customer email(s) to the Google Drive folder for access.
+              This will mark the project as sold and share the selected content with the customer email(s) via Google Drive.
             </p>
           </div>
 

@@ -1402,9 +1402,12 @@ class DaVinciAutomation:
                 "ExportVideo": True,
                 "ExportAudio": True,
                 "FormatWidth": 1920,   # Safe default for template
-                "FormatHeight": 1080,  # Safe default for template  
+                "FormatHeight": 1080,  # Safe default for template
                 "FrameRate": "23.976", # Match template frame rate
                 "VideoQuality": 0,     # Automatic quality
+                # Explicit format settings to ensure MP4 output (not MOV)
+                "ExportFormat": "mp4",
+                "VideoCodec": "H264",
             }
                     
             logger.info(f"Setting render settings: {render_settings}")
