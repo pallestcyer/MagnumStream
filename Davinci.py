@@ -1417,43 +1417,43 @@ class DaVinciAutomation:
                 logger.warning(f"Could not load render preset {RENDER_PRESET}, using default settings")
 
             # Set MP4 format and H.264 codec EXPLICITLY using the correct API method
-            # This overrides whatever format the preset set (which may be MOV/QuickTime)
+            # IMPORTANT: Format/codec names are case-sensitive and must match exactly
+            # Based on DaVinci forum: use 'MP4' (not 'mp4') and 'H264' (not 'H.264')
             try:
-                # First, log available formats and codecs for debugging
+                # Log available formats and codecs for debugging
                 available_formats = self.current_project.GetRenderFormats()
                 logger.info(f"📋 Available render formats: {available_formats}")
 
-                # Find the MP4 format key (could be "MP4", "mp4", etc.)
-                mp4_format = None
-                for fmt_name, fmt_ext in available_formats.items():
-                    if 'mp4' in fmt_ext.lower() or 'mp4' in fmt_name.lower():
-                        mp4_format = fmt_name
-                        logger.info(f"📋 Found MP4 format: {fmt_name} -> {fmt_ext}")
-                        break
+                # Log available codecs for MP4 (pass extension, not format name)
+                mp4_codecs = self.current_project.GetRenderCodecs('mp4')
+                logger.info(f"📋 Available codecs for mp4: {mp4_codecs}")
 
-                if mp4_format:
-                    # Get available codecs for MP4
-                    available_codecs = self.current_project.GetRenderCodecs(mp4_format)
-                    logger.info(f"📋 Available codecs for {mp4_format}: {available_codecs}")
+                # Log current format before change
+                current_format = self.current_project.GetCurrentRenderFormatAndCodec()
+                logger.info(f"📋 Current render format BEFORE: {current_format}")
 
-                    # Find H.264 codec (could be "H264", "H.264", "h264", etc.)
-                    h264_codec = None
-                    for codec_name in available_codecs.keys():
-                        if 'h264' in codec_name.lower() or 'h.264' in codec_name.lower() or 'avc' in codec_name.lower():
-                            h264_codec = codec_name
-                            logger.info(f"📋 Found H.264 codec: {codec_name}")
+                # Try exact known values first (case-sensitive!)
+                # On Silicon Mac, codec is likely 'H264' (no NVIDIA suffix)
+                format_set = self.current_project.SetCurrentRenderFormatAndCodec('MP4', 'H264')
+
+                if format_set:
+                    logger.info("✅ SetCurrentRenderFormatAndCodec('MP4', 'H264') succeeded")
+                else:
+                    logger.warning("⚠️ SetCurrentRenderFormatAndCodec('MP4', 'H264') returned False")
+                    # Try alternate codec names that might exist
+                    for codec_try in ['H264_Apple', 'H264_HW', 'h264', 'H.264']:
+                        format_set = self.current_project.SetCurrentRenderFormatAndCodec('MP4', codec_try)
+                        if format_set:
+                            logger.info(f"✅ SetCurrentRenderFormatAndCodec('MP4', '{codec_try}') succeeded")
                             break
 
-                    if h264_codec:
-                        format_set = self.current_project.SetCurrentRenderFormatAndCodec(mp4_format, h264_codec)
-                        if format_set:
-                            logger.info(f"✅ Render format set to {mp4_format} with {h264_codec} codec")
-                        else:
-                            logger.warning(f"⚠️ SetCurrentRenderFormatAndCodec({mp4_format}, {h264_codec}) returned False")
-                    else:
-                        logger.warning(f"⚠️ Could not find H.264 codec in available codecs")
-                else:
-                    logger.warning(f"⚠️ Could not find MP4 format in available formats")
+                # Verify the change took effect
+                new_format = self.current_project.GetCurrentRenderFormatAndCodec()
+                logger.info(f"📋 Current render format AFTER: {new_format}")
+
+                if new_format.get('format', '').lower() != 'mp4':
+                    logger.warning(f"⚠️ Format is still {new_format.get('format')}, not MP4!")
+
             except Exception as e:
                 logger.warning(f"⚠️ Could not set render format: {e}")
 
