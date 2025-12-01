@@ -1411,24 +1411,24 @@ class DaVinciAutomation:
             }
                     
             logger.info(f"Setting render settings: {render_settings}")
-            
-            # SetRenderSettings is working, so use it directly
-            try:
-                success = self.current_project.SetRenderSettings(render_settings)
-                if success:
-                    logger.info("✅ Render settings applied successfully")
-                else:
-                    logger.warning("⚠️ SetRenderSettings returned False but continuing")
-            except Exception as e:
-                logger.error(f"❌ SetRenderSettings failed: {e}")
-                raise Exception(f"Could not set render settings: {e}")
-            
-            # Load render preset if available
+
+            # Load render preset FIRST (if available) - this sets base quality settings
             try:
                 self.current_project.LoadRenderPreset(RENDER_PRESET)
                 logger.info(f"Loaded render preset: {RENDER_PRESET}")
             except:
                 logger.warning(f"Could not load render preset {RENDER_PRESET}, using default settings")
+
+            # Apply our render settings AFTER preset to ensure MP4 format (preset may default to MOV)
+            try:
+                success = self.current_project.SetRenderSettings(render_settings)
+                if success:
+                    logger.info("✅ Render settings applied successfully (MP4/H264 format enforced)")
+                else:
+                    logger.warning("⚠️ SetRenderSettings returned False but continuing")
+            except Exception as e:
+                logger.error(f"❌ SetRenderSettings failed: {e}")
+                raise Exception(f"Could not set render settings: {e}")
             
             # Clear any existing render jobs from the queue before starting
             try:
