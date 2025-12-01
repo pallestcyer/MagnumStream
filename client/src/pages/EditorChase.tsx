@@ -154,12 +154,33 @@ export default function EditorChase() {
           setSceneVideos(videos);
 
           // Spread markers evenly across the actual scene duration if not yet positioned
-          // Keep seamless pairs connected (follow slot starts where lead slot ends)
+          // OR clamp existing positions that exceed the actual duration
           const actualDuration = videos.duration || 60;
           setSlotSelections(prev => {
             const needsSpread = prev.some(s => s.windowStart < 0);
+
+            // Also check if any positions exceed the actual duration and need clamping
+            const slots = SLOT_TEMPLATE.filter(s => s.sceneType === 'chase');
+            const needsClamp = prev.some(s => {
+              const slotConfig = slots.find(slot => slot.slotNumber === s.slotNumber);
+              const maxStart = slotConfig ? actualDuration - slotConfig.duration : actualDuration;
+              return s.windowStart >= 0 && s.windowStart > maxStart;
+            });
+
+            // If only needs clamping (not spreading), clamp positions to valid range
+            if (!needsSpread && needsClamp) {
+              console.log('🔒 Clamping chase slot positions to actual duration:', actualDuration);
+              return prev.map(selection => {
+                const slotConfig = slots.find(slot => slot.slotNumber === selection.slotNumber);
+                const maxStart = slotConfig ? Math.max(0, actualDuration - slotConfig.duration) : actualDuration;
+                const clampedStart = Math.max(0, Math.min(maxStart, selection.windowStart));
+                if (clampedStart !== selection.windowStart) {
+                  console.log(`🔒 Clamped chase slot ${selection.slotNumber} from ${selection.windowStart}s to ${clampedStart}s`);
+                }
+                return { ...selection, windowStart: clampedStart };
+              });
+            }
             if (needsSpread) {
-              const slots = SLOT_TEMPLATE.filter(s => s.sceneType === 'chase');
 
               // Create a map for tracking positions by slot number
               const positionMap = new Map<number, number>();
@@ -330,48 +351,59 @@ export default function EditorChase() {
     if (videoRef.current && selection && slotConfig) {
       // Load the appropriate camera video, fallback to camera 1 if camera 2 not available
       let videoUrl = slotConfig.cameraAngle === 1 ? sceneVideos.camera1 : sceneVideos.camera2;
-      
+
       // Fallback: if requested camera not available, use camera 1
       if (!videoUrl && slotConfig.cameraAngle === 2 && sceneVideos.camera1) {
         videoUrl = sceneVideos.camera1;
         console.log(`🔄 Camera 2 not available for slot ${slotConfig.slotNumber}, using Camera 1 as fallback`);
       }
-      
+
       console.log(`🎯 Chase: Loading video for camera ${slotConfig.cameraAngle}:`, videoUrl ? videoUrl.substring(0, 50) + '...' : 'No URL');
-      
+
       if (videoUrl) {
         try {
-          videoRef.current.src = videoUrl;
-          videoRef.current.currentTime = selection.windowStart;
-          
-          // Wait for video to load before playing
-          videoRef.current.addEventListener('loadeddata', () => {
-            console.log('✅ Chase video loaded successfully, starting playback at', selection.windowStart);
+          const video = videoRef.current;
+          const currentSrc = video.src;
+          const needsSourceChange = !currentSrc || !currentSrc.startsWith('blob:') || currentSrc !== videoUrl;
+
+          // Calculate safe window start (clamped to video duration)
+          const videoDuration = video.duration || sceneVideos.duration || 60;
+          const slotDuration = slotConfig.duration || 3;
+          const safeWindowStart = Math.max(0, Math.min(selection.windowStart, videoDuration - slotDuration));
+
+          const seekAndPlay = () => {
             if (videoRef.current) {
-              videoRef.current.currentTime = selection.windowStart;
-              videoRef.current.play().catch(error => {
+              const v = videoRef.current;
+              const actualDuration = v.duration || videoDuration;
+              const clampedStart = Math.max(0, Math.min(safeWindowStart, actualDuration - slotDuration));
+
+              console.log(`🎯 Chase: Seeking to ${clampedStart}s (video duration: ${actualDuration})`);
+              v.currentTime = clampedStart;
+              v.play().catch(error => {
                 console.error('❌ Error playing chase video:', error);
               });
             }
-          }, { once: true });
-          
-          // Add error handling
-          videoRef.current.addEventListener('error', (event) => {
-            const video = event.target as HTMLVideoElement;
-            console.error('❌ Chase video load error:', {
-              error: video.error,
-              errorCode: video.error?.code,
-              errorMessage: video.error?.message,
-              canPlayType: {
-                mp4: video.canPlayType('video/mp4'),
-                mp4_h264: video.canPlayType('video/mp4; codecs="avc1.42E01E,mp4a.40.2"'),
-                webm: video.canPlayType('video/webm')
-              }
-            });
-          }, { once: true });
-          
-          // Load the video
-          videoRef.current.load();
+          };
+
+          if (needsSourceChange) {
+            console.log(`🎯 Chase: Changing video source`);
+            video.src = videoUrl;
+
+            video.addEventListener('canplay', () => {
+              console.log('✅ Chase video ready to play');
+              seekAndPlay();
+            }, { once: true });
+
+            video.addEventListener('error', (event) => {
+              const v = event.target as HTMLVideoElement;
+              console.error('❌ Chase video load error:', v.error?.message || 'Unknown error');
+            }, { once: true });
+
+            video.load();
+          } else {
+            console.log(`🎯 Chase: Same source, just seeking to ${safeWindowStart}s`);
+            seekAndPlay();
+          }
         } catch (error) {
           console.error('Error loading video:', error);
         }
@@ -387,21 +419,40 @@ export default function EditorChase() {
 
     const handleTimeUpdate = () => {
       const selection = slotSelections.find(s => s.slotNumber === activeSlot);
-      if (selection) {
-        // Get the duration for this slot from SLOT_TEMPLATE
+      if (selection && selection.windowStart >= 0) {
         const slotConfig = SLOT_TEMPLATE.find(config => config.slotNumber === selection.slotNumber);
-        const slotDuration = slotConfig?.duration || 3; // Fallback to 3 seconds if not found
-        
-        if (video.currentTime >= selection.windowStart + slotDuration) {
-          // Loop back to the start of the slot window instead of pausing
-          video.currentTime = selection.windowStart;
+        const slotDuration = slotConfig?.duration || 3;
+
+        // Clamp windowStart to actual video duration
+        const videoDuration = video.duration || sceneVideos.duration || 60;
+        const safeWindowStart = Math.min(selection.windowStart, Math.max(0, videoDuration - slotDuration));
+        const loopEndTime = safeWindowStart + slotDuration;
+
+        if (video.currentTime >= loopEndTime || video.currentTime < safeWindowStart - 0.5) {
+          video.currentTime = safeWindowStart;
         }
       }
     };
 
+    const handleEnded = () => {
+      const selection = slotSelections.find(s => s.slotNumber === activeSlot);
+      if (selection && selection.windowStart >= 0) {
+        const slotConfig = SLOT_TEMPLATE.find(config => config.slotNumber === selection.slotNumber);
+        const slotDuration = slotConfig?.duration || 3;
+        const videoDuration = video.duration || sceneVideos.duration || 60;
+        const safeWindowStart = Math.min(selection.windowStart, Math.max(0, videoDuration - slotDuration));
+        video.currentTime = safeWindowStart;
+        video.play().catch(e => console.error('Error restarting chase video:', e));
+      }
+    };
+
     video.addEventListener('timeupdate', handleTimeUpdate);
-    return () => video.removeEventListener('timeupdate', handleTimeUpdate);
-  }, [activeSlot, slotSelections]);
+    video.addEventListener('ended', handleEnded);
+    return () => {
+      video.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('ended', handleEnded);
+    };
+  }, [activeSlot, slotSelections, sceneVideos.duration]);
 
 
   return (

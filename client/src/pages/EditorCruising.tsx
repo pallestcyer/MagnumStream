@@ -151,10 +151,32 @@ export default function EditorCruising() {
           setSceneVideos(videos);
 
           // Spread markers evenly across the actual scene duration if not yet positioned
-          // Keep seamless pairs connected (follow slot starts where lead slot ends)
+          // OR clamp existing positions that exceed the actual duration
           const actualDuration = videos.duration || 60;
           setSlotSelections(prev => {
             const needsSpread = prev.some(s => s.windowStart < 0);
+
+            // Also check if any positions exceed the actual duration and need clamping
+            const slots = SLOT_TEMPLATE.filter(s => s.sceneType === 'cruising');
+            const needsClamp = prev.some(s => {
+              const slotConfig = slots.find(slot => slot.slotNumber === s.slotNumber);
+              const maxStart = slotConfig ? actualDuration - slotConfig.duration : actualDuration;
+              return s.windowStart >= 0 && s.windowStart > maxStart;
+            });
+
+            // If only needs clamping (not spreading), clamp positions to valid range
+            if (!needsSpread && needsClamp) {
+              console.log('🔒 Clamping slot positions to actual duration:', actualDuration);
+              return prev.map(selection => {
+                const slotConfig = slots.find(slot => slot.slotNumber === selection.slotNumber);
+                const maxStart = slotConfig ? Math.max(0, actualDuration - slotConfig.duration) : actualDuration;
+                const clampedStart = Math.max(0, Math.min(maxStart, selection.windowStart));
+                if (clampedStart !== selection.windowStart) {
+                  console.log(`🔒 Clamped slot ${selection.slotNumber} from ${selection.windowStart}s to ${clampedStart}s`);
+                }
+                return { ...selection, windowStart: clampedStart };
+              });
+            }
             if (needsSpread) {
               const slots = SLOT_TEMPLATE.filter(s => s.sceneType === 'cruising');
 
@@ -326,74 +348,63 @@ export default function EditorCruising() {
     if (videoRef.current && selection && slotConfig) {
       // Load the appropriate camera video, fallback to camera 1 if camera 2 not available
       let videoUrl = slotConfig.cameraAngle === 1 ? sceneVideos.camera1 : sceneVideos.camera2;
-      
+
       // Fallback: if requested camera not available, use camera 1
       if (!videoUrl && slotConfig.cameraAngle === 2 && sceneVideos.camera1) {
         videoUrl = sceneVideos.camera1;
         console.log(`🔄 Camera 2 not available for slot ${slotConfig.slotNumber}, using Camera 1 as fallback`);
       }
-      
+
       console.log(`🎯 Loading video for camera ${slotConfig.cameraAngle}:`, videoUrl ? videoUrl.substring(0, 50) + '...' : 'No URL');
-      
+
       if (videoUrl) {
         try {
-          console.log(`🎯 Setting video source to:`, videoUrl.substring(0, 50) + '...');
-          
-          videoRef.current.src = videoUrl;
-          videoRef.current.currentTime = selection.windowStart;
-          
-          // Wait for video to load before playing
-          videoRef.current.addEventListener('loadeddata', () => {
-            console.log('✅ Video loaded successfully, starting playback at', selection.windowStart);
+          const video = videoRef.current;
+          const currentSrc = video.src;
+          const needsSourceChange = !currentSrc || !currentSrc.startsWith('blob:') || currentSrc !== videoUrl;
+
+          // Calculate safe window start (clamped to video duration)
+          const videoDuration = video.duration || sceneVideos.duration || 60;
+          const slotDuration = slotConfig.duration || 3;
+          const safeWindowStart = Math.max(0, Math.min(selection.windowStart, videoDuration - slotDuration));
+
+          console.log(`🎯 Safe window start: ${safeWindowStart} (original: ${selection.windowStart}, video duration: ${videoDuration})`);
+
+          const seekAndPlay = () => {
             if (videoRef.current) {
-              videoRef.current.currentTime = selection.windowStart;
-              videoRef.current.play().catch(error => {
+              const v = videoRef.current;
+              const actualDuration = v.duration || videoDuration;
+              const clampedStart = Math.max(0, Math.min(safeWindowStart, actualDuration - slotDuration));
+
+              console.log(`🎯 Seeking to ${clampedStart}s (video duration: ${actualDuration})`);
+              v.currentTime = clampedStart;
+              v.play().catch(error => {
                 console.error('❌ Error playing video:', error);
               });
             }
-          }, { once: true });
-          
-          // More detailed error handling
-          videoRef.current.addEventListener('error', (event) => {
-            const video = event.target as HTMLVideoElement;
-            console.error('❌ Video load error details:', {
-              error: video.error,
-              errorCode: video.error?.code,
-              errorMessage: video.error?.message,
-              networkState: video.networkState,
-              readyState: video.readyState,
-              src: video.src.substring(0, 50) + '...',
-              srcLength: video.src.length,
-              canPlayType: {
-                mp4: video.canPlayType('video/mp4'),
-                mp4_h264: video.canPlayType('video/mp4; codecs="avc1.42E01E,mp4a.40.2"'),
-                webm: video.canPlayType('video/webm'),
-                'webm-vp8': video.canPlayType('video/webm; codecs="vp8"')
-              }
-            });
-            
-            // If video fails, try to clear the blob URL and regenerate
-            if (video.error?.code === 4) { // MEDIA_ELEMENT_ERROR: Format error
-              console.log('🔄 Attempting to reload video with different format...');
-              setTimeout(() => {
-                if (videoRef.current) {
-                  videoRef.current.load();
-                }
-              }, 500);
-            }
-          }, { once: true });
-          
-          // Debug what happens during loading
-          videoRef.current.addEventListener('loadstart', () => {
-            console.log('📡 Video loading started');
-          }, { once: true });
-          
-          videoRef.current.addEventListener('progress', () => {
-            console.log('📊 Video loading progress');
-          }, { once: true });
-          
-          // Load the video
-          videoRef.current.load();
+          };
+
+          if (needsSourceChange) {
+            console.log(`🎯 Changing video source to:`, videoUrl.substring(0, 50) + '...');
+            video.src = videoUrl;
+
+            // Wait for video to be ready before seeking
+            video.addEventListener('canplay', () => {
+              console.log('✅ Video ready to play');
+              seekAndPlay();
+            }, { once: true });
+
+            video.addEventListener('error', (event) => {
+              const v = event.target as HTMLVideoElement;
+              console.error('❌ Video load error:', v.error?.message || 'Unknown error');
+            }, { once: true });
+
+            video.load();
+          } else {
+            // Same source, just seek to new position
+            console.log(`🎯 Same source, just seeking to ${safeWindowStart}s`);
+            seekAndPlay();
+          }
         } catch (error) {
           console.error('❌ Error setting up video:', error);
         }
@@ -410,21 +421,43 @@ export default function EditorCruising() {
 
     const handleTimeUpdate = () => {
       const selection = slotSelections.find(s => s.slotNumber === activeSlot);
-      if (selection) {
+      if (selection && selection.windowStart >= 0) {
         // Get the duration for this slot from SLOT_TEMPLATE
         const slotConfig = SLOT_TEMPLATE.find(config => config.slotNumber === selection.slotNumber);
-        const slotDuration = slotConfig?.duration || 3; // Fallback to 3 seconds if not found
+        const slotDuration = slotConfig?.duration || 3;
 
-        if (video.currentTime >= selection.windowStart + slotDuration) {
-          // Loop back to the start of the slot window instead of pausing
-          video.currentTime = selection.windowStart;
+        // Clamp windowStart to actual video duration
+        const videoDuration = video.duration || sceneVideos.duration || 60;
+        const safeWindowStart = Math.min(selection.windowStart, Math.max(0, videoDuration - slotDuration));
+        const loopEndTime = safeWindowStart + slotDuration;
+
+        if (video.currentTime >= loopEndTime || video.currentTime < safeWindowStart - 0.5) {
+          // Loop back to the start of the slot window
+          video.currentTime = safeWindowStart;
         }
       }
     };
 
+    // Handle video ending naturally (e.g., if slot window is near end of recording)
+    const handleEnded = () => {
+      const selection = slotSelections.find(s => s.slotNumber === activeSlot);
+      if (selection && selection.windowStart >= 0) {
+        const slotConfig = SLOT_TEMPLATE.find(config => config.slotNumber === selection.slotNumber);
+        const slotDuration = slotConfig?.duration || 3;
+        const videoDuration = video.duration || sceneVideos.duration || 60;
+        const safeWindowStart = Math.min(selection.windowStart, Math.max(0, videoDuration - slotDuration));
+        video.currentTime = safeWindowStart;
+        video.play().catch(e => console.error('Error restarting video:', e));
+      }
+    };
+
     video.addEventListener('timeupdate', handleTimeUpdate);
-    return () => video.removeEventListener('timeupdate', handleTimeUpdate);
-  }, [activeSlot, slotSelections]);
+    video.addEventListener('ended', handleEnded);
+    return () => {
+      video.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('ended', handleEnded);
+    };
+  }, [activeSlot, slotSelections, sceneVideos.duration]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

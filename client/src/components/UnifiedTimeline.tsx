@@ -45,10 +45,11 @@ export default function UnifiedTimeline({
     return percentage * sceneDuration;
   }, [sceneDuration]);
 
-  // Convert time to percentage
+  // Convert time to percentage (clamped to 0-100% to prevent visual overflow)
   const timeToPercent = (time: number): number => {
     if (time < 0) return 0;
-    return Math.max(0, (time / sceneDuration) * 100);
+    if (sceneDuration <= 0) return 0;
+    return Math.max(0, Math.min(100, (time / sceneDuration) * 100));
   };
 
   // Handle marker drag start

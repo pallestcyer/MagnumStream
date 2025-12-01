@@ -1405,11 +1405,8 @@ class DaVinciAutomation:
                 "FormatHeight": 1080,  # Safe default for template
                 "FrameRate": "23.976", # Match template frame rate
                 "VideoQuality": 0,     # Automatic quality
-                # Explicit format settings to ensure MP4 output (not MOV)
-                "ExportFormat": "mp4",
-                "VideoCodec": "H264",
             }
-                    
+
             logger.info(f"Setting render settings: {render_settings}")
 
             # Load render preset FIRST (if available) - this sets base quality settings
@@ -1419,11 +1416,22 @@ class DaVinciAutomation:
             except:
                 logger.warning(f"Could not load render preset {RENDER_PRESET}, using default settings")
 
-            # Apply our render settings AFTER preset to ensure MP4 format (preset may default to MOV)
+            # Set MP4 format and H.264 codec EXPLICITLY using the correct API method
+            # This overrides whatever format the preset set (which may be MOV/QuickTime)
+            try:
+                format_set = self.current_project.SetCurrentRenderFormatAndCodec("mp4", "H.264")
+                if format_set:
+                    logger.info("✅ Render format set to MP4 with H.264 codec")
+                else:
+                    logger.warning("⚠️ SetCurrentRenderFormatAndCodec returned False - may use preset format")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not set render format: {e}")
+
+            # Apply our render settings (excluding format which is set separately)
             try:
                 success = self.current_project.SetRenderSettings(render_settings)
                 if success:
-                    logger.info("✅ Render settings applied successfully (MP4/H264 format enforced)")
+                    logger.info("✅ Render settings applied successfully")
                 else:
                     logger.warning("⚠️ SetRenderSettings returned False but continuing")
             except Exception as e:
