@@ -47,7 +47,13 @@ const getRoundedTime = () => {
   return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 };
 
-import { Plus, Clock, Plane, Mail, Video, Image, DollarSign, X, CheckCircle2, Edit3, PlayCircle, Upload, Trash2, ExternalLink, FileVideo, Play, Search, RotateCcw, Star, Archive, ArchiveRestore } from "lucide-react";
+import { Plus, Clock, Plane, Mail, Video, Image, DollarSign, X, CheckCircle2, Edit3, PlayCircle, Upload, Trash2, ExternalLink, FileVideo, Play, Search, RotateCcw, Star, Archive, ArchiveRestore, AlertTriangle, Clapperboard, FolderOpen, ImagePlus, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDevMode } from "@/contexts/DevModeContext";
 import type { FlightRecording } from "@shared/schema";
@@ -668,27 +674,39 @@ export default function ProjectsPage() {
     switch (status) {
       case 'completed':
         return {
-          label: 'Video Complete',
-          icon: CheckCircle2,
-          className: 'border-green-500/50 text-green-500 hover:bg-green-500/10',
+          label: 'Open Video',
+          statusLabel: 'Completed',
+          icon: FolderOpen,
+          statusIcon: CheckCircle2,
+          className: 'bg-green-500 hover:bg-green-600 text-white border-green-500',
+          statusClassName: 'text-green-500',
         };
       case 'in_progress':
         return {
-          label: 'Continue Video',
+          label: 'Edit Video',
+          statusLabel: 'Editing',
           icon: Edit3,
-          className: 'border-orange-500/50 text-orange-500 hover:bg-orange-500/10',
+          statusIcon: Edit3,
+          className: 'bg-purple-500 hover:bg-purple-600 text-white border-purple-500',
+          statusClassName: 'text-purple-500',
         };
       case 'recorded':
         return {
           label: 'Edit Video',
-          icon: PlayCircle,
-          className: 'border-blue-500/50 text-blue-500 hover:bg-blue-500/10',
+          statusLabel: 'Recorded',
+          icon: Edit3,
+          statusIcon: Video,
+          className: 'bg-purple-500 hover:bg-purple-600 text-white border-purple-500',
+          statusClassName: 'text-purple-500',
         };
       default:
         return {
-          label: 'Video',
-          icon: Video,
-          className: '',
+          label: 'Record',
+          statusLabel: 'Pending',
+          icon: Clapperboard,
+          statusIcon: Clock,
+          className: 'border-muted-foreground/30 hover:bg-muted/50',
+          statusClassName: 'text-muted-foreground',
         };
     }
   };
@@ -960,17 +978,16 @@ export default function ProjectsPage() {
           )}
         </div>
 
-        {/* Action Buttons */}
+        {/* Thumbnail - full width at top of action area */}
         <div className="mt-auto pt-4 space-y-3">
-          {/* Thumbnail - show video thumbnail if available, otherwise photo thumbnail */}
           {(() => {
             const hasVideoThumbnail = project.exportStatus === 'completed' && project.thumbnailUrl;
             const hasPhotoThumbnail = project.photoThumbnailUrl;
             const thumbnailUrl = hasVideoThumbnail ? project.thumbnailUrl : hasPhotoThumbnail ? project.photoThumbnailUrl : null;
 
             return (
-              <div className={`aspect-video rounded-lg overflow-hidden relative group ${thumbnailUrl ? 'bg-muted' : ''}`}>
-                {thumbnailUrl && (
+              <div className={`aspect-video rounded-lg overflow-hidden relative group ${thumbnailUrl ? 'bg-muted' : 'bg-muted/30 border border-dashed border-muted-foreground/20'}`}>
+                {thumbnailUrl ? (
                   <>
                     <img
                       src={thumbnailUrl}
@@ -993,19 +1010,37 @@ export default function ProjectsPage() {
                       </div>
                     )}
                   </>
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Video className="w-8 h-8 text-muted-foreground/30" />
+                  </div>
                 )}
               </div>
             );
           })()}
-          <div className="grid grid-cols-2 gap-2">
-            {(() => {
-              const videoInfo = getVideoButtonInfo(project.exportStatus);
-              const VideoIcon = videoInfo.icon;
-              const isCompleted = project.exportStatus === 'completed';
-              // Shorter labels in dev mode to make room for redo button
-              const videoLabel = isDevMode && isCompleted ? 'Video' : videoInfo.label;
-              return (
-                <div className="flex gap-1 min-w-0">
+
+          {/* Video Section */}
+          {(() => {
+            const videoInfo = getVideoButtonInfo(project.exportStatus);
+            const VideoIcon = videoInfo.icon;
+            const StatusIcon = videoInfo.statusIcon;
+            const isCompleted = project.exportStatus === 'completed';
+            const isRecordedOrEditing = project.exportStatus === 'recorded' || project.exportStatus === 'in_progress';
+
+            // Check if project is older than 48 hours / 2 days (source files may be deleted)
+            const createdAt = new Date(project.createdAt);
+            const hoursOld = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
+            const isExpired = hoursOld > 48;
+
+            return (
+              <div className="space-y-1.5">
+                {/* Status indicator */}
+                <div className={`flex items-center gap-1.5 text-xs ${videoInfo.statusClassName}`}>
+                  <StatusIcon className="w-3 h-3" />
+                  <span>{videoInfo.statusLabel}</span>
+                </div>
+                {/* Button row */}
+                <div className="flex gap-1.5">
                   <Button
                     variant="outline"
                     size="sm"
@@ -1015,63 +1050,123 @@ export default function ProjectsPage() {
                       handleOpenVideo(project);
                     }}
                   >
-                    <VideoIcon className="w-4 h-4 shrink-0 mr-1" />
-                    <span className="truncate">{videoLabel}</span>
+                    <VideoIcon className="w-4 h-4 shrink-0 mr-1.5" />
+                    <span className="truncate">{videoInfo.label}</span>
                   </Button>
-                  {isDevMode && isCompleted && (() => {
-                    // Check if project is older than 48 hours / 2 days (source files may be deleted)
-                    const createdAt = new Date(project.createdAt);
-                    const hoursOld = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
-                    const isExpired = hoursOld > 48;
-
-                    return (
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className={`h-8 w-8 shrink-0 ${isExpired ? 'opacity-40 cursor-not-allowed' : 'border-orange-500/50 text-orange-500 hover:bg-orange-500/10'}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!isExpired) {
-                            handleRedoVideo(project);
-                          }
-                        }}
-                        disabled={isExpired}
-                        title={isExpired ? "Source files expired (48h+)" : "Re-edit video"}
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                      </Button>
-                    );
-                  })()}
-                </div>
-              );
-            })()}
-            {(() => {
-              const photosCompleted = project.photosUploaded;
-              return (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`w-full min-w-0 ${photosCompleted ? 'border-green-500/50 text-green-500 hover:bg-green-500/10' : ''}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (photosCompleted && project.photosFolderId) {
-                      // Photos uploaded - open Photos folder in Drive
-                      window.open(`https://drive.google.com/drive/folders/${project.photosFolderId}`, '_blank');
-                    } else {
-                      handleOpenPhotosDialog(project);
-                    }
-                  }}
-                >
-                  {photosCompleted ? (
-                    <CheckCircle2 className="w-4 h-4 shrink-0 mr-1" />
-                  ) : (
-                    <Image className="w-4 h-4 shrink-0 mr-1" />
+                  {/* Action button for completed videos */}
+                  {isCompleted && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <AlertTriangle className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenuItem
+                          disabled={isExpired}
+                          className={isExpired ? 'opacity-50' : ''}
+                          onClick={() => {
+                            if (!isExpired) {
+                              handleRedoVideo(project);
+                            }
+                          }}
+                        >
+                          <Edit3 className="w-4 h-4 mr-2" />
+                          {isExpired ? 'Re-edit (expired)' : 'Re-edit Video'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            // Re-record: go to recording page with this project selected
+                            setActivePilot({
+                              id: project.id,
+                              projectName: project.projectName || project.pilotName,
+                              pilotName: project.pilotName,
+                            });
+                            setLocation('/recording');
+                          }}
+                        >
+                          <Clapperboard className="w-4 h-4 mr-2" />
+                          Re-record Video
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
-                  <span className="truncate">Photos</span>
-                </Button>
-              );
-            })()}
-          </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Photos Section */}
+          {(() => {
+            const photosCompleted = project.photosUploaded;
+            return (
+              <div className="space-y-1.5">
+                {/* Status indicator */}
+                <div className={`flex items-center gap-1.5 text-xs ${photosCompleted ? 'text-green-500' : 'text-muted-foreground'}`}>
+                  {photosCompleted ? (
+                    <>
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span>Uploaded</span>
+                    </>
+                  ) : (
+                    <>
+                      <Image className="w-3 h-3" />
+                      <span>No Photos</span>
+                    </>
+                  )}
+                </div>
+                {/* Button row */}
+                <div className="flex gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={`flex-1 min-w-0 ${photosCompleted ? 'bg-green-500 hover:bg-green-600 text-white border-green-500' : 'border-muted-foreground/30 hover:bg-muted/50'}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (photosCompleted && project.photosFolderId) {
+                        // Photos uploaded - open Photos folder in Drive
+                        window.open(`https://drive.google.com/drive/folders/${project.photosFolderId}`, '_blank');
+                      } else {
+                        handleOpenPhotosDialog(project);
+                      }
+                    }}
+                  >
+                    {photosCompleted ? (
+                      <>
+                        <FolderOpen className="w-4 h-4 shrink-0 mr-1.5" />
+                        <span className="truncate">Open Photos</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4 shrink-0 mr-1.5" />
+                        <span className="truncate">Upload Photos</span>
+                      </>
+                    )}
+                  </Button>
+                  {/* Add more photos button - only show when photos already uploaded */}
+                  {photosCompleted && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 border-blue-500/50 text-blue-500 hover:bg-blue-500/10"
+                      title="Upload more photos"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenPhotosDialog(project);
+                      }}
+                    >
+                      <ImagePlus className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
           <div className="flex justify-end items-center gap-2">
             {isSold ? (
               <>
