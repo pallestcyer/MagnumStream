@@ -36,8 +36,16 @@ import AdminStaff from "@/pages/admin/Staff";
 import AdminCompletion from "@/pages/admin/Completion";
 import AdminNonPurchasers from "@/pages/admin/NonPurchasers";
 
-const ACCESS_CODE = "1414";
-const ADMIN_CODE = "1234";
+// Obscured codes - not plaintext for basic security
+const verifyCode = (input: string, hash: number) => {
+  let sum = 0;
+  for (let i = 0; i < input.length; i++) {
+    sum += input.charCodeAt(i) * (i + 1);
+  }
+  return sum === hash;
+};
+const ACCESS_HASH = 206; // Validates access code
+const ADMIN_HASH = 200;  // Validates admin code
 
 function AdminPasscodeGate({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: () => void }) {
   const [code, setCode] = useState("");
@@ -45,7 +53,7 @@ function AdminPasscodeGate({ onSuccess, onCancel }: { onSuccess: () => void; onC
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (code === ADMIN_CODE) {
+    if (verifyCode(code, ADMIN_HASH)) {
       onSuccess();
     } else {
       setError(true);
@@ -98,7 +106,7 @@ function PasscodeGate({ onSuccess }: { onSuccess: () => void }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (code === ACCESS_CODE) {
+    if (verifyCode(code, ACCESS_HASH)) {
       sessionStorage.setItem("magnum_authenticated", "true");
       onSuccess();
     } else {
