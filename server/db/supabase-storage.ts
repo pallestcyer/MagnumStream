@@ -343,8 +343,8 @@ export class SupabaseStorage implements IStorage {
       throw new Error(`Failed to create sale: ${error.message}`);
     }
     
-    // Mark recording as sold
-    await this.updateFlightRecording(sale.recordingId, { sold: true });
+    // Mark recording as sold and store the bundle type
+    await this.updateFlightRecording(sale.recordingId, { sold: true, soldBundle: sale.bundle });
     
     return {
       id: data.id,
