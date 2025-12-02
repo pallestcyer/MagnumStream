@@ -1224,8 +1224,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await fs.mkdir(sourceDir, { recursive: true });
       
-      // Create expiration metadata file (24 hours from now)
-      const expirationTime = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      // Create expiration metadata file (48 hours / 2 days from now)
+      const expirationTime = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
       const metadataPath = path.join(projectDir, '.expiration');
       await fs.writeFile(metadataPath, JSON.stringify({
         createdAt: new Date().toISOString(),

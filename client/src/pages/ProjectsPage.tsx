@@ -1086,10 +1086,10 @@ export default function ProjectsPage() {
                     <span className="truncate">{videoLabel}</span>
                   </Button>
                   {isDevMode && isCompleted && (() => {
-                    // Check if project is older than 24 hours (source files may be deleted)
+                    // Check if project is older than 48 hours / 2 days (source files may be deleted)
                     const createdAt = new Date(project.createdAt);
                     const hoursOld = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
-                    const isExpired = hoursOld > 24;
+                    const isExpired = hoursOld > 48;
 
                     return (
                       <Button
@@ -1103,7 +1103,7 @@ export default function ProjectsPage() {
                           }
                         }}
                         disabled={isExpired}
-                        title={isExpired ? "Source files expired (24h+)" : "Re-edit video"}
+                        title={isExpired ? "Source files expired (48h+)" : "Re-edit video"}
                       >
                         <RotateCcw className="w-4 h-4" />
                       </Button>
