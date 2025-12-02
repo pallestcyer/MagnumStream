@@ -35,10 +35,21 @@ export const flightRecordings = pgTable("flight_recordings", {
   videoFolderId: text("video_folder_id"), // Google Drive Video subfolder ID for direct upload
   photosFolderId: text("photos_folder_id"), // Google Drive Photos subfolder ID for direct upload
   localVideoPath: text("local_video_path"), // Local file path on Mac for direct playback
-  thumbnailUrl: text("thumbnail_url"), // Thumbnail image path or URL
+  thumbnailUrl: text("thumbnail_url"), // Thumbnail image path or URL (from video)
+  photoThumbnailUrl: text("photo_thumbnail_url"), // Thumbnail from selected photo (fallback when no video)
   smsPhoneNumber: text("sms_phone_number"),
   sold: boolean("sold").notNull().default(false),
+  soldBundle: text("sold_bundle"), // Bundle type when sold: 'video_photos' | 'video_only' | 'photos_only'
   photosUploaded: boolean("photos_uploaded").notNull().default(false),
+  archived: boolean("archived").notNull().default(false), // Soft delete - hide from Active/Sold tabs
+  // Customer intake form fields (MAGSAMPLE-style)
+  phone: text("phone"), // Customer phone number
+  origin: text("origin"), // Where the customer is from (City, Country)
+  referral: text("referral"), // How the customer found Magnum
+  purpose: text("purpose"), // Purpose of visit: vacation, birthday, special_event, bucket_list, other
+  language: text("language").default("english"), // Primary language: english, spanish, japanese, chinese, korean, french
+  contactConsent: boolean("contact_consent").default(false), // Customer agreed to be contacted for updates
+  waiverConsent: boolean("waiver_consent").default(false), // Customer accepted the liability waiver
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -72,9 +83,9 @@ export type InsertSale = z.infer<typeof insertSaleSchema>;
 export type Sale = typeof sales.$inferSelect;
 
 export const BUNDLE_OPTIONS = [
-  { value: 'video_photos', label: 'Video + Photos', price: 49.99 },
-  { value: 'video_only', label: 'Video Only', price: 39.99 },
-  { value: 'photos_only', label: 'Photos Only', price: 19.99 },
+  { value: 'video_photos', label: 'Video + Photos', price: 45 },
+  { value: 'video_only', label: 'Video Only', price: 25 },
+  { value: 'photos_only', label: 'Photos Only', price: 35 },
 ] as const;
 
 // Scene recordings (3 scenes per project)

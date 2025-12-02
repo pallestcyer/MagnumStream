@@ -86,15 +86,23 @@ export class SupabaseStorage implements IStorage {
         flight_time: recording.flightTime,
         export_status: recording.exportStatus || 'pending',
         drive_file_url: recording.driveFileUrl,
-        sms_phone_number: recording.smsPhoneNumber
+        sms_phone_number: recording.smsPhoneNumber,
+        // New intake form fields
+        phone: recording.phone,
+        origin: recording.origin,
+        referral: recording.referral,
+        purpose: recording.purpose,
+        language: recording.language || 'english',
+        contact_consent: recording.contactConsent || false,
+        waiver_consent: recording.waiverConsent || false
       })
       .select()
       .single();
-    
+
     if (error) {
       throw new Error(`Failed to create flight recording: ${error.message}`);
     }
-    
+
     return {
       id: data.id,
       projectName: data.project_name,
@@ -115,6 +123,17 @@ export class SupabaseStorage implements IStorage {
       thumbnailUrl: data.thumbnail_url,
       smsPhoneNumber: data.sms_phone_number,
       sold: data.sold,
+      soldBundle: data.sold_bundle,
+      photosUploaded: data.photos_uploaded,
+      archived: data.archived,
+      // New intake form fields
+      phone: data.phone,
+      origin: data.origin,
+      referral: data.referral,
+      purpose: data.purpose,
+      language: data.language,
+      contactConsent: data.contact_consent,
+      waiverConsent: data.waiver_consent,
       createdAt: new Date(data.created_at)
     };
   }
@@ -151,6 +170,17 @@ export class SupabaseStorage implements IStorage {
       thumbnailUrl: data.thumbnail_url,
       smsPhoneNumber: data.sms_phone_number,
       sold: data.sold,
+      soldBundle: data.sold_bundle,
+      photosUploaded: data.photos_uploaded,
+      archived: data.archived,
+      // New intake form fields
+      phone: data.phone,
+      origin: data.origin,
+      referral: data.referral,
+      purpose: data.purpose,
+      language: data.language,
+      contactConsent: data.contact_consent,
+      waiverConsent: data.waiver_consent,
       createdAt: new Date(data.created_at)
     } : undefined;
   }
@@ -176,7 +206,9 @@ export class SupabaseStorage implements IStorage {
     if (updates.thumbnailUrl !== undefined) dbUpdates.thumbnail_url = updates.thumbnailUrl;
     if (updates.smsPhoneNumber !== undefined) dbUpdates.sms_phone_number = updates.smsPhoneNumber;
     if (updates.sold !== undefined) dbUpdates.sold = updates.sold;
+    if (updates.soldBundle !== undefined) dbUpdates.sold_bundle = updates.soldBundle;
     if (updates.photosUploaded !== undefined) dbUpdates.photos_uploaded = updates.photosUploaded;
+    if (updates.archived !== undefined) dbUpdates.archived = updates.archived;
 
     console.log(`🔍 SUPABASE UPDATE: Recording ${id}`);
     console.log(`   Updates requested:`, updates);
@@ -218,6 +250,17 @@ export class SupabaseStorage implements IStorage {
       thumbnailUrl: data.thumbnail_url,
       smsPhoneNumber: data.sms_phone_number,
       sold: data.sold,
+      soldBundle: data.sold_bundle,
+      photosUploaded: data.photos_uploaded,
+      archived: data.archived,
+      // New intake form fields
+      phone: data.phone,
+      origin: data.origin,
+      referral: data.referral,
+      purpose: data.purpose,
+      language: data.language,
+      contactConsent: data.contact_consent,
+      waiverConsent: data.waiver_consent,
       createdAt: new Date(data.created_at)
     } : undefined;
   }
@@ -264,9 +307,20 @@ export class SupabaseStorage implements IStorage {
       photosFolderId: record.photos_folder_id,
       localVideoPath: record.local_video_path,
       thumbnailUrl: record.thumbnail_url,
+      photoThumbnailUrl: record.photo_thumbnail_url,
       smsPhoneNumber: record.sms_phone_number,
       sold: record.sold,
+      soldBundle: record.sold_bundle,
       photosUploaded: record.photos_uploaded,
+      archived: record.archived,
+      // New intake form fields
+      phone: record.phone,
+      origin: record.origin,
+      referral: record.referral,
+      purpose: record.purpose,
+      language: record.language,
+      contactConsent: record.contact_consent,
+      waiverConsent: record.waiver_consent,
       createdAt: new Date(record.created_at)
     }));
   }
@@ -334,11 +388,11 @@ export class SupabaseStorage implements IStorage {
       .select('*')
       .eq('recording_id', recordingId)
       .order('sale_date', { ascending: false });
-    
+
     if (error) {
       throw new Error(`Failed to fetch sales for recording: ${error.message}`);
     }
-    
+
     return data.map((sale: any) => ({
       id: sale.id,
       recordingId: sale.recording_id,
@@ -350,6 +404,45 @@ export class SupabaseStorage implements IStorage {
       saleDate: new Date(sale.sale_date),
       driveShared: sale.drive_shared
     }));
+  }
+
+  async updateSale(saleId: string, updates: {
+    customerEmail?: string;
+    staffMember?: string;
+    bundle?: string;
+    saleAmount?: number;
+    driveShared?: boolean;
+  }): Promise<Sale> {
+    const updateData: any = {};
+
+    if (updates.customerEmail !== undefined) updateData.customer_email = updates.customerEmail;
+    if (updates.staffMember !== undefined) updateData.staff_member = updates.staffMember;
+    if (updates.bundle !== undefined) updateData.bundle = updates.bundle;
+    if (updates.saleAmount !== undefined) updateData.sale_amount = updates.saleAmount;
+    if (updates.driveShared !== undefined) updateData.drive_shared = updates.driveShared;
+
+    const { data, error } = await db
+      .from('sales')
+      .update(updateData)
+      .eq('id', saleId)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to update sale: ${error.message}`);
+    }
+
+    return {
+      id: data.id,
+      recordingId: data.recording_id,
+      customerName: data.customer_name,
+      customerEmail: data.customer_email,
+      staffMember: data.staff_member,
+      bundle: data.bundle,
+      saleAmount: data.sale_amount,
+      saleDate: new Date(data.sale_date),
+      driveShared: data.drive_shared
+    };
   }
 
   // Scene recordings methods

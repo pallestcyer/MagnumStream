@@ -30,6 +30,7 @@ interface VideoPreviewProps {
     duration?: string;
     size?: number;
     thumbnailUrl?: string;
+    photoThumbnailUrl?: string; // Fallback thumbnail from photos
   };
 }
 
@@ -68,8 +69,9 @@ export default function VideoPreview({
   const embedUrl = null; // We don't support embed preview for search URLs
   const downloadUrl = null; // We don't support direct download for search URLs
 
-  // Generate thumbnail URL from Drive file ID (or use placeholder)
-  const thumbnailUrl = videoInfo?.thumbnailUrl || null;
+  // Generate thumbnail URL - prioritize video thumbnail, fall back to photo thumbnail
+  const thumbnailUrl = videoInfo?.thumbnailUrl || videoInfo?.photoThumbnailUrl || null;
+  const isPhotoThumbnail = !videoInfo?.thumbnailUrl && !!videoInfo?.photoThumbnailUrl;
 
   const handleOpenInGoogleDrive = () => {
     if (isGoogleDriveWebUrl && driveOpenUrl) {

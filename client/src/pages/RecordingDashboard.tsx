@@ -370,6 +370,11 @@ export default function RecordingDashboard() {
       // No existing recording - create a new one (fallback for direct access)
       console.log('⚠️ No existing recording ID found, creating new recording');
       try {
+        // Use local date/time to avoid timezone issues
+        const now = new Date();
+        const localDate = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
+        const localTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
         const response = await fetch('/api/recordings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -378,8 +383,8 @@ export default function RecordingDashboard() {
             pilotName: pilotInfo.name || 'Unknown Pilot',
             pilotEmail: pilotInfo.email || '',
             staffMember: pilotInfo.staffMember || 'Unknown',
-            flightDate: new Date().toISOString().split('T')[0],
-            flightTime: new Date().toTimeString().split(' ')[0],
+            flightDate: localDate,
+            flightTime: localTime,
             exportStatus: 'recording',
             sessionId: pilotInfo.name || 'Unknown'
           })

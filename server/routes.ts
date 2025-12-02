@@ -68,7 +68,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create or update flight recording (for session-based projects)
   app.post("/api/recordings", async (req, res) => {
     try {
-      const { projectName, pilotName, pilotEmail, staffMember, flightDate, flightTime, flightPilot, exportStatus, sessionId } = req.body;
+      const {
+        projectName, pilotName, pilotEmail, staffMember, flightDate, flightTime, flightPilot, exportStatus, sessionId,
+        // New intake form fields
+        phone, origin, referral, purpose, language, contactConsent, waiverConsent
+      } = req.body;
 
       // Check if recording already exists for this session/pilot
       let recording;
@@ -108,10 +112,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (googleDriveOAuth.isReady() && pilotForFolder && timeForFolder) {
               console.log(`📁 Creating Google Drive folder for existing project: ${recording.pilotName}`);
 
+              // Use the existing flightDate or current date
+              const dateForFolder = flightDate || recording.flightDate;
+              const folderDate = dateForFolder ? new Date(dateForFolder + 'T12:00:00') : new Date();
+
               const folderResult = await googleDriveOAuth.createProjectFolderStructure(
                 recording.pilotName,
                 pilotForFolder,
-                timeForFolder
+                timeForFolder,
+                folderDate
               );
 
               if (folderResult) {
@@ -140,7 +149,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           staffMember,
           flightDate,
           flightTime,
-          exportStatus: exportStatus || 'pending'
+          exportStatus: exportStatus || 'pending',
+          // New intake form fields
+          phone,
+          origin,
+          referral,
+          purpose,
+          language: language || 'english',
+          contactConsent: contactConsent || false,
+          waiverConsent: waiverConsent || false
         });
 
         // Try to create Google Drive folder structure for the new project
@@ -150,10 +167,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (googleDriveOAuth.isReady() && flightPilot && flightTime) {
             console.log(`📁 Creating Google Drive folder for project: ${pilotName}`);
 
+            // Parse flightDate string (YYYY-MM-DD) to Date object for folder creation
+            const folderDate = flightDate ? new Date(flightDate + 'T12:00:00') : new Date();
+
             const folderResult = await googleDriveOAuth.createProjectFolderStructure(
               pilotName,
               flightPilot,
-              flightTime
+              flightTime,
+              folderDate
             );
 
             if (folderResult) {
@@ -381,6 +402,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const sales = await storage.getAllSales();
       res.json(sales);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get sale by recording ID
+  app.get("/api/sales/recording/:recordingId", async (req, res) => {
+    try {
+      const { recordingId } = req.params;
+      const sales = await storage.getAllSales();
+
+      // Find the most recent sale for this recording
+      const sale = sales
+        .filter((s: any) => s.recordingId === recordingId)
+        .sort((a: any, b: any) => new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime())[0];
+
+      if (!sale) {
+        return res.status(404).json({ error: 'Sale not found' });
+      }
+
+      res.json(sale);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update sale
+  app.patch("/api/sales/:saleId", async (req, res) => {
+    try {
+      const { saleId } = req.params;
+      const { customerEmail, staffMember, bundle, saleAmount } = req.body;
+
+      if (!storage.updateSale) {
+        return res.status(501).json({ error: 'Sale updates not available with current storage implementation' });
+      }
+
+      const updatedSale = await storage.updateSale(saleId, {
+        customerEmail,
+        staffMember,
+        bundle,
+        saleAmount,
+      });
+
+      // If bundle changed, also update the flight_recordings.sold_bundle
+      if (bundle !== undefined && updatedSale) {
+        await storage.updateFlightRecording(updatedSale.recordingId, {
+          soldBundle: bundle
+        });
+      }
+
+      res.json(updatedSale);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

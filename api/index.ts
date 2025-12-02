@@ -241,14 +241,14 @@ class DatabaseStorage {
 
     if (error) throw error;
 
-    // Mark the recording as sold
+    // Mark the recording as sold with bundle type
     try {
       await (supabase as any)
         .from('flight_recordings')
-        .update({ sold: true })
+        .update({ sold: true, sold_bundle: data.bundle })
         .eq('id', data.recordingId);
 
-      console.log(`✅ Marked recording ${data.recordingId} as sold`);
+      console.log(`✅ Marked recording ${data.recordingId} as sold (${data.bundle})`);
     } catch (updateError) {
       console.warn('⚠️ Failed to mark recording as sold:', updateError);
       // Don't fail the sale if this update fails
@@ -582,6 +582,86 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       });
 
+      // Get sale by recording ID
+      app.get('/api/sales/recording/:recordingId', async (req, res) => {
+        try {
+          const { recordingId } = req.params;
+          const { data, error } = await (supabase as any)
+            .from('sales')
+            .select('*')
+            .eq('recording_id', recordingId)
+            .order('sale_date', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (error) {
+            if (error.code === 'PGRST116') {
+              return res.status(404).json({ error: 'Sale not found' });
+            }
+            throw error;
+          }
+
+          res.json({
+            id: data.id,
+            recordingId: data.recording_id,
+            customerName: data.customer_name,
+            customerEmail: data.customer_email,
+            staffMember: data.staff_member,
+            bundle: data.bundle,
+            saleAmount: data.sale_amount,
+            saleDate: data.sale_date,
+            driveShared: data.drive_shared
+          });
+        } catch (error: any) {
+          res.status(500).json({ error: error.message || 'Failed to fetch sale' });
+        }
+      });
+
+      // Update sale
+      app.patch('/api/sales/:saleId', async (req, res) => {
+        try {
+          const { saleId } = req.params;
+          const { customerEmail, staffMember, bundle, saleAmount } = req.body;
+
+          const updateData: any = {};
+          if (customerEmail !== undefined) updateData.customer_email = customerEmail;
+          if (staffMember !== undefined) updateData.staff_member = staffMember;
+          if (bundle !== undefined) updateData.bundle = bundle;
+          if (saleAmount !== undefined) updateData.sale_amount = saleAmount;
+
+          const { data, error } = await (supabase as any)
+            .from('sales')
+            .update(updateData)
+            .eq('id', saleId)
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          // If bundle changed, also update the flight_recordings.sold_bundle
+          if (bundle !== undefined) {
+            await (supabase as any)
+              .from('flight_recordings')
+              .update({ sold_bundle: bundle })
+              .eq('id', data.recording_id);
+          }
+
+          res.json({
+            id: data.id,
+            recordingId: data.recording_id,
+            customerName: data.customer_name,
+            customerEmail: data.customer_email,
+            staffMember: data.staff_member,
+            bundle: data.bundle,
+            saleAmount: data.sale_amount,
+            saleDate: data.sale_date,
+            driveShared: data.drive_shared
+          });
+        } catch (error: any) {
+          res.status(500).json({ error: error.message || 'Failed to update sale' });
+        }
+      });
+
       // Issue routes (handled by Vercel database)
       app.post('/api/issues', async (req, res) => {
         try {
@@ -804,24 +884,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       app.post('/api/recordings/:recordingId/photos-complete', async (req, res) => {
         try {
           const { recordingId } = req.params;
-          const { uploadedCount, photosFolderId } = req.body;
+          const { uploadedCount, photosFolderId, thumbnailBase64 } = req.body;
 
           const recording = await storage.getFlightRecording(recordingId);
           if (!recording) {
             return res.status(404).json({ error: "Recording not found" });
           }
 
-          // Update the recording to mark photos as uploaded
-          await storage.updateFlightRecording(recordingId, {
+          // Prepare update object
+          const updateData: Record<string, any> = {
             photosUploaded: true,
             photosFolderId: photosFolderId || recording.photosFolderId
-          });
+          };
+
+          // If thumbnail provided, upload to Supabase and save URL
+          if (thumbnailBase64) {
+            try {
+              const { thumbnailGenerator } = await import('./services/ThumbnailGenerator');
+              const photoThumbnailUrl = await thumbnailGenerator.uploadPhotoThumbnail(thumbnailBase64, recordingId);
+              updateData.photoThumbnailUrl = photoThumbnailUrl;
+              console.log(`📸 Photo thumbnail uploaded: ${photoThumbnailUrl}`);
+            } catch (thumbnailError: any) {
+              console.error('⚠️ Failed to upload photo thumbnail:', thumbnailError.message);
+              // Don't fail the whole operation if thumbnail upload fails
+            }
+          }
+
+          // Update the recording
+          await storage.updateFlightRecording(recordingId, updateData);
 
           console.log(`✅ Marked ${uploadedCount} photos as uploaded for recording ${recordingId}`);
 
           res.json({
             success: true,
-            uploaded: uploadedCount
+            uploaded: uploadedCount,
+            photoThumbnailUrl: updateData.photoThumbnailUrl
           });
 
         } catch (error: any) {
@@ -1045,8 +1142,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const totalRevenue = filteredSales.reduce((acc: number, s: any) => acc + (s.saleAmount || 0), 0);
           const avgOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
 
-          // Package breakdown
-          const combos = filteredSales.filter((s: any) => s.bundle === 'combo').length;
+          // Package breakdown (video_photos is the combo bundle)
+          const combos = filteredSales.filter((s: any) => s.bundle === 'video_photos').length;
           const videoOnly = filteredSales.filter((s: any) => s.bundle === 'video_only').length;
           const photosOnly = filteredSales.filter((s: any) => s.bundle === 'photos_only').length;
 
@@ -1103,7 +1200,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             const sale = filteredSales.find((s: any) => s.recordingId === r.id);
             if (sale) {
-              if (sale.bundle === 'combo') incrementSankeyLink(source, 'Bought Combo');
+              if (sale.bundle === 'video_photos') incrementSankeyLink(source, 'Bought Combo');
               else if (sale.bundle === 'video_only') incrementSankeyLink(source, 'Bought Video');
               else if (sale.bundle === 'photos_only') incrementSankeyLink(source, 'Bought Photos');
             } else {
@@ -1125,7 +1222,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
             groundCrewPerformance[staff].revenue += s.saleAmount || 0;
             groundCrewPerformance[staff].totalSales++;
-            if (s.bundle === 'combo') groundCrewPerformance[staff].combos++;
+            if (s.bundle === 'video_photos') groundCrewPerformance[staff].combos++;
             else if (s.bundle === 'video_only') groundCrewPerformance[staff].videos++;
             else if (s.bundle === 'photos_only') groundCrewPerformance[staff].photos++;
           });
@@ -1144,7 +1241,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
             pilotPerformance[pilot].revenue += s.saleAmount || 0;
             pilotPerformance[pilot].totalSales++;
-            if (s.bundle === 'combo') pilotPerformance[pilot].combos++;
+            if (s.bundle === 'video_photos') pilotPerformance[pilot].combos++;
             else if (s.bundle === 'video_only') pilotPerformance[pilot].videos++;
             else if (s.bundle === 'photos_only') pilotPerformance[pilot].photos++;
           });
@@ -1318,7 +1415,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           // Bundle revenue
           const bundleRevenue = {
-            video_photos: filteredSales.filter((s: any) => s.bundle === 'combo').reduce((acc: number, s: any) => acc + (s.saleAmount || 0), 0),
+            video_photos: filteredSales.filter((s: any) => s.bundle === 'video_photos').reduce((acc: number, s: any) => acc + (s.saleAmount || 0), 0),
             video_only: filteredSales.filter((s: any) => s.bundle === 'video_only').reduce((acc: number, s: any) => acc + (s.saleAmount || 0), 0),
             photos_only: filteredSales.filter((s: any) => s.bundle === 'photos_only').reduce((acc: number, s: any) => acc + (s.saleAmount || 0), 0)
           };
@@ -1368,7 +1465,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
             dailyDataMap[date].revenue += s.saleAmount || 0;
             dailyDataMap[date].conversions++;
-            if (s.bundle === 'combo') dailyDataMap[date].combo += s.saleAmount || 0;
+            if (s.bundle === 'video_photos') dailyDataMap[date].combo += s.saleAmount || 0;
             else if (s.bundle === 'video_only') dailyDataMap[date].video += s.saleAmount || 0;
             else if (s.bundle === 'photos_only') dailyDataMap[date].photos += s.saleAmount || 0;
           });
@@ -1399,7 +1496,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               });
 
               const pathSales = pathRecordings.map((r: any) => filteredSales.find((s: any) => s.recordingId === r.id)).filter(Boolean);
-              const comboCount = pathSales.filter((s: any) => s.bundle === 'combo').length;
+              const comboCount = pathSales.filter((s: any) => s.bundle === 'video_photos').length;
               const videoCount = pathSales.filter((s: any) => s.bundle === 'video_only').length;
               const photosCount = pathSales.filter((s: any) => s.bundle === 'photos_only').length;
               const noPurchaseCount = data.sessions - data.conversions;

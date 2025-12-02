@@ -77,6 +77,47 @@ export class ThumbnailGenerator {
   }
 
   /**
+   * Upload a photo thumbnail from base64 data to Supabase Storage
+   * @param base64Data - Base64 encoded image data (with or without data URL prefix)
+   * @param recordingId - Recording ID for naming the file
+   * @returns Public URL of the uploaded thumbnail
+   */
+  async uploadPhotoThumbnail(base64Data: string, recordingId: string): Promise<string> {
+    try {
+      // Remove data URL prefix if present (e.g., "data:image/jpeg;base64,")
+      const base64Clean = base64Data.replace(/^data:image\/\w+;base64,/, '');
+      const fileBuffer = Buffer.from(base64Clean, 'base64');
+      const fileName = `photo-${recordingId}.jpg`;
+
+      console.log(`📤 Uploading photo thumbnail to Supabase Storage: ${fileName}`);
+
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from(this.supabaseBucket)
+        .upload(fileName, fileBuffer, {
+          contentType: 'image/jpeg',
+          upsert: true // Overwrite if exists
+        });
+
+      if (error) {
+        throw new Error(`Supabase upload failed: ${error.message}`);
+      }
+
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from(this.supabaseBucket)
+        .getPublicUrl(fileName);
+
+      console.log(`✅ Photo thumbnail uploaded to Supabase: ${publicUrlData.publicUrl}`);
+
+      return publicUrlData.publicUrl;
+    } catch (error: any) {
+      console.error(`❌ Failed to upload photo thumbnail to Supabase:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
    * Generate a thumbnail from a video file and upload to Supabase Storage
    * @param videoPath - Absolute path to the video file
    * @param recordingId - Recording ID for naming the thumbnail

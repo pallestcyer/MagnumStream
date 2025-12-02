@@ -347,7 +347,8 @@ export default function SalesPage() {
                       onSale={() => handleMarkAsSold(recording)}
                       showSaleButton={true}
                       videoInfo={{
-                        thumbnailUrl: recording.thumbnailUrl || undefined
+                        thumbnailUrl: recording.thumbnailUrl || undefined,
+                        photoThumbnailUrl: recording.photoThumbnailUrl || undefined
                       }}
                     />
                   ))}

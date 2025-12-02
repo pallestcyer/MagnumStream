@@ -15,7 +15,7 @@ interface UploadJob {
 
 interface PhotoUploadContextType {
   uploadJobs: UploadJob[];
-  startUpload: (projectId: string, projectName: string, files: File[], driveFolderUrl: string) => Promise<void>;
+  startUpload: (projectId: string, projectName: string, files: File[], driveFolderUrl: string, thumbnailFile?: File) => Promise<void>;
   dismissJob: (jobId: string) => void;
   hasActiveUploads: boolean;
 }
@@ -34,11 +34,47 @@ export function PhotoUploadProvider({ children }: { children: React.ReactNode })
     ));
   }, []);
 
+  // Helper to resize image and convert to base64 for thumbnail
+  const resizeImageToBase64 = async (file: File, maxWidth: number = 640): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      img.onload = () => {
+        // Calculate new dimensions
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          // Convert to JPEG base64 with good quality
+          const base64 = canvas.toDataURL('image/jpeg', 0.85);
+          resolve(base64);
+        } else {
+          reject(new Error('Could not get canvas context'));
+        }
+      };
+
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const startUpload = useCallback(async (
     projectId: string,
     projectName: string,
     files: File[],
-    driveFolderUrl: string
+    driveFolderUrl: string,
+    thumbnailFile?: File
   ) => {
     const jobId = `upload-${++jobIdCounter.current}-${Date.now()}`;
 
@@ -108,12 +144,24 @@ export function PhotoUploadProvider({ children }: { children: React.ReactNode })
         }
       }
 
-      // Step 3: Mark photos as uploaded in the database
+      // Step 3: Mark photos as uploaded in the database (and upload thumbnail if selected)
       if (uploadedCount > 0) {
+        let thumbnailBase64: string | undefined;
+
+        // If a thumbnail file was selected, resize and convert to base64
+        if (thumbnailFile) {
+          try {
+            thumbnailBase64 = await resizeImageToBase64(thumbnailFile);
+            console.log('📸 Thumbnail resized for upload');
+          } catch (thumbnailError) {
+            console.error('⚠️ Failed to process thumbnail:', thumbnailError);
+          }
+        }
+
         await fetch(`/api/recordings/${projectId}/photos-complete`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ uploadedCount, photosFolderId })
+          body: JSON.stringify({ uploadedCount, photosFolderId, thumbnailBase64 })
         });
       }
 

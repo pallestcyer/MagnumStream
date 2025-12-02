@@ -12,6 +12,7 @@ import { PhotoUploadProgress } from "@/components/PhotoUploadProgress";
 import { DevModeProvider, useDevMode } from "@/contexts/DevModeContext";
 import InfoPage from "@/pages/InfoPage";
 import RecordingDashboard from "@/pages/RecordingDashboard";
+import CustomerIntakePage from "@/pages/CustomerIntakePage";
 import EditorCruising from "@/pages/EditorCruising";
 import EditorChase from "@/pages/EditorChase";
 import EditorArrival from "@/pages/EditorArrival";
@@ -217,6 +218,7 @@ function App() {
 
   const isAdminRoute = location.startsWith("/admin");
   const wasAdminRoute = prevLocationRef.current.startsWith("/admin");
+  const isIntakeRoute = location === "/intake";
 
   // Clear admin authentication when leaving admin area
   useEffect(() => {
@@ -260,6 +262,22 @@ function App() {
           <TooltipProvider>
             <div className="min-h-screen bg-background">
               <AdminRouter />
+            </div>
+            <Toaster />
+          </TooltipProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
+    );
+  }
+
+  // Customer intake page is publicly accessible (no passcode required)
+  if (isIntakeRoute) {
+    return (
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <div className="min-h-screen bg-background">
+              <CustomerIntakePage />
             </div>
             <Toaster />
           </TooltipProvider>
