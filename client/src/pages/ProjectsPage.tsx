@@ -22,8 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PILOTS, getPilotName, STAFF_MEMBERS, getStaffMemberName } from "@/lib/constants";
@@ -49,14 +47,6 @@ const getRoundedTime = () => {
   return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 };
 
-// Get today's date in YYYY-MM-DD format (local timezone)
-const getTodayDate = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = (now.getMonth() + 1).toString().padStart(2, '0');
-  const day = now.getDate().toString().padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
 import { Plus, Clock, Plane, Mail, Video, Image, DollarSign, X, CheckCircle2, Edit3, PlayCircle, Upload, Trash2, ExternalLink, FileVideo, Play, Search, RotateCcw, Star, Archive, ArchiveRestore } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDevMode } from "@/contexts/DevModeContext";
@@ -74,25 +64,11 @@ export default function ProjectsPage() {
   const [isSaleDialogOpen, setIsSaleDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<FlightRecording | null>(null);
   const [saleProject, setSaleProject] = useState<FlightRecording | null>(null);
-  // OLD IMPLEMENTATION - Two first names with "&" (commented out, kept for reference)
-  // const [firstName1, setFirstName1] = useState("");
-  // const [firstName2, setFirstName2] = useState("");
-  const [firstName1, setFirstName1] = useState(""); // Keep for backward compatibility in edit mode
-  const [firstName2, setFirstName2] = useState(""); // Keep for backward compatibility in edit mode
-
-  // NEW INTAKE FORM FIELDS (MAGSAMPLE-style)
-  const [fullName, setFullName] = useState("");
-  const [flightDate, setFlightDate] = useState("");
+  const [firstName1, setFirstName1] = useState("");
+  const [firstName2, setFirstName2] = useState("");
   const [flightTime, setFlightTime] = useState("");
   const [pilotName, setPilotName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [origin, setOrigin] = useState("");
-  const [referral, setReferral] = useState("");
-  const [purpose, setPurpose] = useState("");
-  const [language, setLanguage] = useState("english");
-  const [contactConsent, setContactConsent] = useState(false);
-  const [waiverConsent, setWaiverConsent] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"active" | "sold" | "archived">("active");
@@ -375,43 +351,21 @@ export default function ProjectsPage() {
   };
 
   const handleOpenCreateDialog = () => {
-    // OLD IMPLEMENTATION reset (kept for backward compatibility)
     setFirstName1("");
     setFirstName2("");
-    // NEW INTAKE FORM reset
-    setFullName("");
-    setFlightDate(getTodayDate());
     setFlightTime(getRoundedTime());
     setPilotName("");
     setEmail("");
-    setPhone("");
-    setOrigin("");
-    setReferral("");
-    setPurpose("");
-    setLanguage("english");
-    setContactConsent(false);
-    setWaiverConsent(false);
     setIsCreateDialogOpen(true);
   };
 
   const handleCloseDialog = () => {
     setIsCreateDialogOpen(false);
-    // OLD IMPLEMENTATION reset
     setFirstName1("");
     setFirstName2("");
-    // NEW INTAKE FORM reset
-    setFullName("");
-    setFlightDate("");
     setFlightTime("");
     setPilotName("");
     setEmail("");
-    setPhone("");
-    setOrigin("");
-    setReferral("");
-    setPurpose("");
-    setLanguage("english");
-    setContactConsent(false);
-    setWaiverConsent(false);
   };
 
   const handleCloseEditDialog = () => {
@@ -579,11 +533,10 @@ export default function ProjectsPage() {
   };
 
   const handleCreateProject = () => {
-    // NEW IMPLEMENTATION - Full name validation
-    if (!fullName.trim()) {
+    if (!firstName1.trim()) {
       toast({
         title: "Name Required",
-        description: "Please enter your full name.",
+        description: "Please enter at least the first customer name.",
         variant: "destructive",
       });
       return;
@@ -607,35 +560,15 @@ export default function ProjectsPage() {
       return;
     }
 
-    if (!waiverConsent) {
-      toast({
-        title: "Waiver Required",
-        description: "You must accept the liability waiver to proceed.",
-        variant: "destructive",
-      });
-      return;
-    }
+    const combinedName = firstName2.trim()
+      ? `${firstName1.trim()} & ${firstName2.trim()}`
+      : firstName1.trim();
 
-    // OLD IMPLEMENTATION (commented out, kept for reference)
-    // const combinedName = firstName2.trim()
-    //   ? `${firstName1.trim()} & ${firstName2.trim()}`
-    //   : firstName1.trim();
-
-    // NEW IMPLEMENTATION - Use full name and all intake form fields
     createProjectMutation.mutate({
-      pilotName: fullName.trim(),
+      pilotName: combinedName,
       pilotEmail: email.trim(),
-      flightDate,
       flightTime,
       flightPilot: pilotName,
-      // New intake form fields
-      phone: phone.trim() || undefined,
-      origin: origin.trim() || undefined,
-      referral: referral.trim() || undefined,
-      purpose: purpose || undefined,
-      language: language,
-      contactConsent: contactConsent,
-      waiverConsent: waiverConsent,
     });
   };
 
@@ -1293,17 +1226,16 @@ export default function ProjectsPage() {
         ) : null}
       </div>
 
-      {/* Create Project Dialog - MAGSAMPLE-style Customer Intake Form */}
+      {/* Create Project Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle className="text-xl">Customer Intake Form</DialogTitle>
-            <p className="text-sm text-muted-foreground">Please fill out the details below to help us customize your experience.</p>
+            <DialogTitle>Create New Project</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-6 py-4">
-            {/* OLD IMPLEMENTATION - First Names with "&" (commented out, kept for reference)
-            <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 items-end">
+            {/* First Names */}
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-end">
               <div className="space-y-2">
                 <Label htmlFor="first-name-1">First Name *</Label>
                 <Input
@@ -1315,11 +1247,11 @@ export default function ProjectsPage() {
                   className="h-12"
                 />
               </div>
-              <div className="text-2xl font-bold text-muted-foreground pb-3 hidden sm:block">
+              <div className="text-2xl font-bold text-muted-foreground pb-3">
                 &
               </div>
               <div className="space-y-2">
-                <Label htmlFor="first-name-2">Second Name (Optional)</Label>
+                <Label htmlFor="first-name-2">First Name (Optional)</Label>
                 <Input
                   id="first-name-2"
                   type="text"
@@ -1330,206 +1262,61 @@ export default function ProjectsPage() {
                 />
               </div>
             </div>
-            */}
 
-            {/* Full Name */}
+            {/* Flight Time */}
             <div className="space-y-2">
-              <Label htmlFor="full-name">Full Name *</Label>
+              <Label htmlFor="flight-time">
+                Flight Time *
+                <span className="text-xs text-muted-foreground ml-2">(auto-rounded to next hour/half-hour)</span>
+              </Label>
               <Input
-                id="full-name"
-                type="text"
-                placeholder="John Doe"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="h-12 rounded-xl bg-secondary/50 border-transparent focus:border-primary/50 transition-colors"
+                id="flight-time"
+                type="time"
+                value={flightTime}
+                onChange={(e) => setFlightTime(e.target.value)}
+                className="h-12"
               />
             </div>
 
-            {/* Flight Date & Time */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="flight-date">Flight Date *</Label>
-                <Input
-                  id="flight-date"
-                  type="date"
-                  value={flightDate}
-                  onChange={(e) => setFlightDate(e.target.value)}
-                  className="h-12 rounded-xl bg-secondary/50 border-transparent focus:border-primary/50 transition-colors"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="flight-time">Flight Time *</Label>
-                <Input
-                  id="flight-time"
-                  type="time"
-                  value={flightTime}
-                  onChange={(e) => setFlightTime(e.target.value)}
-                  className="h-12 rounded-xl bg-secondary/50 border-transparent focus:border-primary/50 transition-colors"
-                />
-              </div>
+            {/* Pilot Name */}
+            <div className="space-y-2">
+              <Label htmlFor="pilot-name">Pilot Name *</Label>
+              <Select value={pilotName} onValueChange={setPilotName}>
+                <SelectTrigger id="pilot-name" className="h-12">
+                  <SelectValue placeholder="Select pilot" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PILOTS.map((pilot) => (
+                    <SelectItem key={pilot.value} value={pilot.value}>
+                      {pilot.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Email & Phone */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="john@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="h-12 rounded-xl bg-secondary/50 border-transparent focus:border-primary/50 transition-colors"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+1 (555) 000-0000"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="h-12 rounded-xl bg-secondary/50 border-transparent focus:border-primary/50 transition-colors"
-                />
-              </div>
-            </div>
-
-            {/* Origin & Referral */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="origin">Where are you from?</Label>
-                <Input
-                  id="origin"
-                  type="text"
-                  placeholder="City, Country"
-                  value={origin}
-                  onChange={(e) => setOrigin(e.target.value)}
-                  className="h-12 rounded-xl bg-secondary/50 border-transparent focus:border-primary/50 transition-colors"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="referral">How did you find Magnum?</Label>
-                <Input
-                  id="referral"
-                  type="text"
-                  placeholder="Instagram, Friend, Google..."
-                  value={referral}
-                  onChange={(e) => setReferral(e.target.value)}
-                  className="h-12 rounded-xl bg-secondary/50 border-transparent focus:border-primary/50 transition-colors"
-                />
-              </div>
-            </div>
-
-            {/* Purpose & Pilot */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="purpose">What are you here for?</Label>
-                <Select value={purpose} onValueChange={setPurpose}>
-                  <SelectTrigger id="purpose" className="h-12 rounded-xl bg-secondary/50 border-transparent focus:border-primary/50 transition-colors">
-                    <SelectValue placeholder="Select a purpose" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="vacation">Vacation</SelectItem>
-                    <SelectItem value="birthday">Birthday</SelectItem>
-                    <SelectItem value="special_event">Special Event</SelectItem>
-                    <SelectItem value="bucket_list">Bucket List</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pilot-name">Pilot *</Label>
-                <Select value={pilotName} onValueChange={setPilotName}>
-                  <SelectTrigger id="pilot-name" className="h-12 rounded-xl bg-secondary/50 border-transparent focus:border-primary/50 transition-colors">
-                    <SelectValue placeholder="Select pilot" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PILOTS.map((pilot) => (
-                      <SelectItem key={pilot.value} value={pilot.value}>
-                        {pilot.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Primary Language */}
-            <div className="space-y-3">
-              <Label>Primary Language</Label>
-              <RadioGroup
-                value={language}
-                onValueChange={setLanguage}
-                className="grid grid-cols-3 sm:grid-cols-6 gap-2"
-              >
-                {[
-                  { id: "english", label: "English", icon: "🇺🇸" },
-                  { id: "spanish", label: "Spanish", icon: "🇪🇸" },
-                  { id: "japanese", label: "Japanese", icon: "🇯🇵" },
-                  { id: "chinese", label: "Chinese", icon: "🇨🇳" },
-                  { id: "korean", label: "Korean", icon: "🇰🇷" },
-                  { id: "french", label: "French", icon: "🇫🇷" },
-                ].map((lang) => (
-                  <div key={lang.id}>
-                    <RadioGroupItem value={lang.id} id={`lang-${lang.id}`} className="peer sr-only" />
-                    <Label
-                      htmlFor={`lang-${lang.id}`}
-                      className="flex flex-col items-center justify-center rounded-xl border-2 border-muted bg-secondary/30 p-2 sm:p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all hover:scale-[1.02]"
-                    >
-                      <span className="text-2xl sm:text-3xl mb-1">{lang.icon}</span>
-                      <span className="text-xs font-medium">{lang.label}</span>
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
-
-            {/* Contact Consent */}
-            <div className="flex flex-row items-start space-x-3 rounded-xl border p-4 bg-secondary/20">
-              <Checkbox
-                id="contact-consent"
-                checked={contactConsent}
-                onCheckedChange={(checked) => setContactConsent(checked === true)}
-                className="mt-1"
+            {/* Email */}
+            <div className="space-y-2">
+              <Label htmlFor="email">Email (Optional)</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="customer@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="h-12"
               />
-              <div className="space-y-1 leading-none">
-                <Label htmlFor="contact-consent" className="font-semibold text-sm cursor-pointer">
-                  Permission to contact
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  I agree to be contacted by Magnum regarding my flight and media package updates.
-                </p>
-              </div>
-            </div>
-
-            {/* Waiver Consent */}
-            <div className="flex flex-row items-start space-x-3 rounded-xl border p-4 bg-red-500/5 border-red-500/20">
-              <Checkbox
-                id="waiver-consent"
-                checked={waiverConsent}
-                onCheckedChange={(checked) => setWaiverConsent(checked === true)}
-                className="mt-1 data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500"
-              />
-              <div className="space-y-1 leading-none">
-                <Label htmlFor="waiver-consent" className="font-semibold text-sm text-red-700 dark:text-red-400 cursor-pointer">
-                  Liability Waiver & Risk Agreement *
-                </Label>
-                <p className="text-xs text-red-600/80 dark:text-red-400/70">
-                  I acknowledge that I have read, understood, and agree to the terms of the Flight Liability Waiver. I assume all risks associated with the activity.
-                </p>
-              </div>
             </div>
           </div>
 
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={handleCloseDialog} className="w-full sm:w-auto">
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseDialog}>
               Cancel
             </Button>
             <Button
               onClick={handleCreateProject}
-              disabled={createProjectMutation.isPending || !waiverConsent}
-              className="bg-gradient-purple-blue hover:opacity-90 w-full sm:w-auto"
+              disabled={createProjectMutation.isPending}
+              className="bg-gradient-purple-blue hover:opacity-90"
             >
               {createProjectMutation.isPending ? "Creating..." : "Create Project"}
             </Button>
