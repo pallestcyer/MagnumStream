@@ -68,7 +68,15 @@ class DatabaseStorage {
         staff_member: data.staffMember,
         flight_date: data.flightDate,
         flight_time: data.flightTime,
-        export_status: data.exportStatus || 'pending'
+        export_status: data.exportStatus || 'pending',
+        // Customer intake form fields
+        phone: data.phone || null,
+        origin: data.origin || null,
+        referral: data.referral || null,
+        purpose: data.purpose || null,
+        language: data.language || 'english',
+        contact_consent: data.contactConsent || false,
+        waiver_consent: data.waiverConsent || false
       })
       .select()
       .single();
@@ -100,6 +108,14 @@ class DatabaseStorage {
       soldBundle: result.sold_bundle,
       photosUploaded: result.photos_uploaded,
       archived: result.archived,
+      // Customer intake form fields
+      phone: result.phone,
+      origin: result.origin,
+      referral: result.referral,
+      purpose: result.purpose,
+      language: result.language,
+      contactConsent: result.contact_consent,
+      waiverConsent: result.waiver_consent,
       createdAt: new Date(result.created_at)
     };
   }
@@ -128,6 +144,14 @@ class DatabaseStorage {
     if (data.soldBundle !== undefined) updateData.sold_bundle = data.soldBundle;
     if (data.photosUploaded !== undefined) updateData.photos_uploaded = data.photosUploaded;
     if (data.archived !== undefined) updateData.archived = data.archived;
+    // Customer intake form fields
+    if (data.phone !== undefined) updateData.phone = data.phone;
+    if (data.origin !== undefined) updateData.origin = data.origin;
+    if (data.referral !== undefined) updateData.referral = data.referral;
+    if (data.purpose !== undefined) updateData.purpose = data.purpose;
+    if (data.language !== undefined) updateData.language = data.language;
+    if (data.contactConsent !== undefined) updateData.contact_consent = data.contactConsent;
+    if (data.waiverConsent !== undefined) updateData.waiver_consent = data.waiverConsent;
 
     const { data: result, error } = await (supabase as any)
       .from('flight_recordings')
@@ -159,7 +183,18 @@ class DatabaseStorage {
       thumbnailUrl: result.thumbnail_url,
       smsPhoneNumber: result.sms_phone_number,
       sold: result.sold,
+      soldBundle: result.sold_bundle,
       photosUploaded: result.photos_uploaded,
+      photoThumbnailUrl: result.photo_thumbnail_url,
+      archived: result.archived,
+      // Customer intake form fields
+      phone: result.phone,
+      origin: result.origin,
+      referral: result.referral,
+      purpose: result.purpose,
+      language: result.language,
+      contactConsent: result.contact_consent,
+      waiverConsent: result.waiver_consent,
       createdAt: new Date(result.created_at)
     };
   }
@@ -194,7 +229,18 @@ class DatabaseStorage {
       thumbnailUrl: result.thumbnail_url,
       smsPhoneNumber: result.sms_phone_number,
       sold: result.sold,
+      soldBundle: result.sold_bundle,
       photosUploaded: result.photos_uploaded,
+      photoThumbnailUrl: result.photo_thumbnail_url,
+      archived: result.archived,
+      // Customer intake form fields
+      phone: result.phone,
+      origin: result.origin,
+      referral: result.referral,
+      purpose: result.purpose,
+      language: result.language,
+      contactConsent: result.contact_consent,
+      waiverConsent: result.waiver_consent,
       createdAt: new Date(result.created_at)
     };
   }
@@ -230,6 +276,14 @@ class DatabaseStorage {
       soldBundle: record.sold_bundle,
       photosUploaded: record.photos_uploaded,
       archived: record.archived,
+      // Customer intake form fields
+      phone: record.phone,
+      origin: record.origin,
+      referral: record.referral,
+      purpose: record.purpose,
+      language: record.language,
+      contactConsent: record.contact_consent,
+      waiverConsent: record.waiver_consent,
       createdAt: new Date(record.created_at)
     })) || [];
   }
