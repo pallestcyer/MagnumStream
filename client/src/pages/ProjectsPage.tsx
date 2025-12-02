@@ -26,6 +26,12 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PILOTS, getPilotName, STAFF_MEMBERS, getStaffMemberName } from "@/lib/constants";
 
+// Email validation helper
+const isValidEmail = (email: string) => {
+  if (!email) return true; // Empty is valid (optional field)
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};
+
 // Round up to next hour or half-hour
 const getRoundedTime = () => {
   const now = new Date();
@@ -458,6 +464,7 @@ export default function ProjectsPage() {
     setSoldStaffMember("");
     setSoldBundle("");
     setIsEditingSold(false);
+    setIsLoadingSale(false);
   };
 
   const handleUpdateSale = async () => {
@@ -523,6 +530,17 @@ export default function ProjectsPage() {
       return;
     }
 
+    // Validate all email addresses
+    const invalidEmails = validEmails.filter((e) => !isValidEmail(e.trim()));
+    if (invalidEmails.length > 0) {
+      toast({
+        title: "Invalid Email",
+        description: `Please fix invalid email(s): ${invalidEmails.join(", ")}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     const bundle = BUNDLE_OPTIONS.find((b) => b.value === selectedBundle);
 
     // Create a sale with primary email (first one) and share with ALL emails
@@ -566,6 +584,15 @@ export default function ProjectsPage() {
       return;
     }
 
+    if (email.trim() && !isValidEmail(email.trim())) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address (e.g., name@example.com).",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const combinedName = firstName2.trim()
       ? `${firstName1.trim()} & ${firstName2.trim()}`
       : firstName1.trim();
@@ -603,6 +630,15 @@ export default function ProjectsPage() {
       toast({
         title: "Pilot Required",
         description: "Please select a pilot.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (email.trim() && !isValidEmail(email.trim())) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address (e.g., name@example.com).",
         variant: "destructive",
       });
       return;

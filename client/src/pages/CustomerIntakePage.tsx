@@ -19,6 +19,12 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PILOTS } from "@/lib/constants";
 import { CheckCircle2, Plane } from "lucide-react";
 
+// Email validation helper
+const isValidEmail = (email: string) => {
+  if (!email) return true; // Email is optional
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};
+
 // Round up to next hour or half-hour
 const getRoundedTime = () => {
   const now = new Date();
@@ -67,6 +73,7 @@ export default function CustomerIntakePage() {
   const [language, setLanguage] = useState("english");
   const [contactConsent, setContactConsent] = useState(false);
   const [waiverConsent, setWaiverConsent] = useState(false);
+  const [emailError, setEmailError] = useState(false);
 
   const createProjectMutation = useMutation({
     mutationFn: async (projectData: {
@@ -146,6 +153,16 @@ export default function CustomerIntakePage() {
       return;
     }
 
+    if (email.trim() && !isValidEmail(email.trim())) {
+      setEmailError(true);
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address (e.g., name@example.com).",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!waiverConsent) {
       toast({
         title: "Waiver Required",
@@ -214,6 +231,7 @@ export default function CustomerIntakePage() {
               setLanguage("english");
               setContactConsent(false);
               setWaiverConsent(false);
+              setEmailError(false);
             }}
             variant="outline"
             className="w-full"
@@ -288,9 +306,15 @@ export default function CustomerIntakePage() {
                   type="email"
                   placeholder="john@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="h-12 rounded-xl bg-secondary/50 border-transparent focus:border-primary/50 transition-colors"
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setEmailError(false);
+                  }}
+                  className={`h-12 rounded-xl bg-secondary/50 border-transparent focus:border-primary/50 transition-colors ${emailError ? "border-red-500 border-2" : ""}`}
                 />
+                {emailError && (
+                  <p className="text-red-500 text-xs mt-1">Please enter a valid email address</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone" className="text-base">Phone</Label>

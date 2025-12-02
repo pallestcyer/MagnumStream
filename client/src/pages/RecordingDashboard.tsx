@@ -81,6 +81,11 @@ export default function RecordingDashboard() {
   useEffect(() => {
     initializeCameras().catch(error => {
       console.error('❌ Failed to initialize cameras:', error);
+      toast({
+        title: "Camera Error",
+        description: "Failed to initialize cameras. Please check camera permissions and refresh.",
+        variant: "destructive",
+      });
     });
     checkExistingRecordings();
     return () => {
@@ -357,14 +362,22 @@ export default function RecordingDashboard() {
 
       // Update the existing recording's status to 'recording'
       try {
-        await fetch(`/api/recordings/${existingRecordingId}`, {
+        const response = await fetch(`/api/recordings/${existingRecordingId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ exportStatus: 'recording' })
         });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+        }
         console.log('✅ Updated recording status to recording');
       } catch (error) {
         console.error('Failed to update recording status:', error);
+        toast({
+          title: "Sync Warning",
+          description: "Could not sync recording status with server. Recording will continue locally.",
+          variant: "destructive",
+        });
       }
     } else {
       // No existing recording - create a new one (fallback for direct access)
@@ -397,10 +410,21 @@ export default function RecordingDashboard() {
           localStorage.setItem('currentRecordingId', recordingId);
           console.log('✅ Created recording in Supabase:', recordingId);
         } else {
-          console.error('Failed to create recording:', await response.text());
+          const errorText = await response.text();
+          console.error('Failed to create recording:', errorText);
+          toast({
+            title: "Recording Setup Failed",
+            description: "Could not create recording session. Please return to Projects page and try again.",
+            variant: "destructive",
+          });
         }
       } catch (error) {
         console.error('Failed to create recording session:', error);
+        toast({
+          title: "Connection Error",
+          description: "Could not connect to server. Recording may not be saved. Check your network connection.",
+          variant: "destructive",
+        });
       }
     }
   };
