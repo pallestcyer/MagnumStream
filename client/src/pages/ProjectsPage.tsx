@@ -1132,23 +1132,32 @@ export default function ProjectsPage() {
           <div className="flex justify-end items-center gap-2">
             {isSold ? (
               <>
-                {project.soldBundle && (
-                  <span className="flex items-center gap-1.5 text-muted-foreground">
-                    {project.soldBundle === 'video_photos' && (
-                      <>
+                {(() => {
+                  // Use soldBundle if available, otherwise infer from what's available
+                  const bundle = project.soldBundle || (
+                    project.exportStatus === 'completed' && project.photosUploaded ? 'video_photos' :
+                    project.exportStatus === 'completed' ? 'video_only' :
+                    project.photosUploaded ? 'photos_only' : null
+                  );
+                  if (!bundle) return null;
+                  return (
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      {bundle === 'video_photos' && (
+                        <>
+                          <Video className="w-4 h-4" />
+                          <span className="text-xs">+</span>
+                          <Image className="w-4 h-4" />
+                        </>
+                      )}
+                      {bundle === 'video_only' && (
                         <Video className="w-4 h-4" />
-                        <span className="text-xs">+</span>
+                      )}
+                      {bundle === 'photos_only' && (
                         <Image className="w-4 h-4" />
-                      </>
-                    )}
-                    {project.soldBundle === 'video_only' && (
-                      <Video className="w-4 h-4" />
-                    )}
-                    {project.soldBundle === 'photos_only' && (
-                      <Image className="w-4 h-4" />
-                    )}
-                  </span>
-                )}
+                      )}
+                    </span>
+                  );
+                })()}
                 <Button
                   variant="outline"
                   size="sm"
