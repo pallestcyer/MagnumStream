@@ -1029,31 +1029,41 @@ export default function ProjectsPage() {
 
         {/* Action Buttons */}
         <div className="mt-auto pt-4 space-y-3">
-          {/* Video Thumbnail - always show for consistent card height */}
-          <div className={`aspect-video rounded-lg overflow-hidden relative group ${project.exportStatus === 'completed' && project.thumbnailUrl ? 'bg-muted' : ''}`}>
-            {project.exportStatus === 'completed' && project.thumbnailUrl && (
-              <>
-                <img
-                  src={project.thumbnailUrl}
-                  alt={`${project.pilotName} Flight Video`}
-                  className="w-full h-full object-cover"
-                />
-                {/* Play button overlay */}
-                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Button
-                    size="lg"
-                    className="bg-white/20 hover:bg-white/30 backdrop-blur-sm border-white/30"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePlayVideo(project);
-                    }}
-                  >
-                    <Play className="w-6 h-6 text-white" />
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
+          {/* Thumbnail - show video thumbnail if available, otherwise photo thumbnail */}
+          {(() => {
+            const hasVideoThumbnail = project.exportStatus === 'completed' && project.thumbnailUrl;
+            const hasPhotoThumbnail = project.photoThumbnailUrl;
+            const thumbnailUrl = hasVideoThumbnail ? project.thumbnailUrl : hasPhotoThumbnail ? project.photoThumbnailUrl : null;
+
+            return (
+              <div className={`aspect-video rounded-lg overflow-hidden relative group ${thumbnailUrl ? 'bg-muted' : ''}`}>
+                {thumbnailUrl && (
+                  <>
+                    <img
+                      src={thumbnailUrl}
+                      alt={`${project.pilotName} ${hasVideoThumbnail ? 'Flight Video' : 'Photo'}`}
+                      className="w-full h-full object-cover"
+                    />
+                    {/* Play button overlay - only show for video thumbnails */}
+                    {hasVideoThumbnail && (
+                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Button
+                          size="lg"
+                          className="bg-white/20 hover:bg-white/30 backdrop-blur-sm border-white/30"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePlayVideo(project);
+                          }}
+                        >
+                          <Play className="w-6 h-6 text-white" />
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })()}
           <div className="grid grid-cols-2 gap-2">
             {(() => {
               const videoInfo = getVideoButtonInfo(project.exportStatus);
