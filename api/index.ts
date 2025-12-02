@@ -94,9 +94,12 @@ class DatabaseStorage {
       photosFolderId: result.photos_folder_id,
       localVideoPath: result.local_video_path,
       thumbnailUrl: result.thumbnail_url,
+      photoThumbnailUrl: result.photo_thumbnail_url,
       smsPhoneNumber: result.sms_phone_number,
       sold: result.sold,
+      soldBundle: result.sold_bundle,
       photosUploaded: result.photos_uploaded,
+      archived: result.archived,
       createdAt: new Date(result.created_at)
     };
   }
@@ -119,9 +122,12 @@ class DatabaseStorage {
     if (data.photosFolderId !== undefined) updateData.photos_folder_id = data.photosFolderId;
     if (data.localVideoPath !== undefined) updateData.local_video_path = data.localVideoPath;
     if (data.thumbnailUrl !== undefined) updateData.thumbnail_url = data.thumbnailUrl;
+    if (data.photoThumbnailUrl !== undefined) updateData.photo_thumbnail_url = data.photoThumbnailUrl;
     if (data.smsPhoneNumber !== undefined) updateData.sms_phone_number = data.smsPhoneNumber;
     if (data.sold !== undefined) updateData.sold = data.sold;
+    if (data.soldBundle !== undefined) updateData.sold_bundle = data.soldBundle;
     if (data.photosUploaded !== undefined) updateData.photos_uploaded = data.photosUploaded;
+    if (data.archived !== undefined) updateData.archived = data.archived;
 
     const { data: result, error } = await (supabase as any)
       .from('flight_recordings')
@@ -218,9 +224,12 @@ class DatabaseStorage {
       photosFolderId: record.photos_folder_id,
       localVideoPath: record.local_video_path,
       thumbnailUrl: record.thumbnail_url,
+      photoThumbnailUrl: record.photo_thumbnail_url,
       smsPhoneNumber: record.sms_phone_number,
       sold: record.sold,
+      soldBundle: record.sold_bundle,
       photosUploaded: record.photos_uploaded,
+      archived: record.archived,
       createdAt: new Date(record.created_at)
     })) || [];
   }
