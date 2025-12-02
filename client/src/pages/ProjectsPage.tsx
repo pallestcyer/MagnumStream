@@ -678,7 +678,7 @@ export default function ProjectsPage() {
           statusLabel: 'Completed',
           icon: FolderOpen,
           statusIcon: CheckCircle2,
-          className: 'bg-green-500 hover:bg-green-600 text-white border-green-500',
+          className: 'bg-green-600 hover:bg-green-700 text-white border-green-600',
           statusClassName: 'text-green-500',
         };
       case 'in_progress':
@@ -687,7 +687,7 @@ export default function ProjectsPage() {
           statusLabel: 'Editing',
           icon: Edit3,
           statusIcon: Edit3,
-          className: 'bg-purple-500 hover:bg-purple-600 text-white border-purple-500',
+          className: 'bg-purple-600 hover:bg-purple-700 text-white border-purple-600',
           statusClassName: 'text-purple-500',
         };
       case 'recorded':
@@ -696,7 +696,7 @@ export default function ProjectsPage() {
           statusLabel: 'Recorded',
           icon: Edit3,
           statusIcon: Video,
-          className: 'bg-purple-500 hover:bg-purple-600 text-white border-purple-500',
+          className: 'bg-purple-600 hover:bg-purple-700 text-white border-purple-600',
           statusClassName: 'text-purple-500',
         };
       default:
@@ -902,7 +902,7 @@ export default function ProjectsPage() {
   const renderProjectCard = (project: FlightRecording, isSold: boolean = false, isArchived: boolean = false) => (
     <Card
       key={project.id}
-      className={`p-4 bg-card/30 backdrop-blur-md border-card-border hover:bg-card/50 transition-colors cursor-pointer flex flex-col ${isSold ? 'opacity-75' : ''} ${isArchived ? 'opacity-60' : ''}`}
+      className={`p-4 bg-card/50 backdrop-blur-md border-card-border hover:bg-card/70 transition-colors cursor-pointer flex flex-col ${isSold ? 'border-b-2 border-b-green-600' : ''} ${isArchived ? 'opacity-60' : ''}`}
       onClick={() => isArchived ? handleOpenArchiveDialog(project) : (isSold ? handleOpenSoldDialog(project) : handleOpenEditDialog(project))}
     >
       <div className="flex flex-col flex-1">
@@ -1019,154 +1019,150 @@ export default function ProjectsPage() {
             );
           })()}
 
-          {/* Video Section */}
-          {(() => {
-            const videoInfo = getVideoButtonInfo(project.exportStatus);
-            const VideoIcon = videoInfo.icon;
-            const StatusIcon = videoInfo.statusIcon;
-            const isCompleted = project.exportStatus === 'completed';
-            const isRecordedOrEditing = project.exportStatus === 'recorded' || project.exportStatus === 'in_progress';
+          {/* Combined Status & Action Panels - side by side */}
+          <div className="grid grid-cols-2 gap-2">
+            {/* Video Panel */}
+            {(() => {
+              const videoInfo = getVideoButtonInfo(project.exportStatus);
+              const VideoIcon = videoInfo.icon;
+              const isCompleted = project.exportStatus === 'completed';
 
-            // Check if project is older than 48 hours / 2 days (source files may be deleted)
-            const createdAt = new Date(project.createdAt);
-            const hoursOld = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
-            const isExpired = hoursOld > 48;
+              // Check if project is older than 48 hours / 2 days (source files may be deleted)
+              const createdAt = new Date(project.createdAt);
+              const hoursOld = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
+              const isExpired = hoursOld > 48;
 
-            return (
-              <div className="space-y-1.5">
-                {/* Status indicator */}
-                <div className={`flex items-center gap-1.5 text-xs ${videoInfo.statusClassName}`}>
-                  <StatusIcon className="w-3 h-3" />
-                  <span>{videoInfo.statusLabel}</span>
-                </div>
-                {/* Button row */}
-                <div className="flex gap-1.5">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={`flex-1 min-w-0 ${videoInfo.className}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenVideo(project);
-                    }}
-                  >
-                    <VideoIcon className="w-4 h-4 shrink-0 mr-1.5" />
-                    <span className="truncate">{videoInfo.label}</span>
-                  </Button>
-                  {/* Action button for completed videos */}
-                  {isCompleted && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8 shrink-0 border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <AlertTriangle className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenuItem
-                          disabled={isExpired}
-                          className={isExpired ? 'opacity-50' : ''}
-                          onClick={() => {
-                            if (!isExpired) {
-                              handleRedoVideo(project);
-                            }
-                          }}
-                        >
-                          <Edit3 className="w-4 h-4 mr-2" />
-                          {isExpired ? 'Re-edit (expired)' : 'Re-edit Video'}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            // Re-record: go to recording page with this project selected
-                            setActivePilot({
-                              id: project.id,
-                              projectName: project.projectName || project.pilotName,
-                              pilotName: project.pilotName,
-                            });
-                            setLocation('/recording');
-                          }}
-                        >
-                          <Clapperboard className="w-4 h-4 mr-2" />
-                          Re-record Video
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Photos Section */}
-          {(() => {
-            const photosCompleted = project.photosUploaded;
-            return (
-              <div className="space-y-1.5">
-                {/* Status indicator */}
-                <div className={`flex items-center gap-1.5 text-xs ${photosCompleted ? 'text-green-500' : 'text-muted-foreground'}`}>
-                  {photosCompleted ? (
-                    <>
-                      <CheckCircle2 className="w-3 h-3" />
-                      <span>Uploaded</span>
-                    </>
-                  ) : (
-                    <>
-                      <Image className="w-3 h-3" />
-                      <span>No Photos</span>
-                    </>
-                  )}
-                </div>
-                {/* Button row */}
-                <div className="flex gap-1.5">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={`flex-1 min-w-0 ${photosCompleted ? 'bg-green-500 hover:bg-green-600 text-white border-green-500' : 'border-muted-foreground/30 hover:bg-muted/50'}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (photosCompleted && project.photosFolderId) {
-                        // Photos uploaded - open Photos folder in Drive
-                        window.open(`https://drive.google.com/drive/folders/${project.photosFolderId}`, '_blank');
-                      } else {
-                        handleOpenPhotosDialog(project);
-                      }
-                    }}
-                  >
-                    {photosCompleted ? (
-                      <>
-                        <FolderOpen className="w-4 h-4 shrink-0 mr-1.5" />
-                        <span className="truncate">Open Photos</span>
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="w-4 h-4 shrink-0 mr-1.5" />
-                        <span className="truncate">Upload Photos</span>
-                      </>
-                    )}
-                  </Button>
-                  {/* Add more photos button - only show when photos already uploaded */}
-                  {photosCompleted && (
+              return (
+                <div className="rounded-lg bg-muted/30 border p-2 space-y-2">
+                  {/* Header with label and status */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Video className="w-3.5 h-3.5" />
+                      <span className="text-xs font-medium">Video</span>
+                    </div>
+                    <span className={`text-xs font-medium ${videoInfo.statusClassName}`}>{videoInfo.statusLabel}</span>
+                  </div>
+                  {/* Action buttons */}
+                  <div className="flex gap-1">
                     <Button
                       variant="outline"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 border-blue-500/50 text-blue-500 hover:bg-blue-500/10"
-                      title="Upload more photos"
+                      size="sm"
+                      className={`flex-1 min-w-0 ${videoInfo.className}`}
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleOpenPhotosDialog(project);
+                        handleOpenVideo(project);
                       }}
                     >
-                      <ImagePlus className="w-4 h-4" />
+                      <VideoIcon className="w-4 h-4 shrink-0 mr-1" />
+                      <span className="truncate">{videoInfo.label}</span>
                     </Button>
-                  )}
+                    {isCompleted && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8 shrink-0 border-muted-foreground/30 text-muted-foreground hover:bg-muted/50"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <AlertTriangle className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenuItem
+                            disabled={isExpired}
+                            className={isExpired ? 'opacity-50' : ''}
+                            onClick={() => {
+                              if (!isExpired) {
+                                handleRedoVideo(project);
+                              }
+                            }}
+                          >
+                            <Edit3 className="w-4 h-4 mr-2" />
+                            {isExpired ? 'Re-edit (expired)' : 'Re-edit Video'}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setActivePilot({
+                                id: project.id,
+                                projectName: project.projectName || project.pilotName,
+                                pilotName: project.pilotName,
+                              });
+                              setLocation('/recording');
+                            }}
+                          >
+                            <Clapperboard className="w-4 h-4 mr-2" />
+                            Re-record Video
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })()}
+              );
+            })()}
+            {/* Photos Panel */}
+            {(() => {
+              const photosCompleted = project.photosUploaded;
+              const statusLabel = photosCompleted ? 'Uploaded' : 'No Photos';
+              const statusColor = photosCompleted ? 'text-green-500' : 'text-muted-foreground';
+
+              return (
+                <div className="rounded-lg bg-muted/30 border p-2 space-y-2">
+                  {/* Header with label and status */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Image className="w-3.5 h-3.5" />
+                      <span className="text-xs font-medium">Photos</span>
+                    </div>
+                    <span className={`text-xs font-medium ${statusColor}`}>{statusLabel}</span>
+                  </div>
+                  {/* Action buttons */}
+                  <div className="flex gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={`flex-1 min-w-0 ${photosCompleted ? 'bg-green-600 hover:bg-green-700 text-white border-green-600' : 'border-muted-foreground/30 hover:bg-muted/50'}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (photosCompleted && project.photosFolderId) {
+                          window.open(`https://drive.google.com/drive/folders/${project.photosFolderId}`, '_blank');
+                        } else {
+                          handleOpenPhotosDialog(project);
+                        }
+                      }}
+                    >
+                      {photosCompleted ? (
+                        <>
+                          <FolderOpen className="w-4 h-4 shrink-0 mr-1" />
+                          <span className="truncate">Open</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4 shrink-0 mr-1" />
+                          <span className="truncate">Upload</span>
+                        </>
+                      )}
+                    </Button>
+                    {photosCompleted && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 shrink-0 border-muted-foreground/30 text-muted-foreground hover:bg-muted/50"
+                        title="Upload more photos"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenPhotosDialog(project);
+                        }}
+                      >
+                        <ImagePlus className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
           <div className="flex justify-end items-center gap-2">
             {isSold ? (
               <>
@@ -1210,21 +1206,18 @@ export default function ProjectsPage() {
                 </Button>
               </>
             ) : (() => {
-              // Allow sale if video is complete OR photos have been uploaded
+              // Show orange styling if video or photos are complete
               const hasVideo = project.exportStatus === 'completed';
               const hasPhotos = project.photosUploaded === true;
-              const canCreateSale = hasVideo || hasPhotos;
+              const isReady = hasVideo || hasPhotos;
               return (
                 <Button
                   size="sm"
                   variant="outline"
-                  className={`min-w-0 ${canCreateSale ? "border-orange-500 text-orange-500 hover:bg-orange-500/10" : ""}`}
-                  disabled={!canCreateSale}
+                  className={`min-w-0 ${isReady ? "border-orange-500 text-orange-500 hover:bg-orange-500/10" : ""}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (canCreateSale) {
-                      handleOpenSaleDialog(project);
-                    }
+                    handleOpenSaleDialog(project);
                   }}
                 >
                   <DollarSign className="w-4 h-4 shrink-0 mr-1" />
