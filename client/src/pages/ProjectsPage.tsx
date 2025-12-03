@@ -53,7 +53,70 @@ const getRoundedTime = () => {
   return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 };
 
-import { Plus, Clock, Plane, Mail, Video, Image, DollarSign, X, CheckCircle2, Edit3, PlayCircle, Upload, Trash2, ExternalLink, FileVideo, Play, Search, RotateCcw, Star, Archive, ArchiveRestore, AlertTriangle, Clapperboard, FolderOpen, ImagePlus, ChevronDown } from "lucide-react";
+import { Plus, Clock, Plane, Mail, Video, Image, DollarSign, X, CheckCircle2, Edit3, PlayCircle, Upload, Trash2, ExternalLink, FileVideo, Play, Search, RotateCcw, Star, Archive, ArchiveRestore, AlertTriangle, Clapperboard, FolderOpen, ImagePlus, ChevronDown, Calendar } from "lucide-react";
+
+// Hawaii timezone for consistent date formatting
+const HAWAII_TIMEZONE = 'Pacific/Honolulu';
+
+// Format date for display in Hawaii timezone
+const formatProjectDate = (dateString: string | Date): string => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    timeZone: HAWAII_TIMEZONE,
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric'
+  });
+};
+
+// Get date key for grouping (YYYY-MM-DD in Hawaii time)
+const getDateKey = (dateString: string | Date): string => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-CA', { timeZone: HAWAII_TIMEZONE }); // en-CA gives YYYY-MM-DD format
+};
+
+// Format section header date
+const formatSectionDate = (dateKey: string): string => {
+  const date = new Date(dateKey + 'T12:00:00'); // Add noon to avoid timezone issues
+  const today = new Date();
+  const todayKey = getDateKey(today);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayKey = getDateKey(yesterday);
+
+  if (dateKey === todayKey) {
+    return 'Today';
+  } else if (dateKey === yesterdayKey) {
+    return 'Yesterday';
+  } else {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
+    });
+  }
+};
+
+// Group projects by date and sort (newest first)
+const groupProjectsByDate = <T extends { createdAt: string | Date }>(projects: T[]): Map<string, T[]> => {
+  const grouped = new Map<string, T[]>();
+
+  // Sort projects by date descending (newest first)
+  const sorted = [...projects].sort((a, b) =>
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
+  for (const project of sorted) {
+    const dateKey = getDateKey(project.createdAt);
+    if (!grouped.has(dateKey)) {
+      grouped.set(dateKey, []);
+    }
+    grouped.get(dateKey)!.push(project);
+  }
+
+  return grouped;
+};
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -262,9 +325,9 @@ export default function ProjectsPage() {
       return await apiRequest("POST", "/api/sales", saleData);
     },
     onSuccess: async (_, variables) => {
-      // Try to share the Drive folder with ALL customer emails based on bundle type (via local Mac server)
+      // Try to share the Drive folder with ALL customer emails based on bundle type
       try {
-        await fetch("http://localhost:3001/api/drive/share-folder", {
+        await fetch("/api/drive/share-folder", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -496,10 +559,10 @@ export default function ProjectsPage() {
       saleAmount: bundle?.price || saleData.saleAmount,
     });
 
-    // Share Drive folder with all emails (via local Mac server)
+    // Share Drive folder with all emails
     if (validEmails.length > 0) {
       try {
-        await fetch("http://localhost:3001/api/drive/share-folder", {
+        await fetch("/api/drive/share-folder", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -991,6 +1054,11 @@ export default function ProjectsPage() {
   const soldProjects = filterProjects(allSoldProjects);
   const archivedProjects = filterProjects(allArchivedProjects);
 
+  // Group projects by date for display
+  const groupedUnsoldProjects = groupProjectsByDate(unsoldProjects);
+  const groupedSoldProjects = groupProjectsByDate(soldProjects);
+  const groupedArchivedProjects = groupProjectsByDate(archivedProjects);
+
   const renderProjectCard = (project: FlightRecording, isSold: boolean = false, isArchived: boolean = false) => (
     <Card
       key={project.id}
@@ -1066,6 +1134,12 @@ export default function ProjectsPage() {
             <div className="flex items-center gap-2 text-muted-foreground">
               <Mail className="w-3 h-3" />
               <span className="truncate">{project.pilotEmail}</span>
+            </div>
+          )}
+          {project.createdAt && (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Calendar className="w-3 h-3" />
+              <span>{formatProjectDate(project.createdAt)}</span>
             </div>
           )}
         </div>
@@ -1248,9 +1322,9 @@ export default function ProjectsPage() {
               );
             })()}
           </div>
-          <div className="flex justify-end items-center gap-2">
+          <div className="w-full">
             {isSold ? (
-              <>
+              <div className="flex justify-end items-center gap-2">
                 {(() => {
                   // Use soldBundle if available, otherwise infer from what's available
                   const bundle = project.soldBundle || (
@@ -1289,7 +1363,7 @@ export default function ProjectsPage() {
                   <CheckCircle2 className="w-4 h-4 shrink-0 mr-1" />
                   <span className="truncate">Sold</span>
                 </Button>
-              </>
+              </div>
             ) : (() => {
               // Show orange styling if video or photos are complete
               const hasVideo = project.exportStatus === 'completed';
@@ -1299,7 +1373,7 @@ export default function ProjectsPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className={`min-w-0 ${isReady ? "bg-orange-500 hover:bg-orange-600 text-white border-orange-500" : "border-orange-500"}`}
+                  className={`w-full ${isReady ? "bg-orange-500 hover:bg-orange-600 text-white border-orange-500" : "border-orange-500 text-orange-500"}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleOpenSaleDialog(project);
@@ -1356,43 +1430,85 @@ export default function ProjectsPage() {
         </TabsList>
       </Tabs>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {/* Projects Section */}
+      <div className="space-y-6">
         {/* Create New Project Card - only show on Active tab */}
         {activeTab === "active" && (
-          <Card
-            className="p-6 bg-card/30 backdrop-blur-md border-card-border border-dashed cursor-pointer hover:bg-card/50 transition-colors flex flex-col items-center justify-center min-h-[200px]"
-            onClick={handleOpenCreateDialog}
-          >
-            <div className="w-16 h-16 rounded-full bg-gradient-purple-blue flex items-center justify-center mb-4">
-              <Plus className="w-8 h-8 text-white" />
-            </div>
-            <h3 className="text-lg font-semibold text-foreground">New Project</h3>
-            <p className="text-sm text-muted-foreground text-center mt-1">
-              Create a new flight recording project
-            </p>
-          </Card>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <Card
+              className="p-6 bg-card/30 backdrop-blur-md border-card-border border-dashed cursor-pointer hover:bg-card/50 transition-colors flex flex-col items-center justify-center min-h-[200px]"
+              onClick={handleOpenCreateDialog}
+            >
+              <div className="w-16 h-16 rounded-full bg-gradient-purple-blue flex items-center justify-center mb-4">
+                <Plus className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground">New Project</h3>
+              <p className="text-sm text-muted-foreground text-center mt-1">
+                Create a new flight recording project
+              </p>
+            </Card>
+          </div>
         )}
 
-        {/* Projects based on active tab */}
+        {/* Projects grouped by date */}
         {isLoading ? (
           <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border min-h-[200px] flex items-center justify-center">
             <p className="text-muted-foreground">Loading projects...</p>
           </Card>
         ) : activeTab === "active" ? (
-          unsoldProjects.map((project) => renderProjectCard(project, false, false))
-        ) : activeTab === "sold" ? (
-          soldProjects.length > 0 ? (
-            soldProjects.map((project) => renderProjectCard(project, true, false))
+          groupedUnsoldProjects.size > 0 ? (
+            Array.from(groupedUnsoldProjects.entries()).map(([dateKey, projects]) => (
+              <div key={dateKey}>
+                <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-muted-foreground" />
+                  {formatSectionDate(dateKey)}
+                  <span className="text-sm font-normal text-muted-foreground">({projects.length})</span>
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {projects.map((project) => renderProjectCard(project, false, false))}
+                </div>
+              </div>
+            ))
           ) : (
-            <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border min-h-[200px] flex items-center justify-center col-span-full">
+            <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border min-h-[200px] flex items-center justify-center">
+              <p className="text-muted-foreground">No active projects</p>
+            </Card>
+          )
+        ) : activeTab === "sold" ? (
+          groupedSoldProjects.size > 0 ? (
+            Array.from(groupedSoldProjects.entries()).map(([dateKey, projects]) => (
+              <div key={dateKey}>
+                <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-muted-foreground" />
+                  {formatSectionDate(dateKey)}
+                  <span className="text-sm font-normal text-muted-foreground">({projects.length})</span>
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {projects.map((project) => renderProjectCard(project, true, false))}
+                </div>
+              </div>
+            ))
+          ) : (
+            <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border min-h-[200px] flex items-center justify-center">
               <p className="text-muted-foreground">No sold projects yet</p>
             </Card>
           )
         ) : activeTab === "archived" ? (
-          archivedProjects.length > 0 ? (
-            archivedProjects.map((project) => renderProjectCard(project, project.sold || false, true))
+          groupedArchivedProjects.size > 0 ? (
+            Array.from(groupedArchivedProjects.entries()).map(([dateKey, projects]) => (
+              <div key={dateKey}>
+                <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-muted-foreground" />
+                  {formatSectionDate(dateKey)}
+                  <span className="text-sm font-normal text-muted-foreground">({projects.length})</span>
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {projects.map((project) => renderProjectCard(project, project.sold || false, true))}
+                </div>
+              </div>
+            ))
           ) : (
-            <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border min-h-[200px] flex items-center justify-center col-span-full">
+            <Card className="p-6 bg-card/30 backdrop-blur-md border-card-border min-h-[200px] flex items-center justify-center">
               <p className="text-muted-foreground">No archived projects</p>
             </Card>
           )
