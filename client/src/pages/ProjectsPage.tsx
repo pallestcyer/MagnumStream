@@ -104,6 +104,11 @@ export default function ProjectsPage() {
   // Sold project dialog state
   const [isSoldDialogOpen, setIsSoldDialogOpen] = useState(false);
   const [soldProject, setSoldProject] = useState<FlightRecording | null>(null);
+
+  // Re-edit/Re-record confirmation dialog state
+  const [isReEditDialogOpen, setIsReEditDialogOpen] = useState(false);
+  const [isReRecordDialogOpen, setIsReRecordDialogOpen] = useState(false);
+  const [projectToRedo, setProjectToRedo] = useState<FlightRecording | null>(null);
   const [saleData, setSaleData] = useState<{
     id: string;
     customerEmail: string;
@@ -818,6 +823,57 @@ export default function ProjectsPage() {
     setLocation('/editor/cruising');
   };
 
+  // Re-edit confirmation dialog handlers
+  const handleOpenReEditDialog = (project: FlightRecording) => {
+    setProjectToRedo(project);
+    setIsReEditDialogOpen(true);
+  };
+
+  const handleCloseReEditDialog = () => {
+    setIsReEditDialogOpen(false);
+    setProjectToRedo(null);
+  };
+
+  const handleConfirmReEdit = () => {
+    if (projectToRedo) {
+      handleRedoVideo(projectToRedo);
+      handleCloseReEditDialog();
+    }
+  };
+
+  // Re-record confirmation dialog handlers
+  const handleOpenReRecordDialog = (project: FlightRecording) => {
+    setProjectToRedo(project);
+    setIsReRecordDialogOpen(true);
+  };
+
+  const handleCloseReRecordDialog = () => {
+    setIsReRecordDialogOpen(false);
+    setProjectToRedo(null);
+  };
+
+  const handleConfirmReRecord = () => {
+    if (projectToRedo) {
+      // Set up the session for re-recording
+      videoStorage.setCurrentSession(projectToRedo.pilotName, true); // true = new recording
+
+      // Store in localStorage
+      localStorage.setItem('pilotEmail', projectToRedo.pilotEmail || '');
+      localStorage.setItem('staffMember', projectToRedo.staffMember || '');
+      localStorage.setItem('currentRecordingId', projectToRedo.id);
+
+      // Update PilotContext
+      setPilotInfo({
+        name: projectToRedo.pilotName,
+        email: projectToRedo.pilotEmail || '',
+        staffMember: projectToRedo.staffMember || '',
+      });
+
+      handleCloseReRecordDialog();
+      setLocation('/recording');
+    }
+  };
+
   const handleOpenPhotosDialog = (project: FlightRecording) => {
     setPhotosProject(project);
     setUploadedPhotos([]);
@@ -1110,7 +1166,7 @@ export default function ProjectsPage() {
                             className={isExpired ? 'opacity-50' : ''}
                             onClick={() => {
                               if (!isExpired) {
-                                handleRedoVideo(project);
+                                handleOpenReEditDialog(project);
                               }
                             }}
                           >
@@ -1118,14 +1174,7 @@ export default function ProjectsPage() {
                             {isExpired ? 'Re-edit (expired)' : 'Re-edit Video'}
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => {
-                              setActivePilot({
-                                id: project.id,
-                                projectName: project.projectName || project.pilotName,
-                                pilotName: project.pilotName,
-                              });
-                              setLocation('/recording');
-                            }}
+                            onClick={() => handleOpenReRecordDialog(project)}
                           >
                             <Clapperboard className="w-4 h-4 mr-2" />
                             Re-record Video
@@ -2100,6 +2149,99 @@ export default function ProjectsPage() {
                 : projectToArchive?.archived
                 ? "Restore Project"
                 : "Archive Project"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Re-edit Confirmation Dialog */}
+      <Dialog open={isReEditDialogOpen} onOpenChange={setIsReEditDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit3 className="w-5 h-5 text-purple-500" />
+              Re-edit Video
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="py-4">
+            {projectToRedo && (
+              <>
+                <p className="text-foreground mb-4">
+                  Are you sure you want to re-edit this video?
+                </p>
+                <div className="bg-muted/50 rounded-lg p-3 mb-4">
+                  <p className="font-semibold text-foreground">{projectToRedo.pilotName}</p>
+                  {projectToRedo.flightTime && (
+                    <p className="text-sm text-muted-foreground">
+                      Flight Time: {projectToRedo.flightTime}
+                    </p>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  This will open the editor to modify slot positions. You'll need to re-render to create a new version of the video.
+                </p>
+              </>
+            )}
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={handleCloseReEditDialog} className="w-full sm:w-auto">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmReEdit}
+              className="bg-purple-600 hover:bg-purple-700 w-full sm:w-auto"
+            >
+              Re-edit Video
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Re-record Confirmation Dialog */}
+      <Dialog open={isReRecordDialogOpen} onOpenChange={setIsReRecordDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clapperboard className="w-5 h-5 text-orange-500" />
+              Re-record Video
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="py-4">
+            {projectToRedo && (
+              <>
+                <p className="text-foreground mb-4">
+                  Are you sure you want to re-record this video?
+                </p>
+                <div className="bg-muted/50 rounded-lg p-3 mb-4">
+                  <p className="font-semibold text-foreground">{projectToRedo.pilotName}</p>
+                  {projectToRedo.flightTime && (
+                    <p className="text-sm text-muted-foreground">
+                      Flight Time: {projectToRedo.flightTime}
+                    </p>
+                  )}
+                </div>
+                <p className="text-sm text-orange-500 font-medium mb-2">
+                  Warning: This will start a new recording session.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  The existing video will remain in Google Drive, but new recordings will replace local source files.
+                </p>
+              </>
+            )}
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={handleCloseReRecordDialog} className="w-full sm:w-auto">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmReRecord}
+              className="bg-orange-600 hover:bg-orange-700 w-full sm:w-auto"
+            >
+              Re-record Video
             </Button>
           </DialogFooter>
         </DialogContent>
