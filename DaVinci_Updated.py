@@ -12,6 +12,17 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 import logging
+try:
+    from zoneinfo import ZoneInfo  # Python 3.9+
+except ImportError:
+    from backports.zoneinfo import ZoneInfo  # Fallback for older Python
+
+# Hawaii timezone - ensures folders are always created with Hawaii dates
+HAWAII_TZ = ZoneInfo('Pacific/Honolulu')
+
+def get_hawaii_datetime():
+    """Get current datetime in Hawaii timezone"""
+    return datetime.now(HAWAII_TZ)
 
 # DaVinci Resolve Script API
 try:
@@ -178,7 +189,7 @@ class MagnumStreamDaVinciAutomation:
         try:
             # Create a new bin for this project's clips
             root_folder = self.media_pool.GetRootFolder()
-            clip_bin = self.media_pool.AddSubFolder(root_folder, f"MagnumStream_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+            clip_bin = self.media_pool.AddSubFolder(root_folder, f"MagnumStream_{get_hawaii_datetime().strftime('%Y%m%d_%H%M%S')}")
             self.media_pool.SetCurrentFolder(clip_bin)
             
             # Import all clips to media pool
@@ -258,7 +269,7 @@ class MagnumStreamDaVinciAutomation:
             self.project_manager.SaveProject()
             
             # Rename the project
-            sanitized_name = f"MagnumStream_{project_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            sanitized_name = f"MagnumStream_{project_name}_{get_hawaii_datetime().strftime('%Y%m%d_%H%M%S')}"
             self.current_project.SetName(sanitized_name)
             self.project_manager.SaveProject()
             

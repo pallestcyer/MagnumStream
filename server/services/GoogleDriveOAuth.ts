@@ -5,6 +5,20 @@ import * as path from 'path';
 
 const TOKEN_PATH = path.join(process.cwd(), 'google-drive-tokens.json');
 
+// Hawaii timezone constant
+const HAWAII_TIMEZONE = 'Pacific/Honolulu';
+
+/**
+ * Get current date/time in Hawaii timezone
+ * This ensures folder dates are always in Hawaii time, regardless of server location
+ */
+function getHawaiiDate(): Date {
+  const now = new Date();
+  // Convert to Hawaii time string, then parse back to get correct date components
+  const hawaiiString = now.toLocaleString('en-US', { timeZone: HAWAII_TIMEZONE });
+  return new Date(hawaiiString);
+}
+
 export class GoogleDriveOAuth {
   private oauth2Client: OAuth2Client;
   private isAuthenticated: boolean = false;
@@ -384,7 +398,8 @@ export class GoogleDriveOAuth {
 
     try {
       const drive = google.drive({ version: 'v3', auth: this.oauth2Client });
-      const date = flightDate || new Date();
+      // Always use Hawaii timezone for folder dates
+      const date = flightDate || getHawaiiDate();
 
       // Format date components
       const year = date.getFullYear().toString();
