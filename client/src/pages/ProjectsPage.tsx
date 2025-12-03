@@ -79,23 +79,13 @@ const getDateKey = (dateString: string | Date): string => {
 const formatSectionDate = (dateKey: string): string => {
   const date = new Date(dateKey + 'T12:00:00'); // Add noon to avoid timezone issues
   const today = new Date();
-  const todayKey = getDateKey(today);
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayKey = getDateKey(yesterday);
 
-  if (dateKey === todayKey) {
-    return 'Today';
-  } else if (dateKey === yesterdayKey) {
-    return 'Yesterday';
-  } else {
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
-    });
-  }
+  return date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
+  });
 };
 
 // Group projects by date and sort (newest first)
@@ -1062,7 +1052,7 @@ export default function ProjectsPage() {
   const renderProjectCard = (project: FlightRecording, isSold: boolean = false, isArchived: boolean = false) => (
     <Card
       key={project.id}
-      className={`p-4 bg-card/50 backdrop-blur-md border-card-border hover:bg-card/70 transition-colors cursor-pointer flex flex-col ${isSold ? 'border-b-2 border-b-green-600' : ''} ${isArchived ? 'opacity-60' : ''}`}
+      className={`p-4 bg-card/80 backdrop-blur-md border-card-border hover:bg-card transition-colors cursor-pointer flex flex-col ${isSold ? 'border-b-2 border-b-green-600' : ''} ${isArchived ? 'opacity-60' : ''}`}
       onClick={() => isArchived ? handleOpenArchiveDialog(project) : (isSold ? handleOpenSoldDialog(project) : handleOpenEditDialog(project))}
     >
       <div className="flex flex-col flex-1">
@@ -1118,28 +1108,37 @@ export default function ProjectsPage() {
         </div>
 
         <div className="space-y-1 text-sm">
-          {project.flightTime && (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Clock className="w-3 h-3" />
-              <span>{getFlightTimeLabel(project.flightTime)}</span>
-            </div>
-          )}
-          {project.flightPilot && (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Plane className="w-3 h-3" />
-              <span>{getPilotName(project.flightPilot)}</span>
-            </div>
-          )}
+          {/* Time, Pilot, Date inline with dividers */}
+          <div className="flex items-center gap-2 text-muted-foreground flex-wrap">
+            {project.flightTime && (
+              <div className="flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                <span>{getFlightTimeLabel(project.flightTime)}</span>
+              </div>
+            )}
+            {project.flightTime && project.flightPilot && (
+              <div className="h-3 w-px bg-muted-foreground/30" />
+            )}
+            {project.flightPilot && (
+              <div className="flex items-center gap-1">
+                <Plane className="w-3 h-3" />
+                <span>{getPilotName(project.flightPilot)}</span>
+              </div>
+            )}
+            {(project.flightTime || project.flightPilot) && project.createdAt && (
+              <div className="h-3 w-px bg-muted-foreground/30" />
+            )}
+            {project.createdAt && (
+              <div className="flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                <span>{formatProjectDate(project.createdAt)}</span>
+              </div>
+            )}
+          </div>
           {project.pilotEmail && (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Mail className="w-3 h-3" />
               <span className="truncate">{project.pilotEmail}</span>
-            </div>
-          )}
-          {project.createdAt && (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Calendar className="w-3 h-3" />
-              <span>{formatProjectDate(project.createdAt)}</span>
             </div>
           )}
         </div>
