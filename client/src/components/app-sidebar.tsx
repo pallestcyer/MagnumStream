@@ -49,9 +49,11 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-gradient-purple-blue flex items-center justify-center">
-            <Plane className="w-6 h-6 text-white" />
-          </div>
+          <img
+            src="/logo.png"
+            alt="Magnum Helicopters"
+            className="w-10 h-10 rounded-lg object-cover"
+          />
           <div>
             <h2 className="font-bold text-sidebar-foreground">Magnum Dashboard</h2>
             <p className="text-xs text-sidebar-foreground/60">Video Platform</p>

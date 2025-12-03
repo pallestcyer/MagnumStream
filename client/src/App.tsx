@@ -187,11 +187,6 @@ function HeaderContent({ onAdminClick }: { onAdminClick: () => void }) {
   return (
     <header className="flex items-center gap-2 p-2 border-b border-border bg-card/30 backdrop-blur-md">
       <SidebarTrigger data-testid="button-sidebar-toggle" />
-      <img
-        src="/logo.png"
-        alt="Magnum Helicopters"
-        className="h-8 w-auto"
-      />
       <Button
         variant="outline"
         size="sm"
