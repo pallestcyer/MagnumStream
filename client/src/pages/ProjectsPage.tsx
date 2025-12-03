@@ -1299,7 +1299,7 @@ export default function ProjectsPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className={`min-w-0 ${isReady ? "border-orange-500 text-orange-500 hover:bg-orange-500/10" : ""}`}
+                  className={`min-w-0 ${isReady ? "bg-orange-500 hover:bg-orange-600 text-white border-orange-500" : "border-orange-500"}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleOpenSaleDialog(project);
