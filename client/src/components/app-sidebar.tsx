@@ -52,10 +52,10 @@ export function AppSidebar() {
           <img
             src="/logo.png"
             alt="Magnum Helicopters"
-            className="w-10 h-10 rounded-lg object-cover"
+            className="w-12 h-12 rounded-lg object-cover"
           />
           <div>
-            <h2 className="font-bold text-sidebar-foreground">Magnum Dashboard</h2>
+            <h2 className="font-bold text-sidebar-foreground">Magnum Hub</h2>
             <p className="text-xs text-sidebar-foreground/60">Video Platform</p>
           </div>
         </div>
@@ -90,7 +90,7 @@ export function AppSidebar() {
       <SidebarFooter className="p-4 border-t border-sidebar-border">
         <div className="text-xs text-sidebar-foreground/60">
           <p>Version 1.0.0</p>
-          <p className="mt-1">© 2025 Magnum Dashboard</p>
+          <p className="mt-1">© 2025 Magnum Hub</p>
         </div>
       </SidebarFooter>
     </Sidebar>
