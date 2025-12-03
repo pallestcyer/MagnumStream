@@ -16,6 +16,10 @@
       "dest": "/templates/$1"
     },
     {
+      "src": "/(.*\\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot|css|js|json|xml|txt|pdf|mp4|webm|mp3|wav)$)",
+      "dest": "/$1"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
