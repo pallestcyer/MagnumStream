@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertSaleSchema, insertFlightRecordingSchema, SLOT_TEMPLATE } from "./schema";
+import { insertSaleSchema, insertFlightRecordingSchema, SLOT_TEMPLATE, BUNDLE_OPTIONS } from "./schema";
 import { ClipGenerator } from "./services/ClipGenerator";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 
@@ -857,19 +857,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
           packagePurchased: recordingsWithSales.has(r.id) ? "purchased" : null,
         }));
 
-      // Non-purchasers list
+      // Non-purchasers list - determine upsell opportunity based on available media
       const nonPurchasers = filteredRecordings
         .filter(r => !recordingsWithSales.has(r.id))
-        .map(r => ({
-          id: r.id,
-          flightDate: r.flightDate || null,
-          flightTime: r.flightTime || null,
-          customerNames: [r.pilotName],
-          email: r.pilotEmail || "",
-          packagePurchased: null,
-          upsellOpportunity: "Full Combo",
-          potentialValue: 49.99,
-        }));
+        .map(r => {
+          const hasVideo = r.exportStatus === "completed" || !!r.driveFileUrl;
+          const hasPhotos = r.photosUploaded;
+
+          // Determine upsell opportunity and value based on what's available
+          let upsellOpportunity = "No Media Available";
+          let potentialValue = 0;
+
+          if (hasVideo && hasPhotos) {
+            // Both available - offer full combo
+            const combo = BUNDLE_OPTIONS.find(b => b.value === 'video_photos');
+            upsellOpportunity = combo?.label || "Video + Photos";
+            potentialValue = combo?.price || 0;
+          } else if (hasVideo && !hasPhotos) {
+            // Only video available
+            const videoOnly = BUNDLE_OPTIONS.find(b => b.value === 'video_only');
+            upsellOpportunity = videoOnly?.label || "Video Only";
+            potentialValue = videoOnly?.price || 0;
+          } else if (!hasVideo && hasPhotos) {
+            // Only photos available
+            const photosOnly = BUNDLE_OPTIONS.find(b => b.value === 'photos_only');
+            upsellOpportunity = photosOnly?.label || "Photos Only";
+            potentialValue = photosOnly?.price || 0;
+          }
+
+          return {
+            id: r.id,
+            flightDate: r.flightDate || null,
+            flightTime: r.flightTime || null,
+            customerNames: [r.pilotName],
+            email: r.pilotEmail || "",
+            packagePurchased: null,
+            videoCompleted: hasVideo,
+            photosCompleted: hasPhotos,
+            upsellOpportunity,
+            potentialValue,
+          };
+        })
+        .filter(r => r.potentialValue > 0); // Only include records with available media
 
       res.json({
         // KPI Metrics

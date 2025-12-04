@@ -45,7 +45,7 @@ const verifyCode = (input: string, hash: number) => {
   return sum === hash;
 };
 const ACCESS_HASH = 508; // Validates access code
-const ADMIN_HASH = 510;  // Validates admin code
+const ADMIN_HASH = 530;  // Validates admin code
 
 function AdminPasscodeGate({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: () => void }) {
   const [code, setCode] = useState("");
