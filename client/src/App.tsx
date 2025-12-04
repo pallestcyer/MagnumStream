@@ -9,7 +9,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { PilotProvider } from "@/contexts/PilotContext";
 import { PhotoUploadProvider } from "@/contexts/PhotoUploadContext";
 import { PhotoUploadProgress } from "@/components/PhotoUploadProgress";
-import { DevModeProvider, useDevMode } from "@/contexts/DevModeContext";
+import { DevModeProvider } from "@/contexts/DevModeContext";
 import InfoPage from "@/pages/InfoPage";
 import RecordingDashboard from "@/pages/RecordingDashboard";
 import CustomerIntakePage from "@/pages/CustomerIntakePage";
@@ -28,7 +28,7 @@ import NotFound from "@/pages/not-found";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ThemeProvider } from "next-themes";
-import { Shield, Wrench } from "lucide-react";
+import { Shield } from "lucide-react";
 import AdminOverview from "@/pages/admin/Overview";
 import AdminPackages from "@/pages/admin/Packages";
 import AdminTimeAnalysis from "@/pages/admin/TimeAnalysis";
@@ -182,8 +182,6 @@ function AdminRouter() {
 }
 
 function HeaderContent({ onAdminClick }: { onAdminClick: () => void }) {
-  const { isDevMode, toggleDevMode } = useDevMode();
-
   return (
     <header className="flex items-center gap-2 p-2 border-b border-border bg-card/30 backdrop-blur-md">
       <SidebarTrigger data-testid="button-sidebar-toggle" />
@@ -197,15 +195,6 @@ function HeaderContent({ onAdminClick }: { onAdminClick: () => void }) {
         Admin
       </Button>
       <div className="flex-1" />
-      <Button
-        variant={isDevMode ? "default" : "ghost"}
-        size="sm"
-        onClick={toggleDevMode}
-        className={`flex items-center gap-2 ${isDevMode ? "bg-orange-500 hover:bg-orange-600 text-white" : "text-muted-foreground"}`}
-      >
-        <Wrench className="w-4 h-4" />
-        {isDevMode ? "Dev Mode ON" : "Dev"}
-      </Button>
     </header>
   );
 }
