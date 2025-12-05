@@ -52,7 +52,7 @@ export default function NonPurchasers() {
 
   const nonPurchasers = analytics?.nonPurchasers || [];
 
-  const potentialRevenue = nonPurchasers.reduce((acc, p) => acc + (p.potentialValue || 49.99), 0);
+  const potentialRevenue = nonPurchasers.reduce((acc, p) => acc + (p.potentialValue || 0), 0);
   const totalOpportunities = nonPurchasers.length;
   const noPurchaseCount = nonPurchasers.filter(p => !p.packagePurchased).length;
 

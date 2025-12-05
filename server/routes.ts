@@ -524,10 +524,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return recordingDate >= fromDate && recordingDate <= toDate;
       });
 
+      // Get the IDs of filtered recordings to filter sales by associated recording
+      const filteredRecordingIds = new Set(filteredRecordings.map(r => r.id));
+
+      // Filter sales based on their associated recording being in the date range
       const filteredSales = sales.filter(s => {
         if (!fromDate || !toDate) return true;
-        const saleDate = s.saleDate;
-        return saleDate >= fromDate && saleDate <= toDate;
+        return filteredRecordingIds.has(s.recordingId);
       });
 
       // Get recording IDs that have sales
@@ -562,14 +565,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const totalRevenue = filteredSales.reduce((sum, s) => sum + (s.saleAmount || 0), 0);
 
-      // Missed opportunities
-      const missingVideo = filteredRecordings.filter(r =>
-        r.exportStatus !== "completed" && !r.driveFileUrl
-      ).length;
-      const missingPhotos = filteredRecordings.filter(r => !r.photosUploaded).length;
-      const missingBoth = filteredRecordings.filter(r =>
-        (r.exportStatus !== "completed" && !r.driveFileUrl) && !r.photosUploaded
-      ).length;
+      // Missed opportunities - mutually exclusive categories
+      const hasVideo = (r: typeof filteredRecordings[0]) => r.exportStatus === "completed" || !!r.driveFileUrl;
+      const hasPhotos = (r: typeof filteredRecordings[0]) => r.photosUploaded;
+
+      // Missing Video ONLY = has photos but no video
+      const missingVideo = filteredRecordings.filter(r => !hasVideo(r) && hasPhotos(r)).length;
+      // Missing Photos ONLY = has video but no photos
+      const missingPhotos = filteredRecordings.filter(r => hasVideo(r) && !hasPhotos(r)).length;
+      // Missing Both = has neither video nor photos
+      const missingBoth = filteredRecordings.filter(r => !hasVideo(r) && !hasPhotos(r)).length;
 
       // Conversion rates
       const projectsWithSales = recordingsWithSales.size;
@@ -592,9 +597,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const incompleteConversion = incompleteMediaProjects.length > 0
         ? (incompleteMediaWithSales / incompleteMediaProjects.length) * 100 : 0;
 
-      // Daily revenue breakdown
+      // Create a map of recording ID to recording for lookups
+      const recordingMap = new Map(filteredRecordings.map(r => [r.id, r]));
+
+      // Daily revenue breakdown - attributed to flight/recording date (not sale date)
       const dailyRevenue = filteredSales.reduce((acc, sale) => {
-        const dateKey = sale.saleDate.toISOString().split('T')[0];
+        const recording = recordingMap.get(sale.recordingId);
+        if (!recording) return acc; // Skip if recording not found
+        const dateKey = recording.createdAt.toISOString().split('T')[0];
         if (!acc[dateKey]) {
           acc[dateKey] = { date: dateKey, revenue: 0, video: 0, photos: 0, combo: 0 };
         }
@@ -661,9 +671,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Combined staffData for backward compatibility (uses ground crew data)
       const staffData = groundCrewData;
 
-      // Hourly analysis (based on flight time or sale time)
+      // Hourly analysis (based on flight time) - covers 6 AM to 10 PM
       const hourlyData: Record<number, { hour: number; sales: number; total: number; revenue: number }> = {};
-      for (let h = 8; h <= 18; h++) {
+      for (let h = 6; h <= 22; h++) {
         hourlyData[h] = { hour: h, sales: 0, total: 0, revenue: 0 };
       }
 
@@ -679,8 +689,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
+      // Attribute revenue to flight time (not sale time) for consistency
       filteredSales.forEach(s => {
-        const hour = s.saleDate.getHours();
+        const recording = recordingMap.get(s.recordingId);
+        if (!recording || !recording.flightTime) return;
+        const hour = parseInt(recording.flightTime.split(':')[0], 10);
         if (hourlyData[hour]) {
           hourlyData[hour].revenue += s.saleAmount || 0;
         }
@@ -704,7 +717,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       filteredSales.forEach(s => {
-        const day = s.saleDate.getDay();
+        const recording = recordingMap.get(s.recordingId);
+        if (!recording) return; // Skip if recording not found
+        const day = recording.createdAt.getDay();
         dayData[day].revenue += s.saleAmount || 0;
       });
 
@@ -789,12 +804,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ];
           } else if (key === "video_only") {
             validOutcomes = [
-              { label: "Video Bought", value: data.outcomes.video + data.outcomes.combo, percentage: data.total > 0 ? ((data.outcomes.video + data.outcomes.combo) / data.total) * 100 : 0, color: "bg-amber-500" },
+              { label: "Video Bought", value: data.outcomes.video, percentage: data.total > 0 ? (data.outcomes.video / data.total) * 100 : 0, color: "bg-amber-500" },
               { label: "No Purchase", value: data.outcomes.no_purchase, percentage: data.total > 0 ? (data.outcomes.no_purchase / data.total) * 100 : 0, color: "bg-muted" },
             ];
           } else if (key === "photos_only") {
             validOutcomes = [
-              { label: "Photos Bought", value: data.outcomes.photos + data.outcomes.combo, percentage: data.total > 0 ? ((data.outcomes.photos + data.outcomes.combo) / data.total) * 100 : 0, color: "bg-blue-500" },
+              { label: "Photos Bought", value: data.outcomes.photos, percentage: data.total > 0 ? (data.outcomes.photos / data.total) * 100 : 0, color: "bg-blue-500" },
               { label: "No Purchase", value: data.outcomes.no_purchase, percentage: data.total > 0 ? (data.outcomes.no_purchase / data.total) * 100 : 0, color: "bg-muted" },
             ];
           }
@@ -819,11 +834,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const hasVideo = r.exportStatus === "completed" || !!r.driveFileUrl;
         const hasPhotos = r.photosUploaded;
 
+        // Skip recordings with neither available (consistent with Availability Paths)
+        if (!hasVideo && !hasPhotos) return;
+
         // Determine source (availability)
-        let source = "Neither Available";
-        if (hasVideo && hasPhotos) source = "Both Available";
-        else if (hasVideo) source = "Video Only Available";
-        else if (hasPhotos) source = "Photos Only Available";
+        let source = "Both Available";
+        if (hasVideo && !hasPhotos) source = "Video Only Available";
+        else if (!hasVideo && hasPhotos) source = "Photos Only Available";
 
         // Determine target (outcome)
         const saleBundleType = recordingSaleMap.get(r.id);
