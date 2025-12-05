@@ -1210,33 +1210,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const videoOnly = filteredSales.filter((s: any) => s.bundle === 'video_only').length;
           const photosOnly = filteredSales.filter((s: any) => s.bundle === 'photos_only').length;
 
-          // Daily revenue
+          // Create recording map for lookups
+          const recordingMap = new Map(filteredRecordings.map((r: any) => [r.id, r]));
+
+          // Daily revenue - attributed to recording/flight date (not sale date)
           const dailyRevenueMap: Record<string, number> = {};
           filteredSales.forEach((s: any) => {
-            const date = new Date(s.saleDate).toISOString().split('T')[0];
+            const recording = recordingMap.get(s.recordingId);
+            if (!recording) return;
+            const date = new Date(recording.createdAt).toISOString().split('T')[0];
             dailyRevenueMap[date] = (dailyRevenueMap[date] || 0) + (s.saleAmount || 0);
           });
           const dailyRevenue = Object.entries(dailyRevenueMap)
             .map(([date, revenue]) => ({ date, revenue }))
             .sort((a, b) => a.date.localeCompare(b.date));
 
-          // Availability paths
+          // Availability paths - excludes recordings with neither media available
           const availabilityPaths: Record<string, { sessions: number; conversions: number }> = {
             'Both Available': { sessions: 0, conversions: 0 },
             'Video Only Available': { sessions: 0, conversions: 0 },
-            'Photos Only Available': { sessions: 0, conversions: 0 },
-            'Neither Available': { sessions: 0, conversions: 0 }
+            'Photos Only Available': { sessions: 0, conversions: 0 }
           };
 
           filteredRecordings.forEach((r: any) => {
             const hasVideo = r.exportStatus === 'completed' || r.driveFileUrl;
             const hasPhotos = r.photosUploaded;
 
+            // Skip recordings with neither media available
+            if (!hasVideo && !hasPhotos) return;
+
             let path: string;
             if (hasVideo && hasPhotos) path = 'Both Available';
             else if (hasVideo) path = 'Video Only Available';
-            else if (hasPhotos) path = 'Photos Only Available';
-            else path = 'Neither Available';
+            else path = 'Photos Only Available';
 
             availabilityPaths[path].sessions++;
 
@@ -1255,11 +1261,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const hasVideo = r.exportStatus === 'completed' || r.driveFileUrl;
             const hasPhotos = r.photosUploaded;
 
+            // Skip recordings with neither media available (consistent with availability paths)
+            if (!hasVideo && !hasPhotos) return;
+
             let source: string;
             if (hasVideo && hasPhotos) source = 'Both Available';
-            else if (hasVideo) source = 'Video Only';
-            else if (hasPhotos) source = 'Photos Only';
-            else source = 'Neither';
+            else if (hasVideo) source = 'Video Only Available';
+            else source = 'Photos Only Available';
 
             const sale = filteredSales.find((s: any) => s.recordingId === r.id);
             if (sale) {
@@ -1348,8 +1356,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             conversion: hourlyStats[i]?.total > 0 ? (hourlyStats[i].sales / hourlyStats[i].total) * 100 : 0
           }));
 
-          // TimeAnalysis format (filter to business hours 8-18)
-          const timeAnalysis = hourlyData.filter(h => h.hour >= 8 && h.hour <= 18);
+          // TimeAnalysis format (filter to extended business hours 6-22)
+          const timeAnalysis = hourlyData.filter(h => h.hour >= 6 && h.hour <= 22);
 
           // Day of week analysis - use flightDate for accurate analysis
           const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -1399,9 +1407,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               };
             });
 
-          const missingVideo = incompleteProjects.filter((p: any) => !p.videoCompleted).length;
-          const missingPhotos = incompleteProjects.filter((p: any) => !p.photosCompleted).length;
-          const missingBoth = incompleteProjects.filter((p: any) => !p.videoCompleted && !p.photosCompleted).length;
+          // Mutually exclusive missing media categories
+          const missingVideo = incompleteProjects.filter((p: any) => !p.videoCompleted && p.photosCompleted).length; // Missing video ONLY
+          const missingPhotos = incompleteProjects.filter((p: any) => p.videoCompleted && !p.photosCompleted).length; // Missing photos ONLY
+          const missingBoth = incompleteProjects.filter((p: any) => !p.videoCompleted && !p.photosCompleted).length; // Missing both
 
           // Upsell opportunities - includes non-purchasers AND partial purchasers (video_only, photos_only)
           const upsellOpportunities: any[] = [];
@@ -1417,30 +1426,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             if (!sale) {
               // No purchase - opportunity to sell full combo (if media available)
+              // Prices from BUNDLE_OPTIONS: combo=$45, video=$25, photos=$35
               currentStatus = null; // No Purchase
               if (hasVideo && hasPhotos) {
                 upsellOpportunity = 'Full Combo';
-                potentialValue = 99.99;
+                potentialValue = 45;
               } else if (hasVideo) {
                 upsellOpportunity = 'Video Only';
-                potentialValue = 49.99;
+                potentialValue = 25;
               } else if (hasPhotos) {
                 upsellOpportunity = 'Photos Only';
-                potentialValue = 29.99;
+                potentialValue = 35;
               }
             } else if (sale.bundle === 'video_only') {
               // Bought video only - opportunity to add photos
               currentStatus = 'video_only';
               if (hasPhotos) {
                 upsellOpportunity = 'Add Photos';
-                potentialValue = 29.99;
+                potentialValue = 35;
               }
             } else if (sale.bundle === 'photos_only') {
               // Bought photos only - opportunity to add video
               currentStatus = 'photos_only';
               if (hasVideo) {
                 upsellOpportunity = 'Add Video';
-                potentialValue = 49.99;
+                potentialValue = 25;
               }
             }
             // combo purchasers are not upsell opportunities
